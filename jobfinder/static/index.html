@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Finder — match your CV to live jobs</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <div>
+        <h1>Job Finder</h1>
+        <p class="tagline">Upload your CV → get ranked, live job matches</p>
+      </div>
+    </div>
+    <a class="gh" href="https://www.linkedin.com/jobs/" target="_blank" rel="noopener">LinkedIn Jobs ↗</a>
+  </header>
+
+  <main class="layout">
+    <!-- ============ LEFT: CV + controls ============ -->
+    <section class="panel sidebar">
+      <h2 class="step"><span class="num">1</span> Your CV</h2>
+
+      <div id="dropzone" class="dropzone">
+        <input id="fileInput" type="file" accept=".pdf,.docx,.txt,.md" hidden />
+        <div class="dz-inner">
+          <div class="dz-icon">⬆</div>
+          <p><strong>Drop your CV here</strong> or <button id="browseBtn" class="link-btn" type="button">browse</button></p>
+          <p class="muted small">PDF, DOCX or TXT</p>
+        </div>
+      </div>
+      <button id="pasteToggle" class="link-btn small" type="button">…or paste CV text instead</button>
+      <div id="pasteArea" class="hidden">
+        <textarea id="cvText" rows="6" placeholder="Paste your CV / resume text here…"></textarea>
+        <button id="usePaste" class="btn ghost small" type="button">Use this text</button>
+      </div>
+
+      <div id="profileCard" class="profile-card hidden">
+        <div class="profile-head">
+          <span id="pTitle" class="pill strong"></span>
+          <span id="pSeniority" class="pill"></span>
+          <span id="pYears" class="pill"></span>
+        </div>
+        <p class="muted small" style="margin:.4rem 0 .2rem">Detected skills</p>
+        <div id="pSkills" class="chips"></div>
+      </div>
+
+      <h2 class="step"><span class="num">2</span> Search</h2>
+      <label class="field">
+        <span>Keywords / role</span>
+        <input id="keywords" type="text" placeholder="e.g. Senior Python Engineer" />
+      </label>
+      <label class="field">
+        <span>Location</span>
+        <input id="location" type="text" placeholder="e.g. London, Remote, United States" />
+      </label>
+
+      <div class="field">
+        <span>Sources</span>
+        <div id="sources" class="sources">
+          <label class="chk"><input type="checkbox" value="linkedin" /> <b>LinkedIn</b> <i class="muted">(live scrape)</i></label>
+          <label class="chk"><input type="checkbox" value="remotive" checked /> Remotive <i class="muted">(remote)</i></label>
+          <label class="chk"><input type="checkbox" value="arbeitnow" /> Arbeitnow <i class="muted">(EU)</i></label>
+          <label class="chk" id="jsearchChk"><input type="checkbox" value="jsearch" /> JSearch <i class="muted">(needs key)</i></label>
+        </div>
+      </div>
+
+      <div class="row">
+        <label class="field half">
+          <span>Posted within</span>
+          <select id="days">
+            <option value="">Any time</option>
+            <option value="1">24 hours</option>
+            <option value="7" selected>1 week</option>
+            <option value="14">2 weeks</option>
+            <option value="30">1 month</option>
+          </select>
+        </label>
+        <label class="field half">
+          <span>Per source</span>
+          <select id="limit">
+            <option value="10">10</option>
+            <option value="25" selected>25</option>
+            <option value="40">40</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="chk"><input id="remote" type="checkbox" /> Remote only</label>
+        <label class="chk" title="Uses sentence-transformers if installed"><input id="semantic" type="checkbox" /> Semantic match</label>
+      </div>
+
+      <label class="field">
+        <span>Min match score: <b id="minScoreVal">0</b></span>
+        <input id="minScore" type="range" min="0" max="90" step="5" value="0" />
+      </label>
+
+      <button id="searchBtn" class="btn primary" type="button" disabled>Find matching jobs</button>
+      <p id="hint" class="muted small center">Upload your CV to begin.</p>
+    </section>
+
+    <!-- ============ RIGHT: results ============ -->
+    <section class="panel results">
+      <div class="results-head">
+        <div class="tabs">
+          <button class="tab active" data-tab="matches" id="tabMatches">Matches</button>
+          <button class="tab" data-tab="outbox" id="tabOutbox">Outbox <span id="outboxCount" class="badge">0</span></button>
+        </div>
+        <div id="resultMeta" class="muted small"></div>
+      </div>
+
+      <!-- ===== Matches view ===== -->
+      <div id="view-matches">
+        <div id="selbar" class="selbar hidden">
+          <span><b id="selCount">0</b> role(s) selected for drafting</span>
+          <div class="selbar-actions">
+            <button id="clearSel" class="btn ghost small" type="button">Clear</button>
+            <button id="genDrafts" class="btn primary small" type="button">✍ Generate drafts</button>
+          </div>
+        </div>
+        <div id="warnings" class="warnings hidden"></div>
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div>
+          <p>Searching live job boards… <span class="muted small">LinkedIn scraping is polite and can take 20–60s.</span></p>
+        </div>
+        <div id="empty" class="empty">
+          <div class="empty-art">🔍</div>
+          <p>Your ranked job matches will appear here.</p>
+        </div>
+        <div id="jobs" class="jobs"></div>
+      </div>
+
+      <!-- ===== Outbox view ===== -->
+      <div id="view-outbox" class="hidden">
+        <div class="outbox-controls">
+          <div class="examples-box">
+            <div class="examples-head">
+              <span>Style examples <i class="muted small">— optional: upload past applications to match your voice</i></span>
+              <span>
+                <input id="exampleFile" type="file" accept=".pdf,.docx,.txt,.md" hidden />
+                <button id="addExample" class="link-btn small" type="button">+ add example</button>
+              </span>
+            </div>
+            <div id="examples" class="chips"></div>
+          </div>
+          <div class="gen-opts">
+            <label class="field inline"><span>Tone</span>
+              <select id="tone">
+                <option value="professional">Professional</option>
+                <option value="warm">Warm</option>
+                <option value="concise">Concise</option>
+                <option value="enthusiastic">Enthusiastic</option>
+              </select>
+            </label>
+            <label class="field inline"><span>Length</span>
+              <select id="length">
+                <option value="standard">Standard</option>
+                <option value="short">Short</option>
+              </select>
+            </label>
+            <label class="chk" id="useLlmWrap" title="Uses Claude if ANTHROPIC_API_KEY is set">
+              <input id="useLlm" type="checkbox" checked /> Use Claude <i class="muted small" id="llmHint"></i>
+            </label>
+          </div>
+        </div>
+        <p class="muted small disclaimer">Drafts are staged here for your review — nothing is sent automatically. Edit, copy or download, then apply yourself.</p>
+        <div id="draftLoading" class="loading hidden"><div class="spinner"></div><p>Writing your applications… <span class="muted small">may take a few seconds per role</span></p></div>
+        <div id="draftsEmpty" class="empty">
+          <div class="empty-art">✉️</div>
+          <p>No drafts yet. Tick roles in <b>Matches</b>, then click <b>Generate drafts</b>.</p>
+        </div>
+        <div id="drafts" class="drafts"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot muted small">
+    Personal, low-volume job search tool. LinkedIn data comes from public guest pages — be gentle with it.
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

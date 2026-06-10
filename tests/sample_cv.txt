@@ -1,0 +1,28 @@
+Jane Doe
+Senior Software Engineer
+San Francisco, CA | jane.doe@email.com | linkedin.com/in/janedoe
+
+SUMMARY
+Senior software engineer with 8 years of experience building scalable backend
+systems and data pipelines. Strong in Python, Go, and cloud infrastructure.
+
+SKILLS
+Python, Go, JavaScript, TypeScript, SQL, PostgreSQL, MongoDB, Redis
+Django, FastAPI, Flask, React, Node.js
+AWS, Docker, Kubernetes, Terraform, CI/CD, GitHub Actions
+Machine Learning, pandas, NumPy, scikit-learn, PyTorch
+REST API design, GraphQL, microservices, distributed systems
+
+EXPERIENCE
+Senior Software Engineer — Acme Corp (2019 - 2024)
+- Built and scaled microservices in Python and Go serving 10M+ daily requests
+- Designed data pipelines with Airflow, Kafka and Spark
+- Led migration to Kubernetes on AWS, cutting infra costs 30%
+- Mentored a team of 5 engineers
+
+Software Engineer — DataStart Inc (2016 - 2019)
+- Developed REST APIs with Django and FastAPI
+- Implemented machine learning models for recommendation systems
+
+EDUCATION
+B.S. Computer Science — UC Berkeley (2016)

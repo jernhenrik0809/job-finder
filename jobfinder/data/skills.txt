@@ -1,0 +1,522 @@
+# Curated skills dictionary. One skill per line. Lines starting with # are ignored.
+# Used to extract recognizable skills from a CV and from job descriptions.
+# Multi-word skills are matched as whole phrases (case-insensitive, word-boundary aware).
+
+# --- Programming languages ---
+python
+java
+javascript
+typescript
+c++
+c#
+c
+go
+golang
+rust
+ruby
+php
+swift
+kotlin
+scala
+r
+matlab
+perl
+objective-c
+dart
+elixir
+haskell
+clojure
+lua
+bash
+shell scripting
+powershell
+sql
+pl/sql
+t-sql
+vba
+groovy
+solidity
+fortran
+cobol
+assembly
+
+# --- Web / frontend ---
+html
+html5
+css
+css3
+sass
+scss
+tailwind
+tailwind css
+bootstrap
+react
+react.js
+react native
+angular
+angularjs
+vue
+vue.js
+svelte
+next.js
+nuxt.js
+redux
+jquery
+webpack
+vite
+babel
+gatsby
+ember.js
+backbone.js
+web components
+responsive design
+accessibility
+wcag
+pwa
+single page application
+material ui
+chakra ui
+
+# --- Backend / frameworks ---
+node.js
+express
+express.js
+nest.js
+django
+flask
+fastapi
+spring
+spring boot
+.net
+.net core
+asp.net
+laravel
+symfony
+ruby on rails
+rails
+phoenix
+graphql
+rest
+rest api
+restful api
+grpc
+soap
+micro services
+microservices
+serverless
+websockets
+oauth
+jwt
+api design
+
+# --- Mobile ---
+ios
+android
+flutter
+xamarin
+ionic
+swiftui
+jetpack compose
+mobile development
+
+# --- Data / databases ---
+postgresql
+postgres
+mysql
+mariadb
+sqlite
+oracle
+sql server
+microsoft sql server
+mongodb
+cassandra
+redis
+elasticsearch
+dynamodb
+couchdb
+neo4j
+firebase
+firestore
+snowflake
+bigquery
+redshift
+databricks
+clickhouse
+influxdb
+db2
+data modeling
+database design
+etl
+elt
+data warehousing
+data lake
+olap
+oltp
+
+# --- Data science / ML / AI ---
+machine learning
+deep learning
+artificial intelligence
+data science
+data analysis
+data analytics
+statistics
+statistical analysis
+nlp
+natural language processing
+computer vision
+neural networks
+reinforcement learning
+pandas
+numpy
+scipy
+scikit-learn
+sklearn
+tensorflow
+keras
+pytorch
+xgboost
+lightgbm
+hugging face
+transformers
+llm
+large language models
+generative ai
+prompt engineering
+rag
+langchain
+openai
+mlops
+feature engineering
+model deployment
+a/b testing
+time series
+forecasting
+recommendation systems
+data visualization
+matplotlib
+seaborn
+plotly
+tableau
+power bi
+looker
+qlik
+dax
+spark
+pyspark
+hadoop
+hive
+kafka
+airflow
+dbt
+jupyter
+
+# --- Cloud / DevOps / infra ---
+aws
+amazon web services
+azure
+microsoft azure
+gcp
+google cloud
+google cloud platform
+docker
+kubernetes
+k8s
+terraform
+ansible
+puppet
+chef
+jenkins
+gitlab ci
+github actions
+circleci
+travis ci
+argocd
+helm
+prometheus
+grafana
+datadog
+new relic
+splunk
+elk
+elk stack
+ci/cd
+infrastructure as code
+cloudformation
+ec2
+s3
+lambda
+eks
+ecs
+rds
+vpc
+iam
+cloudwatch
+linux
+unix
+windows server
+nginx
+apache
+load balancing
+service mesh
+istio
+vault
+openshift
+devops
+sre
+site reliability engineering
+observability
+networking
+tcp/ip
+dns
+vpn
+firewall
+
+# --- Version control / tooling ---
+git
+github
+gitlab
+bitbucket
+svn
+mercurial
+jira
+confluence
+trello
+asana
+notion
+slack
+postman
+swagger
+openapi
+
+# --- Testing / QA ---
+unit testing
+integration testing
+end-to-end testing
+test automation
+selenium
+cypress
+playwright
+jest
+mocha
+chai
+pytest
+junit
+testng
+cucumber
+bdd
+tdd
+qa
+quality assurance
+manual testing
+performance testing
+load testing
+jmeter
+postman testing
+appium
+
+# --- Security ---
+cybersecurity
+information security
+penetration testing
+ethical hacking
+owasp
+encryption
+cryptography
+siem
+soc
+incident response
+vulnerability assessment
+network security
+application security
+identity and access management
+zero trust
+compliance
+gdpr
+hipaa
+soc 2
+iso 27001
+pci dss
+
+# --- Architecture / methods ---
+software architecture
+system design
+distributed systems
+event driven architecture
+domain driven design
+design patterns
+object oriented programming
+functional programming
+clean code
+solid principles
+agile
+scrum
+kanban
+scaled agile
+waterfall
+six sigma
+itil
+
+# --- Project / product / business ---
+project management
+product management
+program management
+stakeholder management
+requirements gathering
+business analysis
+roadmapping
+backlog management
+user stories
+go-to-market
+product strategy
+project planning
+risk management
+budgeting
+resource planning
+pmp
+prince2
+change management
+vendor management
+
+# --- Design / UX ---
+ux
+ui
+ux design
+ui design
+user research
+wireframing
+prototyping
+figma
+sketch
+adobe xd
+invision
+adobe photoshop
+adobe illustrator
+indesign
+after effects
+premiere pro
+design systems
+interaction design
+usability testing
+information architecture
+
+# --- Marketing / sales / growth ---
+digital marketing
+seo
+sem
+content marketing
+social media marketing
+email marketing
+google ads
+google analytics
+ga4
+facebook ads
+marketing automation
+hubspot
+salesforce
+crm
+lead generation
+copywriting
+brand management
+public relations
+growth marketing
+conversion rate optimization
+account management
+b2b sales
+b2b
+saas
+cold calling
+negotiation
+
+# --- Finance / accounting ---
+financial analysis
+financial modeling
+accounting
+bookkeeping
+quickbooks
+sap
+erp
+excel
+microsoft excel
+advanced excel
+financial reporting
+budget management
+forecasting
+auditing
+tax
+payroll
+accounts payable
+accounts receivable
+gaap
+ifrs
+cpa
+cfa
+valuation
+investment analysis
+portfolio management
+risk analysis
+
+# --- Operations / supply chain ---
+supply chain management
+logistics
+procurement
+inventory management
+operations management
+process improvement
+lean manufacturing
+warehouse management
+demand planning
+quality control
+iso 9001
+
+# --- Healthcare / other domains ---
+clinical research
+patient care
+medical coding
+ehr
+emr
+epic
+hl7
+regulatory affairs
+pharmacovigilance
+gmp
+
+# --- Soft skills ---
+communication
+leadership
+teamwork
+problem solving
+critical thinking
+collaboration
+time management
+adaptability
+mentoring
+coaching
+presentation
+analytical skills
+attention to detail
+creativity
+decision making
+conflict resolution
+emotional intelligence
+
+# --- Languages (human) ---
+english
+spanish
+french
+german
+mandarin
+cantonese
+japanese
+korean
+portuguese
+italian
+dutch
+arabic
+russian
+hindi
+danish
+swedish
+norwegian
+finnish
+polish

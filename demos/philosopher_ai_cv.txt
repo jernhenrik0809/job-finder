@@ -1,0 +1,55 @@
+Dr. Sophia Almeida
+AI Ethics Researcher & Philosopher
+Cambridge, United Kingdom | sophia.almeida@email.com | linkedin.com/in/sophiaalmeida
+
+SUMMARY
+Philosopher specialising in the ethics of artificial intelligence, philosophy of mind,
+and machine consciousness. 9 years of experience bridging analytic philosophy and
+applied AI research. I combine rigorous conceptual analysis with hands-on technical
+work — designing AI alignment evaluations, auditing large language models for bias,
+and advising policy teams on responsible AI. Published author and experienced lecturer.
+
+AREAS OF EXPERTISE
+Philosophy of mind, ethics, moral philosophy, applied ethics, AI ethics, AI safety,
+AI alignment, responsible AI, fairness and bias, epistemology, logic, philosophy of
+science, metaethics, value alignment, governance and policy.
+
+TECHNICAL SKILLS
+Python, machine learning, deep learning, natural language processing, large language
+models, prompt engineering, generative AI, data analysis, pandas, NumPy, scikit-learn,
+PyTorch, Hugging Face, statistics, research design, A/B testing, data visualization,
+Jupyter, Git, LaTeX.
+
+RESEARCH & PROFESSIONAL SKILLS
+Academic writing, critical thinking, argumentation, conceptual analysis, qualitative
+research, literature review, public speaking, teaching, mentoring, grant writing,
+stakeholder engagement, cross-disciplinary collaboration, communication.
+
+EXPERIENCE
+Senior AI Ethics Researcher — Institute for Responsible AI (2021 - present)
+- Led evaluations of large language models for fairness, bias and value alignment
+- Built Python pipelines to red-team LLMs and measure harmful outputs at scale
+- Authored the institute's framework on machine consciousness and moral status of AI
+- Advised UK and EU policy groups on AI governance and responsible deployment
+
+Postdoctoral Research Fellow, Philosophy of AI — University of Cambridge (2018 - 2021)
+- Researched philosophy of mind, consciousness and the foundations of machine learning
+- Combined formal logic and NLP experiments to study reasoning in language models
+- Published 7 peer-reviewed papers on AI ethics and philosophy of mind
+
+Lecturer in Philosophy — King's College London (2016 - 2018)
+- Taught ethics, logic, philosophy of mind and critical thinking to undergraduates
+- Designed a new course on the ethics of artificial intelligence
+
+EDUCATION
+PhD in Philosophy (Philosophy of Mind & AI) — University of Oxford (2016)
+MA in Philosophy — London School of Economics (2012)
+BA in Philosophy — University of Edinburgh (2010)
+
+SELECTED PUBLICATIONS
+- "Moral Status and Machine Consciousness", Journal of AI Ethics (2023)
+- "Value Alignment as a Philosophical Problem", Minds and Machines (2022)
+- "Bias, Fairness and the Limits of Explainability in LLMs", AI & Society (2021)
+
+LANGUAGES
+English (native), French (fluent), German (intermediate)
