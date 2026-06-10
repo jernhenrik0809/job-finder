@@ -1,5 +1,7 @@
 # Job Finder
 
+[![tests](https://github.com/jernhenrik0809/job-finder/actions/workflows/ci.yml/badge.svg)](https://github.com/jernhenrik0809/job-finder/actions/workflows/ci.yml)
+
 Upload your CV and get **ranked, live job matches** — scored against your actual
 skills and experience. Runs entirely on your local PC with a clean web UI.
 
