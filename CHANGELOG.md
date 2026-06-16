@@ -2,6 +2,33 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.13.0] — 2026-06-16
+
+### Security / privacy
+- **LLM-egress disclosure + PII redaction.** Job Finder is local-first; its *only* egress is the
+  optional Claude path, which sends your CV text and the job description to Anthropic. The app now
+  **says so** in the UI (next to *Use Claude*) and offers a **"redact contact details" toggle**,
+  on by default, that masks **email / phone / links** in your CV (and style examples) *before* they
+  are sent — your name is kept so the letter can still sign off, and dates / amounts / metrics are
+  left intact. Applies to both the cover-letter and résumé-tailoring Claude paths.
+- `jobfinder/privacy.py` (`redact_pii`); `redact_pii` flow on the generate / regenerate / tailor
+  endpoints; `JOBFINDER_REDACT_PII` config default; `/api/draft-config` returns an `llm_egress`
+  disclosure object. Nothing leaves the machine unless you enable Claude (needs an API key).
+
+### Fixed (from review)
+- The redactor now also catches **scheme-less profile/portfolio links** (`linkedin.com/in/jane`,
+  `github.com/janedoe`, `janedoe.io/portfolio`) — previously only `http(s)://`/`www.` URLs were
+  masked, so the most identifying link on a CV could leak. It still **keeps tech terms** that look
+  like domains (`socket.io`, `ASP.NET`, `Node.js`), the **Danish 4-4 phone format** (`3122 8450`)
+  is now masked, and **space-grouped amounts** (`25 000 000 DKK`) are no longer mistaken for a
+  phone. The egress disclosure now also names uploaded **style examples**, and the UI reads the
+  redaction toggle null-safely (a stale cached page can't break draft generation).
+
+### Tests
+- 188 → 196 (redactor masks email / phone incl. 4-4 split / bare profile URLs; keeps name, dates,
+  space- and comma-grouped amounts, and domain-like tech terms; the Claude system prompt is
+  verifiably scrubbed when enabled and untouched by default).
+
 ## [1.12.0] — 2026-06-16
 
 ### Added

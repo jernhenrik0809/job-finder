@@ -42,6 +42,7 @@ class Settings:
     port: int
     allow_lan: bool              # permit *binding* beyond loopback (off by default)
     allowed_hosts: list[str]     # extra Host names accepted by the security guard
+    redact_pii_default: bool     # default for masking contact details before a Claude send
 
     @property
     def llm_key_present(self) -> bool:
@@ -99,6 +100,8 @@ def load_settings() -> Settings:
         port=int(os.environ.get("JOBFINDER_PORT", "8000")),
         allow_lan=os.environ.get("JOBFINDER_ALLOW_LAN", "").strip().lower() in ("1", "true", "yes", "on"),
         allowed_hosts=[h.strip() for h in os.environ.get("JOBFINDER_ALLOWED_HOSTS", "").split(",") if h.strip()],
+        # Privacy-first default: mask contact details before the optional Claude send.
+        redact_pii_default=os.environ.get("JOBFINDER_REDACT_PII", "true").strip().lower() not in ("0", "false", "no", "off"),
     )
 
 

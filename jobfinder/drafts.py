@@ -20,6 +20,7 @@ from dataclasses import dataclass, field, asdict
 from .config import settings
 from .cv_parser import CVProfile
 from .guardrails import PLACEHOLDER_RE as _PLACEHOLDER_RE  # single source of truth
+from .privacy import redact_pii
 
 # Model tier comes from config (JOBFINDER_MODEL): use Haiku/Sonnet to cut cost,
 # Opus for best quality. Defaults to claude-opus-4-8.
@@ -35,6 +36,7 @@ class DraftOptions:
     tone: str = "professional"     # professional | warm | concise | enthusiastic
     length: str = "standard"       # short | standard
     use_llm: bool = True           # use Claude if available; else template
+    redact_pii: bool = False       # mask contact details in CV/examples before sending to Claude
 
 
 @dataclass
@@ -228,18 +230,23 @@ def generate_llm(profile: CVProfile, job: dict, options: DraftOptions,
     matched = ", ".join((job.get("matched_skills") or [])[:12])
     missing = ", ".join((job.get("missing_skills") or [])[:8])
 
+    # Privacy: optionally mask contact details in the candidate-supplied text (CV + examples)
+    # before it leaves the machine. The job description is the employer's text, not the
+    # candidate's PII, so it is sent as-is (and Claude needs it).
+    _scrub = redact_pii if options.redact_pii else (lambda t: t)
+
     # Stable system prefix (instructions + style examples + CV) — identical across all
     # drafts in a batch, so prompt-cache it.
     system_parts = [_SYSTEM_BASE]
     if examples:
-        joined = "\n\n---\n\n".join(e.strip()[:4000] for e in examples[:3])
+        joined = "\n\n---\n\n".join(_scrub(e.strip()[:4000]) for e in examples[:3])
         system_parts.append(
             "STYLE REFERENCE — match the voice, structure and tone of these example "
             f"applications the candidate wrote, but write fresh content for THIS job:\n\n{joined}"
         )
     system_parts.append(
         "CANDIDATE CV (the only source of truth about the candidate):\n\n"
-        + (profile.raw_text or "")[:8000]
+        + _scrub((profile.raw_text or "")[:8000])
     )
     system_blocks = [{"type": "text", "text": "\n\n========\n\n".join(system_parts),
                       "cache_control": {"type": "ephemeral"}}]

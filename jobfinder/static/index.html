@@ -179,6 +179,10 @@
             <label class="chk" id="useLlmWrap" title="Uses Claude if ANTHROPIC_API_KEY is set">
               <input id="useLlm" type="checkbox" checked /> Use Claude <i class="muted small" id="llmHint"></i>
             </label>
+            <div id="egressNote" class="egress-note hidden">
+              <span class="muted small" id="egressText">With Claude on, your CV text, any style examples, and the job description are sent to Anthropic.</span>
+              <label class="chk small"><input id="redactPii" type="checkbox" /> Redact contact details (email · phone · links) before sending</label>
+            </div>
           </div>
         </div>
         <p class="muted small disclaimer">Your pipeline is private and review-first — nothing is ever sent automatically. Drag a card between columns to update its status; open a card to edit the letter, add notes, and apply yourself.</p>

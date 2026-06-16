@@ -127,6 +127,7 @@ class GenerateRequest(BaseModel):
     tone: str = "professional"
     length: str = "standard"
     use_llm: bool = True
+    redact_pii: bool = False
 
 
 class RegenerateRequest(BaseModel):
@@ -134,11 +135,13 @@ class RegenerateRequest(BaseModel):
     tone: str = "professional"
     length: str = "standard"
     use_llm: bool = True
+    redact_pii: bool = False
 
 
 class TailorRequest(BaseModel):
     cv_id: str = ""
     use_llm: bool = True
+    redact_pii: bool = False
 
 
 class ApplicationUpdate(BaseModel):
@@ -304,6 +307,13 @@ def draft_config() -> dict:
         "model": settings.model,
         "statuses": STATUSES,
         "suggested_next": SUGGESTED_NEXT,
+        # Disclose the one egress so the UI can show it: with a key, the Claude path sends
+        # the candidate's CV text + the job description to Anthropic. Offer redaction.
+        "llm_egress": {
+            "provider": "Anthropic",
+            "sends": "your CV text, any style examples you've uploaded, and the job description",
+            "redact_default": settings.redact_pii_default,
+        },
     }
 
 
@@ -370,7 +380,7 @@ def generate_applications(req: GenerateRequest) -> JSONResponse:
     if not req.jobs:
         raise HTTPException(status_code=400, detail="No roles selected.")
 
-    options = DraftOptions(tone=req.tone, length=req.length, use_llm=req.use_llm)
+    options = DraftOptions(tone=req.tone, length=req.length, use_llm=req.use_llm, redact_pii=req.redact_pii)
     examples = [e["text"] for e in store.list_examples()]
     created = []
     for job in req.jobs[:_MAX_JOBS_PER_BATCH]:
@@ -428,7 +438,7 @@ def regenerate_application(aid: str, req: RegenerateRequest) -> JSONResponse:
     if profile is None:
         raise HTTPException(status_code=400,
                             detail="The CV for this application isn't available — re-upload your CV.")
-    options = DraftOptions(tone=req.tone, length=req.length, use_llm=req.use_llm)
+    options = DraftOptions(tone=req.tone, length=req.length, use_llm=req.use_llm, redact_pii=req.redact_pii)
     examples = [e["text"] for e in store.list_examples()]
     draft = generate_draft(profile, job_snapshot(a), options, examples=examples)
     attach_letter(a, draft.subject, draft.body, draft.generator, draft.note)
@@ -447,7 +457,7 @@ def tailor_application(aid: str, req: TailorRequest) -> JSONResponse:
     if profile is None:
         raise HTTPException(status_code=400,
                             detail="The CV for this application isn't available — re-upload your CV.")
-    return JSONResponse(generate_tailoring(profile, job_snapshot(a), use_llm=req.use_llm))
+    return JSONResponse(generate_tailoring(profile, job_snapshot(a), use_llm=req.use_llm, redact_pii=req.redact_pii))
 
 
 @app.delete("/api/applications/{aid}")

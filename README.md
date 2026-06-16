@@ -84,6 +84,7 @@ database, so they **survive a restart**. By default it lives at
 | `JOBFINDER_HOST` / `JOBFINDER_PORT` | `127.0.0.1` / `8000` | Bind address/port |
 | `JOBFINDER_ALLOW_LAN` | `0` | Permit *binding* beyond loopback (see **Privacy & network safety**) |
 | `JOBFINDER_ALLOWED_HOSTS` | — | Extra `Host` names/IPs the server answers to (comma-separated) |
+| `JOBFINDER_REDACT_PII` | `true` | Mask contact details in your CV before the optional Claude send |
 
 ---
 
@@ -102,6 +103,11 @@ runs a small web server on your machine, it also guards that boundary:
   `python run.py --allow-lan --host 0.0.0.0` (or set `JOBFINDER_ALLOW_LAN=1`) **and** declare the
   address you'll connect to in `JOBFINDER_ALLOWED_HOSTS` (e.g. `JOBFINDER_ALLOWED_HOSTS=192.168.1.50`).
   You'll see a warning, because anyone on that network can then reach it with no login.
+- **One disclosed egress, minimised.** The *only* time data leaves your machine is if you turn on
+  the optional **Claude** writer (needs your own API key): it sends your CV text and the job
+  description to Anthropic. The UI says so, and a **"redact contact details"** toggle (on by default)
+  strips email / phone / links from your CV before sending — your name stays so the letter can sign
+  off. With no key set, nothing is ever sent.
 
 ---
 

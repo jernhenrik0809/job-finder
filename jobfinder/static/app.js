@@ -29,6 +29,7 @@ const el = {
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
   examples: $('#examples'), addExample: $('#addExample'), exampleFile: $('#exampleFile'),
   tone: $('#tone'), length: $('#length'), useLlm: $('#useLlm'), llmHint: $('#llmHint'), useLlmWrap: $('#useLlmWrap'),
+  egressNote: $('#egressNote'), egressText: $('#egressText'), redactPii: $('#redactPii'),
   board: $('#board'), boardEmpty: $('#boardEmpty'), draftLoading: $('#draftLoading'),
   drawer: $('#drawer'), drawerPanel: $('#drawerPanel'), drawerBackdrop: $('#drawerBackdrop'),
 };
@@ -51,6 +52,12 @@ fetch('/api/draft-config').then(r => r.json()).then(d => {
   if (Array.isArray(d.statuses) && d.statuses.length) STATUSES = d.statuses;
   if (llmAvailable) {
     el.llmHint.textContent = `(${d.model})`;
+    // Disclose the one egress and offer redaction (privacy-first default).
+    if (d.llm_egress && el.egressNote && el.redactPii) {
+      el.egressText.textContent = `With Claude on, ${d.llm_egress.sends} are sent to ${d.llm_egress.provider}.`;
+      el.redactPii.checked = d.llm_egress.redact_default !== false;
+      el.egressNote.classList.remove('hidden');
+    }
   } else {
     el.useLlm.checked = false;
     el.useLlm.disabled = true;
@@ -469,7 +476,7 @@ async function generateApplications() {
   try {
     const resp = await fetch('/api/applications/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cv_id: cvId, jobs, tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked }),
+      body: JSON.stringify({ cv_id: cvId, jobs, tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked, redact_pii: !!(el.redactPii && el.redactPii.checked) }),
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.detail || 'Generation failed');
@@ -689,7 +696,7 @@ function wireDrawer(id) {
     try {
       const resp = await fetch(`/api/applications/${id}/regenerate`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cv_id: cvId || '', tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked }),
+        body: JSON.stringify({ cv_id: cvId || '', tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked, redact_pii: !!(el.redactPii && el.redactPii.checked) }),
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.detail || 'Generation failed');
@@ -709,7 +716,7 @@ function wireDrawer(id) {
     try {
       const resp = await fetch(`/api/applications/${id}/tailor`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cv_id: cvId || '', use_llm: el.useLlm.checked }),
+        body: JSON.stringify({ cv_id: cvId || '', use_llm: el.useLlm.checked, redact_pii: !!(el.redactPii && el.redactPii.checked) }),
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.detail || 'Tailoring failed');
