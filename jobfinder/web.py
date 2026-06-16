@@ -24,6 +24,7 @@ from .config import settings
 from .cv_parser import CVProfile, build_profile, default_query, extract_text_from_bytes, looks_empty
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
+from .guardrails import check_letter
 from .insights import compute_insights
 from .saved_searches import new_saved_search, register_run, mark_seen
 from .security import LocalSecurityMiddleware, build_allowed_hosts
@@ -74,6 +75,16 @@ def _profile_summary(profile: CVProfile) -> dict:
 def _example_summary(ex: dict) -> dict:
     return {"id": ex["id"], "name": ex["name"], "chars": ex["chars"],
             "preview": (ex.get("text") or "")[:160].replace("\n", " ").strip()}
+
+
+def _app_payload(a) -> dict:
+    """An application dict enriched with freshly-computed letter guardrails, so the UI
+    can flag placeholders / unsupported skill claims (verified, not just promised). The
+    job's gap skills come from its stored snapshot — no profile lookup needed."""
+    d = a.to_dict()
+    job = d.get("job") if isinstance(d.get("job"), dict) else {}
+    d["guardrails"] = check_letter(d.get("body") or "", (job or {}).get("missing_skills"))
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -347,7 +358,7 @@ def save_application(req: SaveApplicationRequest) -> JSONResponse:
         raise HTTPException(status_code=400, detail="Missing job.")
     appn = new_application(req.job, cv_id=req.cv_id, status="saved")
     store.save_application(appn)
-    return JSONResponse(appn.to_dict())
+    return JSONResponse(_app_payload(appn))
 
 
 @app.post("/api/applications/generate")
@@ -367,13 +378,13 @@ def generate_applications(req: GenerateRequest) -> JSONResponse:
         draft = generate_draft(profile, job, options, examples=examples)
         attach_letter(appn, draft.subject, draft.body, draft.generator, draft.note)
         store.save_application(appn)
-        created.append(appn.to_dict())
+        created.append(_app_payload(appn))
     return JSONResponse({"applications": created, "used_llm": options.use_llm and llm_available()})
 
 
 @app.get("/api/applications")
 def list_applications() -> dict:
-    return {"applications": [a.to_dict() for a in store.list_applications()], "statuses": STATUSES}
+    return {"applications": [_app_payload(a) for a in store.list_applications()], "statuses": STATUSES}
 
 
 @app.get("/api/applications/{aid}")
@@ -381,7 +392,7 @@ def get_application(aid: str) -> JSONResponse:
     a = store.get_application(aid)
     if a is None:
         raise HTTPException(status_code=404, detail="Application not found.")
-    return JSONResponse(a.to_dict())
+    return JSONResponse(_app_payload(a))
 
 
 @app.patch("/api/applications/{aid}")
@@ -404,7 +415,7 @@ def update_application(aid: str, upd: ApplicationUpdate) -> JSONResponse:
         a.body = upd.body
         a.updated = time.time()
     store.save_application(a)
-    return JSONResponse(a.to_dict())
+    return JSONResponse(_app_payload(a))
 
 
 @app.post("/api/applications/{aid}/regenerate")
@@ -423,7 +434,7 @@ def regenerate_application(aid: str, req: RegenerateRequest) -> JSONResponse:
     attach_letter(a, draft.subject, draft.body, draft.generator, draft.note)
     a.cv_id = cv_id
     store.save_application(a)
-    return JSONResponse(a.to_dict())
+    return JSONResponse(_app_payload(a))
 
 
 @app.post("/api/applications/{aid}/tailor")

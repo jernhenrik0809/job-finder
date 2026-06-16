@@ -125,6 +125,12 @@ search survives across weeks — not just one session.
 > automatically. You review, copy/download, and apply yourself. (Auto-submitting to
 > LinkedIn would violate its ToS and risk your account.)
 
+**Guardrails on every letter.** The drawer checks each draft offline and flags two things, so
+"it never fabricates" is *verified*, not just promised: unresolved **placeholders** (`[Company]`,
+`[Your Name]`) that mean it isn't ready to send, and any **skill the job wants that isn't on your
+CV** but appears in the letter — so you can frame it as something you're keen to learn rather than
+a claim. (It's scoped to the role's gap skills, so ordinary prose isn't mistaken for a claim.)
+
 Everything in the pipeline persists locally (SQLite), so it's all still there when
 you reopen the app.
 

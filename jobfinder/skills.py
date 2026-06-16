@@ -72,6 +72,46 @@ def _canonical(skill: str) -> str:
     return _ALIASES.get(skill, skill)
 
 
+def canonical(skill: str) -> str:
+    """Public: normalise a skill string to its canonical form (lower, alias-resolved)."""
+    return _canonical(skill.strip().lower())
+
+
+@lru_cache(maxsize=1)
+def non_technical_skills() -> frozenset[str]:
+    """Soft skills + human languages from the dictionary (canonicalised).
+
+    These are excluded from the cover-letter "unsupported skill claim" guardrail: they
+    appear constantly in ordinary prose ("strong leadership", "clear communication") and
+    aren't credentials you fact-check against a CV, so flagging them is noise.
+    """
+    out: set[str] = set()
+    excluding = False
+    for raw in _SKILLS_FILE.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line.startswith("#"):
+            low = line.lower()
+            if line.startswith("# ---"):
+                excluding = ("soft skills" in low) or ("languages (human)" in low)
+            continue
+        if line and excluding:
+            out.add(_canonical(line.lower()))
+    return frozenset(out)
+
+
+def skill_spans(text: str) -> list[tuple[str, int, int]]:
+    """Every (canonical_skill, start, end) mention in ``text`` (all matches, not just
+    the first) — lets callers inspect the surrounding context of a mention."""
+    if not text:
+        return []
+    lowered = text.lower()
+    spans: list[tuple[str, int, int]] = []
+    for skill, pattern in _compiled_patterns():
+        for m in pattern.finditer(lowered):
+            spans.append((_canonical(skill), m.start(), m.end()))
+    return spans
+
+
 def extract_skills(text: str) -> list[str]:
     """Extract the set of known skills mentioned in ``text``.
 
@@ -93,9 +133,12 @@ def extract_skills(text: str) -> list[str]:
 
 
 def skill_overlap(cv_skills: list[str], job_skills: list[str]) -> tuple[list[str], list[str]]:
-    """Return (matched, missing) skills given a CV's skills and a job's skills."""
-    cv_set = {s.lower() for s in cv_skills}
+    """Return (matched, missing) skills given a CV's skills and a job's skills.
+
+    Both sides are canonicalised so a CV that lists "golang"/"k8s" matches a job's
+    "go"/"kubernetes" (otherwise the candidate's real skills look like gaps)."""
+    cv_set = {_canonical(s.lower()) for s in cv_skills}
     matched, missing = [], []
     for s in job_skills:
-        (matched if s.lower() in cv_set else missing).append(s)
+        (matched if _canonical(s.lower()) in cv_set else missing).append(s)
     return matched, missing

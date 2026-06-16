@@ -180,6 +180,26 @@ def test_profile_update_clamps_years_and_rejects_unknown_cv():
     assert client.patch("/api/profile/does-not-exist", json={"location": "x"}).status_code == 404
 
 
+def test_application_responses_carry_guardrails():
+    cv_id = _upload_cv()
+    aid = client.post("/api/applications/generate", json={"cv_id": cv_id, "jobs": [JOB], "use_llm": False}).json()["applications"][0]["id"]
+    # the template letter is grounded in the CV → no findings
+    got = client.get(f"/api/applications/{aid}").json()
+    assert "guardrails" in got and got["guardrails"] == []
+
+    # edit the letter to introduce a placeholder + a claim to the job's gap skill (rust)
+    bad = "Dear Hiring Team at [Company],\nI have deep Rust expertise.\nRegards,\nJane"
+    patched = client.patch(f"/api/applications/{aid}", json={"body": bad}).json()
+    guards = {g["type"]: g for g in patched["guardrails"]}
+    assert "placeholder" in guards and "unsupported_skill" in guards
+    assert "rust" in guards["unsupported_skill"]["items"]      # JOB's missing skill, named in the letter
+
+    # and the list view carries them too (so the board/drawer stay in sync)
+    listed = next(a for a in client.get("/api/applications").json()["applications"] if a["id"] == aid)
+    assert {g["type"] for g in listed["guardrails"]} == set(guards)
+    client.delete(f"/api/applications/{aid}")
+
+
 def test_profile_update_refreshes_suggested_keywords():
     # correcting the title must also drive the default search query (regression):
     # an empty keyword box should search the corrected role, not the parsed guess.

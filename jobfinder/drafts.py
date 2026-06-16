@@ -14,26 +14,16 @@ edit and send themselves — it never auto-submits anywhere.
 from __future__ import annotations
 
 import os
-import re
 import secrets
 from dataclasses import dataclass, field, asdict
 
 from .config import settings
 from .cv_parser import CVProfile
+from .guardrails import PLACEHOLDER_RE as _PLACEHOLDER_RE  # single source of truth
 
 # Model tier comes from config (JOBFINDER_MODEL): use Haiku/Sonnet to cut cost,
 # Opus for best quality. Defaults to claude-opus-4-8.
 DEFAULT_MODEL = settings.model
-
-# A draft that still contains a bracketed placeholder ("[Company]", "[Your Name]",
-# "[insert role here]") isn't ready to send — flag it so the user (and the UI) notice.
-# Matches only bracketed text that carries a placeholder cue word, so legitimate prose
-# like "[top 5%]" or "array[i]" is not flagged.
-_PLACEHOLDER_RE = re.compile(
-    r"\[[^\]\n]*\b(?:your\s+name|company|role|position|platform|employer|"
-    r"hiring\s+manager|title|team|date|address|insert|todo|tbd|here|xx+)\b[^\]\n]*\]",
-    re.I,
-)
 
 
 # ---------------------------------------------------------------------------

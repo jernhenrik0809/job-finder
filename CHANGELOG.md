@@ -2,6 +2,36 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.10.0] — 2026-06-16
+
+### Added
+- **Cover-letter guardrails (verified, not just promised).** Every letter — from either
+  generator — is now checked offline and the findings are shown as badges in the application
+  drawer:
+  - **Placeholders**: an unresolved `[Company]` / `[Your Name]` means it isn't ready to send.
+  - **Unsupported skill claims**: a skill the *job* wants that **isn't on your CV** (a gap skill)
+    but is named in the letter is flagged, so you can frame it as something you're eager to learn
+    rather than a claim. Scoping to the job's gap skills keeps this precise — ordinary prose like
+    "express my interest" is never mistaken for a claim to know Express.js.
+- `jobfinder/guardrails.py` (`check_letter`, the single home for the placeholder regex that
+  `drafts.py` now imports). The application API responses carry a computed `guardrails` list.
+
+### Fixed (from review)
+- **High-precision skill check (no false accusations).** The unsupported-skill check now (1)
+  excludes **soft skills and human languages** (prose-common, not CV credentials — "strong
+  leadership" is never flagged), (2) requires a **possession cue** around the mention, so
+  ordinary prose ("go above and beyond") and growth language ("eager to learn Kubernetes") are
+  not flagged while real claims ("expert in Go", "Rust expertise") are, (3) **canonicalises**
+  alias gap skills (`golang`→`go`) so a raw alias still matches, and (4) tolerates a malformed
+  (non-string) skills list instead of 500-ing the applications list endpoint.
+- `skills.skill_overlap` now canonicalises **both** sides, so a CV that lists `golang`/`k8s`
+  matches a job's `go`/`kubernetes` instead of reporting them as gaps (also improves matching).
+
+### Tests
+- 94 → 105 (placeholder + legitimate-bracket guard; claim-context precision incl. prose, growth
+  language, soft-skill exclusion, alias canonicalisation, non-string tolerance; API attaches
+  guardrails on generate/get/patch/list).
+
 ## [1.9.0] — 2026-06-16
 
 ### Added

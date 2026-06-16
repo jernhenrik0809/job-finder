@@ -600,6 +600,7 @@ function openDrawer(id) {
       <input class="subject" value="${esc(a.subject || '')}" placeholder="Subject" />
       <textarea class="body" placeholder="No letter yet — click “${esc(genLabel)}”.">${esc(a.body || '')}</textarea>
       ${a.gen_note ? `<p class="dw-note">⚠ ${esc(a.gen_note)}</p>` : ''}
+      ${guardrailBadges(a)}
       <div class="dw-actions">
         <button class="btn mini ok save-letter">Save</button>
         <button class="btn mini ghost regen">${esc(genLabel)}</button>
@@ -634,6 +635,18 @@ function openDrawer(id) {
   }
 }
 
+// Offline guardrail badges — placeholders + skills claimed but not on the CV.
+// Verified server-side on every letter, so "never fabricates" is checked, not just promised.
+function guardrailBadges(a) {
+  const g = a.guardrails || [];
+  if (!g.length) return '';
+  return `<div class="dw-guards">` + g.map(f => `
+    <div class="guard guard-${esc(f.severity)}">
+      <span class="guard-msg">${f.type === 'placeholder' ? '⚠' : '⚑'} ${esc(f.message)}</span>
+      ${(f.items && f.items.length) ? `<div class="guard-items">${f.items.map(i => `<code>${esc(i)}</code>`).join(' ')}</div>` : ''}
+    </div>`).join('') + `</div>`;
+}
+
 function wireDrawer(id) {
   const panel = el.drawerPanel;
   const subjectEl = panel.querySelector('.subject');
@@ -660,7 +673,10 @@ function wireDrawer(id) {
 
   panel.querySelector('.save-letter').addEventListener('click', async () => {
     const updated = await patchApp(id, { subject: subjectEl.value, body: bodyEl.value });
-    if (updated) { appsById.set(id, updated); renderBoard(); flash('.dw-actions .msg'); }
+    if (updated) {
+      appsById.set(id, updated); renderBoard();
+      if (!el.drawer.classList.contains('hidden')) openDrawer(id);   // refresh guardrail badges
+    }
   });
 
   panel.querySelector('.regen').addEventListener('click', async () => {
