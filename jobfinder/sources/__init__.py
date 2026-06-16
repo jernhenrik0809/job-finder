@@ -26,11 +26,21 @@ def get_source(name: str) -> JobSource:
     if name in ("jooble",):
         from .jooble import JoobleSource
         return JoobleSource()
+    if name in ("thehub", "hub"):
+        from .thehub import TheHubSource
+        return TheHubSource()
+    if name in ("themuse", "muse"):
+        from .themuse import TheMuseSource
+        return TheMuseSource()
+    if name in ("jobindex",):
+        from .jobindex import JobindexSource
+        return JobindexSource()
     raise ValueError(f"Unknown job source: {name!r}")
 
 
 def available_sources() -> list[str]:
-    return ["linkedin", "remotive", "arbeitnow", "adzuna", "jooble", "jsearch"]
+    return ["linkedin", "remotive", "arbeitnow", "thehub", "themuse",
+            "adzuna", "jooble", "jobindex", "jsearch"]
 
 
 __all__ = ["Job", "JobSource", "get_source", "available_sources"]

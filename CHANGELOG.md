@@ -2,6 +2,39 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.16.0] — 2026-06-16
+
+### Added
+- **Three new Denmark job sources** (after researching the Danish landscape):
+  - **The Hub** (`thehub.io`) — free, no-key JSON API of Nordic startup/scale-up jobs, filtered to
+    `countryCode=DK` (≈360 current Danish roles, Copenhagen-heavy). **On by default.**
+  - **The Muse** — free, no-key JSON API; queries the Danish cities and **filters client-side** to
+    Denmark-located roles (its location filter is a global OR). **On by default.**
+  - **Jobindex** — Denmark's **largest** job board, via its free, no-login, officially-promoted
+    **RSS** feed (parsed with the stdlib + the already-present BeautifulSoup — no new dependency;
+    handles the ISO-8859-1 feed and the "Title, Company" format). **Opt-in** (personal-use; also
+    covers Ofir, now merged into Jobindex).
+- Default sources are now `remotive, arbeitnow, thehub, themuse` — all free/no-key and
+  Denmark-relevant. The security host allow-list was extended to the three new hosts.
+
+### Researched but not added
+- **Jobnet / STAR** (the official Danish public job database) requires partner onboarding (SOAP,
+  contact STAR) and its search now sits behind MitID login — not self-serviceable. **EURES** only
+  exposes an undocumented portal backend whose terms forbid automated extraction. **Careerjet** is
+  DK-relevant (`da_DK`) but its ToS is conditional and needs a signup — a candidate for a future
+  optional, key-gated source.
+
+### Fixed (from review)
+- Hardened the new parsers against malformed upstream data (the "silent source loss" class): The
+  Muse no longer discards its whole result set if a `locations` entry is null/non-dict, and
+  `_strip_html` coerces a non-string field instead of raising. The authoritative runtime
+  egress-allow-list test now also exercises the three new sources.
+
+### Tests
+- 208 → 215 (The Hub mapping + keyword filter + non-string-description tolerance, The Muse
+  Denmark-only filter + malformed-location tolerance, Jobindex RSS parsing incl. ISO-8859-1
+  decoding + title split + location filter).
+
 ## [1.15.0] — 2026-06-16
 
 ### Added

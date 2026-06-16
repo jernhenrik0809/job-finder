@@ -15,11 +15,15 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles:
-   - **LinkedIn** — via the public, no-login guest job search (personal, low-volume use).
+2. **Searches live job boards** for matching roles (Denmark-focused):
+   - **The Hub** & **The Muse** — free, no-key JSON APIs with real Danish coverage (The Hub
+     filters to `countryCode=DK` startups/scale-ups; The Muse to Denmark-located roles). On by default.
    - **Remotive** & **Arbeitnow** — free, no-key JSON APIs (remote / EU incl. Denmark).
-   - **Adzuna** (Denmark) & **Jooble** (optional) — free-key aggregators with strong Danish coverage.
+   - **Jobindex** — Denmark's **largest** job board, via its free no-login RSS feed (opt-in;
+     personal-use). Also covers Ofir (now merged into Jobindex).
+   - **Adzuna** (dedicated Denmark endpoint) & **Jooble** — free-key aggregators with strong Danish coverage.
    - **JSearch** (optional) — aggregates Google for Jobs incl. LinkedIn/Indeed/Glassdoor (needs a free RapidAPI key).
+   - **LinkedIn** — via the public, no-login guest job search (opt-in; personal, low-volume use).
 3. **Scores every job 0–100** against your CV using a transparent hybrid of
    text similarity (TF-IDF), skill overlap, and job-title match — and shows you
    exactly **which skills you have** and **which you're missing** for each role.

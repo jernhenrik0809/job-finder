@@ -126,3 +126,110 @@ def test_adzuna_handles_decimal_string_salary():
         jobs = AdzunaSource(app_id="id", app_key="key").search("python", limit=5)
     assert len(jobs) == 1                                         # no ValueError → source survives
     assert jobs[0].salary == "500,000–700,000"
+
+
+# --- new Denmark sources: The Hub / The Muse / Jobindex --------------------
+
+from jobfinder.sources.thehub import TheHubSource
+from jobfinder.sources.themuse import TheMuseSource
+from jobfinder.sources.jobindex import JobindexSource
+
+
+def test_thehub_parses_dk_jobs_and_stops_at_last_page():
+    payload = {"docs": [{
+        "title": "Backend Engineer", "company": {"name": "Acme DK"},
+        "location": {"address": "Copenhagen, Denmark"}, "absoluteJobUrl": "https://thehub.io/jobs/abc",
+        "description": "<p>Python and Django backend</p>", "publishedAt": "2026-06-10T09:00:00.000Z",
+        "isRemote": False,
+    }], "pages": 1, "total": 1}
+    with patch("jobfinder.sources.thehub.requests.get", return_value=_FakeResp(payload)):
+        jobs = TheHubSource().search("backend", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Backend Engineer" and j.company == "Acme DK" and j.source == "The Hub"
+    assert j.location == "Copenhagen, Denmark" and j.url == "https://thehub.io/jobs/abc"
+    assert j.posted == "2026-06-10" and "Python" in j.description
+
+
+def test_thehub_keyword_filter_drops_non_matches():
+    payload = {"docs": [
+        {"title": "Marketing Manager", "company": {"name": "X"}, "location": {"address": "Copenhagen"},
+         "absoluteJobUrl": "u", "description": "brand campaigns", "publishedAt": "2026-06-01", "isRemote": False},
+    ], "pages": 1}
+    with patch("jobfinder.sources.thehub.requests.get", return_value=_FakeResp(payload)):
+        assert TheHubSource().search("python developer", limit=5) == []
+
+
+def test_themuse_keeps_only_denmark_located():
+    payload = {"results": [
+        {"name": "DK Role", "company": {"name": "Celonis"}, "locations": [{"name": "Copenhagen, Denmark"}],
+         "refs": {"landing_page": "https://themuse/1"}, "contents": "Python", "publication_date": "2026-06-02T10:00:00Z"},
+        {"name": "US Role", "company": {"name": "Optum"}, "locations": [{"name": "Flexible / Remote"}],
+         "refs": {"landing_page": "https://themuse/2"}, "contents": "Python", "publication_date": "2026-06-02T10:00:00Z"},
+    ], "page_count": 1}
+    with patch("jobfinder.sources.themuse.requests.get", return_value=_FakeResp(payload)):
+        jobs = TheMuseSource().search("python", limit=5)
+    assert len(jobs) == 1                                   # the OR-global filter is enforced client-side
+    assert jobs[0].title == "DK Role" and jobs[0].location == "Copenhagen, Denmark" and jobs[0].source == "The Muse"
+
+
+class _FakeRssResp:
+    def __init__(self, content: bytes):
+        self.content = content
+    def raise_for_status(self):
+        pass
+
+
+def test_jobindex_parses_rss_iso8859_and_splits_title():
+    # ISO-8859-1 feed with a Danish place name (ø) to confirm correct decoding
+    rss = (
+        '<?xml version="1.0" encoding="ISO-8859-1"?>'
+        '<rss version="2.0"><channel>'
+        '<item>'
+        '<title>Senior Python Udvikler, NTI A/S</title>'
+        '<link>https://www.jobindex.dk/vis-job/h123</link>'
+        '<pubDate>Tue, 16 Jun 2026 00:00:00 +0200</pubDate>'
+        '<description>&lt;div&gt;&lt;span class="jix_robotjob--area"&gt;Værløse&lt;/span&gt; Build Python services&lt;/div&gt;</description>'
+        '</item>'
+        '</channel></rss>'
+    ).encode("iso-8859-1")
+    with patch("jobfinder.sources.jobindex.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = JobindexSource().search("python", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Senior Python Udvikler" and j.company == "NTI A/S"   # split on last comma
+    assert j.location == "Værløse"                                 # ISO-8859-1 decoded to unicode
+    assert j.url == "https://www.jobindex.dk/vis-job/h123" and j.posted == "2026-06-16"
+    assert j.source == "Jobindex" and "Python" in j.description
+
+
+def test_jobindex_location_filter():
+    rss = (
+        '<?xml version="1.0" encoding="ISO-8859-1"?><rss><channel>'
+        '<item><title>Dev, Co</title><link>u</link><pubDate>Tue, 16 Jun 2026 00:00:00 +0200</pubDate>'
+        '<description>&lt;span class="jix_robotjob--area"&gt;Aarhus&lt;/span&gt;</description></item>'
+        '</channel></rss>'
+    ).encode("iso-8859-1")
+    with patch("jobfinder.sources.jobindex.requests.get", return_value=_FakeRssResp(rss)):
+        assert JobindexSource().search("dev", location="Copenhagen", limit=5) == []   # Aarhus != Copenhagen
+
+
+def test_themuse_tolerates_malformed_location_entries():
+    # a null / non-dict locations entry must NOT discard the whole result set
+    payload = {"results": [
+        {"name": "Good DK", "company": {"name": "C"}, "locations": [None, "Copenhagen", {"name": "Aarhus, Denmark"}],
+         "refs": {"landing_page": "u"}, "contents": "Python", "publication_date": "2026-06-02"},
+    ], "page_count": 1}
+    with patch("jobfinder.sources.themuse.requests.get", return_value=_FakeResp(payload)):
+        jobs = TheMuseSource().search("python", limit=5)
+    assert len(jobs) == 1 and jobs[0].location == "Aarhus, Denmark"   # survived the bad entries
+
+
+def test_thehub_tolerates_non_string_description():
+    payload = {"docs": [{
+        "title": "Dev", "company": {"name": "C"}, "location": {"address": "Copenhagen"},
+        "absoluteJobUrl": "u", "description": 12345, "publishedAt": "2026-06-01", "isRemote": False,
+    }], "pages": 1}
+    with patch("jobfinder.sources.thehub.requests.get", return_value=_FakeResp(payload)):
+        jobs = TheHubSource().search("dev", limit=5)
+    assert len(jobs) == 1 and jobs[0].description == "12345"          # coerced, no TypeError

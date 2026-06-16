@@ -87,8 +87,8 @@ def load_settings() -> Settings:
     if sources_env:
         default_sources = [s.strip() for s in sources_env.split(",") if s.strip()]
     else:
-        # Ethics principle: free/official sources on by default, LinkedIn opt-in.
-        default_sources = ["remotive", "arbeitnow"]
+        # Free/no-key, Denmark-relevant sources on by default; LinkedIn + Jobindex opt-in.
+        default_sources = ["remotive", "arbeitnow", "thehub", "themuse"]
 
     return Settings(
         anthropic_key=os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"),

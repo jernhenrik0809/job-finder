@@ -29,6 +29,9 @@ from jobfinder.sources.jooble import JoobleSource
 from jobfinder.sources.jsearch import JSearchSource
 from jobfinder.sources.linkedin import LinkedInSource
 from jobfinder.sources.remotive import RemotiveSource
+from jobfinder.sources.thehub import TheHubSource
+from jobfinder.sources.themuse import TheMuseSource
+from jobfinder.sources.jobindex import JobindexSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -45,6 +48,9 @@ _ALLOWED_HOSTS = {
     "jsearch.p.rapidapi.com", "rapidapi.com",       # JSearch source + signup-doc URL
     "remotive.com",                                 # Remotive source
     "www.arbeitnow.com",                            # Arbeitnow source
+    "thehub.io",                                    # The Hub source
+    "www.themuse.com",                              # The Muse source
+    "www.jobindex.dk",                              # Jobindex RSS source
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -133,7 +139,7 @@ def test_runtime_egress_allowlist(monkeypatch):
             monkeypatch.setattr(mod.time, "sleep", lambda *_: None, raising=False)
 
     sources = [
-        RemotiveSource(), ArbeitnowSource(),
+        RemotiveSource(), ArbeitnowSource(), TheHubSource(), TheMuseSource(), JobindexSource(),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]
