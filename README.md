@@ -82,6 +82,26 @@ database, so they **survive a restart**. By default it lives at
 | `JOBFINDER_DATA_DIR` / `JOBFINDER_DB` | OS app-data dir | Where the SQLite DB lives |
 | `JOBFINDER_DEFAULT_SOURCES` | `remotive,arbeitnow` | Sources used when none are picked |
 | `JOBFINDER_HOST` / `JOBFINDER_PORT` | `127.0.0.1` / `8000` | Bind address/port |
+| `JOBFINDER_ALLOW_LAN` | `0` | Permit *binding* beyond loopback (see **Privacy & network safety**) |
+| `JOBFINDER_ALLOWED_HOSTS` | — | Extra `Host` names/IPs the server answers to (comma-separated) |
+
+---
+
+## Privacy & network safety
+
+Your CVs, cover letters and pipeline are stored locally and never uploaded. Because the app
+runs a small web server on your machine, it also guards that boundary:
+
+- **Same-origin only.** A web page you visit in another tab could otherwise quietly call
+  `http://127.0.0.1:8000/api/...` and read your data. Job Finder rejects any cross-site request
+  (CSRF), so only its own page can talk to the API.
+- **Host allow-list (anti DNS-rebinding).** It only answers requests addressed to a name it
+  trusts — `localhost`/`127.0.0.1` by default — so a rebound attacker domain can't reach the API.
+- **Loopback by default.** It binds `127.0.0.1` and refuses to serve the wider network unless you
+  ask. To use it from your phone or another computer on a **trusted** network, start it with
+  `python run.py --allow-lan --host 0.0.0.0` (or set `JOBFINDER_ALLOW_LAN=1`) **and** declare the
+  address you'll connect to in `JOBFINDER_ALLOWED_HOSTS` (e.g. `JOBFINDER_ALLOWED_HOSTS=192.168.1.50`).
+  You'll see a warning, because anyone on that network can then reach it with no login.
 
 ---
 
@@ -227,7 +247,8 @@ Job finder/
 │  ├─ engine.py           # orchestration: CV → search → dedup → rank
 │  ├─ cv_parser.py        # PDF/DOCX/TXT → text → structured profile
 │  ├─ skills.py           # skill extraction (curated dictionary, word-boundary)
-│  ├─ matcher.py          # hybrid 0–100 scoring
+│  ├─ matcher.py          # hybrid 0–100 scoring + per-job "why this score" explanation
+│  ├─ security.py         # same-origin + loopback network-boundary guard
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)

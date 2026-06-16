@@ -40,6 +40,8 @@ class Settings:
     default_sources: list[str]
     host: str
     port: int
+    allow_lan: bool              # permit *binding* beyond loopback (off by default)
+    allowed_hosts: list[str]     # extra Host names accepted by the security guard
 
     @property
     def llm_key_present(self) -> bool:
@@ -95,6 +97,8 @@ def load_settings() -> Settings:
         default_sources=default_sources,
         host=os.environ.get("JOBFINDER_HOST", "127.0.0.1"),
         port=int(os.environ.get("JOBFINDER_PORT", "8000")),
+        allow_lan=os.environ.get("JOBFINDER_ALLOW_LAN", "").strip().lower() in ("1", "true", "yes", "on"),
+        allowed_hosts=[h.strip() for h in os.environ.get("JOBFINDER_ALLOWED_HOSTS", "").split(",") if h.strip()],
     )
 
 

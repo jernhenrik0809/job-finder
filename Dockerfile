@@ -6,7 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     JOBFINDER_HOST=0.0.0.0 \
     JOBFINDER_PORT=8000 \
-    JOBFINDER_DATA_DIR=/data
+    JOBFINDER_DATA_DIR=/data \
+    # A published container binds 0.0.0.0 by design — this is the explicit bind opt-in.
+    # The Host allow-list still applies: reach it via http://localhost:8000 (loopback).
+    # To reach the container by another name/IP, set JOBFINDER_ALLOWED_HOSTS to it.
+    JOBFINDER_ALLOW_LAN=1
 
 WORKDIR /app
 

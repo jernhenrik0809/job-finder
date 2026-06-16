@@ -26,11 +26,23 @@ from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
 from .insights import compute_insights
 from .saved_searches import new_saved_search, register_run, mark_seen
+from .security import LocalSecurityMiddleware, build_allowed_hosts
 from .sources import available_sources
 from .store import get_store
 from .tailor import generate_tailoring
 
 app = FastAPI(title="Job Finder", version=__version__)
+
+# Network-boundary hardening: reject cross-site (CSRF) requests and any Host not on
+# the allow-list (DNS-rebinding defense), so a stray browser tab can't read the
+# user's CVs/letters. Loopback is always accepted; the user adds LAN names/IPs via
+# JOBFINDER_ALLOWED_HOSTS. A concrete (non-wildcard) bind host is trusted too — a
+# rebinding attack sends the attacker's domain as Host, never the target IP. See
+# jobfinder/security.py.
+app.add_middleware(
+    LocalSecurityMiddleware,
+    allowed_hosts=build_allowed_hosts([*settings.allowed_hosts, settings.host]),
+)
 
 _STATIC = Path(__file__).parent / "static"
 _MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB — a CV is tiny; reject anything larger

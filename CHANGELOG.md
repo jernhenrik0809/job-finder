@@ -2,6 +2,32 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.8.0] — 2026-06-16
+
+### Security
+- **Network-boundary hardening.** A personal app bound to `localhost` is still reachable by any
+  website you visit — a malicious page can run `fetch('http://127.0.0.1:8000/api/...')` in the
+  background and read your CVs and pipeline. Two always-on layers now guard the boundary:
+  - **Host allow-list** (DNS-rebinding defense) — the request's `Host` must be a trusted name:
+    loopback always, plus anything you declare in `JOBFINDER_ALLOWED_HOSTS` (and a concrete bind
+    IP). A rebound attacker domain arrives as a non-allowed `Host` and gets a **400**. This is
+    enforced **even when LAN serving is enabled** — enabling LAN only lets the server *bind* a
+    public address; it never accepts an arbitrary `Host`.
+  - **Same-origin** — any request whose `Origin` isn't same-origin with the host it targeted gets
+    a **403** (ordinary cross-site CSRF). Your own page is unaffected; non-browser clients (curl,
+    the test client) send no `Origin` and pass through.
+  - **Won't bind beyond loopback by default**: `run.py` falls back to `127.0.0.1` (with a clear
+    message) if asked to bind a public address without `--allow-lan` / `JOBFINDER_ALLOW_LAN=1`.
+- `jobfinder/security.py` (`LocalSecurityMiddleware`, pure `check_request` + `build_allowed_hosts`).
+  The Docker image sets `JOBFINDER_ALLOW_LAN=1` (a published container binds `0.0.0.0` by design);
+  reach it via `http://localhost:8000` — the Host allow-list still applies, so add any other
+  name/IP you'll use to `JOBFINDER_ALLOWED_HOSTS`.
+
+### Tests
+- 77 → 90 (`check_request` host/origin matrix incl. IPv6 loopback, userinfo/trailing-dot parsing,
+  the **DNS-rebinding-blocked-even-with-LAN** regression, and live middleware allow/deny through
+  the FastAPI test client).
+
 ## [1.7.0] — 2026-06-16
 
 ### Added
