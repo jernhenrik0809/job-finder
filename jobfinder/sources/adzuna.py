@@ -16,6 +16,7 @@ import requests
 
 from .base import Job, JobSource
 from ..config import settings
+from .. import secrets_store
 
 _HEADERS = {"User-Agent": "JobFinder/1.0 (personal job search)"}
 
@@ -47,8 +48,8 @@ class AdzunaSource(JobSource):
     name = "adzuna"
 
     def __init__(self, app_id: str | None = None, app_key: str | None = None, country: str | None = None):
-        self.app_id = app_id or settings.adzuna_app_id
-        self.app_key = app_key or settings.adzuna_app_key
+        self.app_id = app_id or secrets_store.get("adzuna_app_id")
+        self.app_key = app_key or secrets_store.get("adzuna_app_key")
         self.country = (country or settings.adzuna_country or "dk").lower()
 
     def search(self, keywords: str, location: str = "", limit: int = 25,

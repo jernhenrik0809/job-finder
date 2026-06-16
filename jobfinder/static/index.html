@@ -122,6 +122,7 @@
           <button class="tab active" data-tab="matches" id="tabMatches">Matches</button>
           <button class="tab" data-tab="pipeline" id="tabPipeline">Pipeline <span id="pipelineCount" class="badge">0</span></button>
           <button class="tab" data-tab="insights" id="tabInsights">Insights</button>
+          <button class="tab" data-tab="settings" id="tabSettings">⚙ Settings</button>
         </div>
         <div id="resultMeta" class="muted small"></div>
       </div>
@@ -200,6 +201,11 @@
           <p>Insights appear once you have applications in your <b>Pipeline</b>.</p>
         </div>
         <div id="insightsBody"></div>
+      </div>
+
+      <!-- ===== Settings view ===== -->
+      <div id="view-settings" class="hidden">
+        <div id="settingsBody" class="settings-body"></div>
       </div>
     </section>
   </main>

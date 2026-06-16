@@ -10,24 +10,19 @@ and the app simply skips it.
 """
 from __future__ import annotations
 
-import os
-
 import requests
 
 from .base import Job, JobSource
+from .. import secrets_store
 
 _API = "https://jsearch.p.rapidapi.com/search"
-
-
-def _api_key() -> str | None:
-    return os.environ.get("RAPIDAPI_KEY") or os.environ.get("JSEARCH_API_KEY")
 
 
 class JSearchSource(JobSource):
     name = "jsearch"
 
     def __init__(self, api_key: str | None = None):
-        self.api_key = api_key or _api_key()
+        self.api_key = api_key or secrets_store.get("rapidapi_key")
 
     def search(self, keywords: str, location: str = "", limit: int = 25,
                remote: bool = False, days: int | None = None) -> list[Job]:

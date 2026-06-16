@@ -24,6 +24,7 @@ const el = {
   resultMeta: $('#resultMeta'), warnings: $('#warnings'),
   loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'),
   tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), tabInsights: $('#tabInsights'), pipelineCount: $('#pipelineCount'),
+  tabSettings: $('#tabSettings'), viewSettings: $('#view-settings'), settingsBody: $('#settingsBody'),
   viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'), viewInsights: $('#view-insights'),
   insightsEmpty: $('#insightsEmpty'), insightsBody: $('#insightsBody'),
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
@@ -35,24 +36,25 @@ const el = {
 };
 
 // ---------- init ----------
-fetch('/api/sources').then(r => r.json()).then(d => {
-  // Disable any keyed source that has no API key configured.
+function applySources(d) {
+  // Enable/disable each keyed source by whether its API key is configured.
   Object.entries(d.keyed || {}).forEach(([src, present]) => {
-    if (present) return;
     const input = document.querySelector(`#sources input[value="${src}"]`);
     if (!input) return;
-    input.disabled = true; input.checked = false;
     const lab = input.closest('.chk');
-    if (lab) { lab.style.opacity = .55; lab.title = `Set the API key for ${src} to enable it`; }
+    input.disabled = !present;
+    if (!present) input.checked = false;
+    if (lab) { lab.style.opacity = present ? '' : .55; lab.title = present ? '' : `Set the ${src} API key in ⚙ Settings to enable it`; }
   });
-}).catch(() => {});
+}
 
-fetch('/api/draft-config').then(r => r.json()).then(d => {
+function applyDraftConfig(d) {
   llmAvailable = !!d.llm_available;
   if (Array.isArray(d.statuses) && d.statuses.length) STATUSES = d.statuses;
+  el.useLlm.disabled = !llmAvailable;
+  el.useLlmWrap.style.opacity = llmAvailable ? '' : .55;
   if (llmAvailable) {
     el.llmHint.textContent = `(${d.model})`;
-    // Disclose the one egress and offer redaction (privacy-first default).
     if (d.llm_egress && el.egressNote && el.redactPii) {
       el.egressText.textContent = `With Claude on, ${d.llm_egress.sends} are sent to ${d.llm_egress.provider}.`;
       el.redactPii.checked = d.llm_egress.redact_default !== false;
@@ -60,11 +62,16 @@ fetch('/api/draft-config').then(r => r.json()).then(d => {
     }
   } else {
     el.useLlm.checked = false;
-    el.useLlm.disabled = true;
-    el.useLlmWrap.style.opacity = .55;
-    el.llmHint.textContent = '(set ANTHROPIC_API_KEY to enable — using offline template)';
+    el.llmHint.textContent = '(add an Anthropic key in ⚙ Settings to enable — using offline template)';
+    if (el.egressNote) el.egressNote.classList.add('hidden');
   }
-}).catch(() => {});
+}
+
+function refreshKeyGating() {
+  fetch('/api/sources').then(r => r.json()).then(applySources).catch(() => {});
+  fetch('/api/draft-config').then(r => r.json()).then(applyDraftConfig).catch(() => {});
+}
+refreshKeyGating();
 
 el.minScore.addEventListener('input', () => { el.minScoreVal.textContent = el.minScore.value; });
 
@@ -219,12 +226,14 @@ if (el.editProfileBtn) el.editProfileBtn.addEventListener('click', () => {
 el.tabMatches.addEventListener('click', () => switchTab('matches'));
 el.tabPipeline.addEventListener('click', () => { switchTab('pipeline'); loadPipeline(); });
 el.tabInsights.addEventListener('click', () => { switchTab('insights'); loadInsights(); });
+el.tabSettings.addEventListener('click', () => { switchTab('settings'); loadSettings(); });
 
 function switchTab(name) {
   const map = {
     matches: [el.tabMatches, el.viewMatches],
     pipeline: [el.tabPipeline, el.viewPipeline],
     insights: [el.tabInsights, el.viewInsights],
+    settings: [el.tabSettings, el.viewSettings],
   };
   for (const [k, [tab, view]] of Object.entries(map)) {
     tab.classList.toggle('active', k === name);
@@ -659,12 +668,17 @@ function guardrailBadges(a) {
     </div>`).join('') + `</div>`;
 }
 
+// Briefly show a "saved" indicator. Module-scope so every panel (drawer, settings) can use it.
+function flash(sel) {
+  const m = document.querySelector(sel);
+  if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 1400); }
+}
+
 function wireDrawer(id) {
   const panel = el.drawerPanel;
   const subjectEl = panel.querySelector('.subject');
   const bodyEl = panel.querySelector('.body');
   const notesEl = panel.querySelector('.notes');
-  const flash = (sel) => { const m = panel.querySelector(sel); if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 1400); } };
 
   panel.querySelector('.dw-close').addEventListener('click', closeDrawer);
 
@@ -759,6 +773,66 @@ function renderTailoring(box, data) {
     <p class="muted small">${data.generator === 'llm'
       ? '✨ Bullets rephrased by Claude — grounded in your CV; the original is shown for you to verify.'
       : 'Selected & ranked from your real CV — nothing invented.'}</p>`;
+}
+
+// ---------- settings ----------
+const _KEY_FIELDS = [
+  { id: 'anthropic_key', group: 'anthropic', env: 'ANTHROPIC_API_KEY', label: 'Anthropic API key', hint: 'Enables the Claude letter & résumé writer', ph: 'sk-ant-…' },
+  { id: 'rapidapi_key', group: 'rapidapi', env: 'RAPIDAPI_KEY', label: 'RapidAPI key (JSearch)', hint: 'Enables the JSearch source', ph: '…' },
+  { id: 'adzuna_app_id', group: 'adzuna', env: 'ADZUNA_APP_ID', label: 'Adzuna app id', hint: 'With the app key, enables the Adzuna (Denmark) source', ph: '…' },
+  { id: 'adzuna_app_key', group: 'adzuna', env: 'ADZUNA_APP_KEY', label: 'Adzuna app key', hint: '', ph: '…' },
+  { id: 'jooble_key', group: 'jooble', env: 'JOOBLE_API_KEY', label: 'Jooble API key', hint: 'Enables the Jooble source', ph: '…' },
+];
+
+async function loadSettings() {
+  try { renderSettings(await (await fetch('/api/settings')).json()); }
+  catch { el.settingsBody.innerHTML = '<p class="muted">Could not load settings.</p>'; }
+}
+
+function renderSettings(s) {
+  const present = s.present || {}, locked = s.env_locked || {};
+  const models = (s.models || []).map(m =>
+    `<option value="${esc(m.id)}"${m.id === s.model ? ' selected' : ''}>${esc(m.label)} — ${esc(m.cost)}, ${esc(m.per_letter)}/letter</option>`).join('');
+  const rows = _KEY_FIELDS.map(f => {
+    const has = !!present[f.group], lk = !!locked[f.id];
+    const status = lk ? `<span class="set-env">set via ${esc(f.env)}</span>`
+      : has ? '<span class="set-ok">✓ configured</span>' : '<span class="set-no">not set</span>';
+    const ph = lk ? `controlled by ${f.env}` : (has ? 'configured — type to replace' : f.ph);
+    return `<div class="set-row">
+      <label>${esc(f.label)} ${status}</label>
+      ${f.hint ? `<div class="muted small">${esc(f.hint)}</div>` : ''}
+      <input type="password" autocomplete="off" spellcheck="false" data-key="${f.id}" placeholder="${esc(ph)}"${lk ? ' disabled' : ''} />
+    </div>`;
+  }).join('');
+  el.settingsBody.innerHTML = `
+    <p class="muted small">Keys are stored in a local file on your machine — never in the database, and never sent back in a response. An environment variable, if set, always wins.</p>
+    <div class="set-section">
+      <h3>Claude — AI writer</h3>
+      <div class="set-row"><label>Model tier</label>
+        <select id="setModel"${locked.model ? ' disabled' : ''}>${models}</select>
+        <div class="muted small">Cost is per generated letter, billed to your own Anthropic key. Lower tiers are cheaper and faster.</div></div>
+    </div>
+    <div class="set-section"><h3>API keys</h3>${rows}</div>
+    <div class="set-actions"><button id="setSave" class="btn ok">Save settings</button><span class="msg copied" style="display:none">saved ✓</span></div>`;
+  el.settingsBody.querySelector('#setSave').addEventListener('click', saveSettings);
+}
+
+async function saveSettings() {
+  const body = {};
+  el.settingsBody.querySelectorAll('input[data-key]').forEach(inp => {
+    if (!inp.disabled && inp.value.trim() !== '') body[inp.dataset.key] = inp.value.trim();
+  });
+  const m = el.settingsBody.querySelector('#setModel');
+  if (m && !m.disabled) body.model = m.value;
+  const btn = el.settingsBody.querySelector('#setSave'); btn.disabled = true;
+  try {
+    const resp = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(d.detail || 'Save failed');
+    renderSettings(d);                 // re-render with fresh presence; password inputs cleared
+    flash('.set-actions .msg');
+    refreshKeyGating();                 // newly-added keys light up sources + Claude without a restart
+  } catch (err) { showWarnings(['Settings: ' + err.message]); btn.disabled = false; }
 }
 
 // ---------- insights ----------

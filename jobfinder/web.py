@@ -29,6 +29,7 @@ from .insights import compute_insights
 from .saved_searches import new_saved_search, register_run, mark_seen
 from .security import LocalSecurityMiddleware, build_allowed_hosts
 from .sources import available_sources
+from . import secrets_store
 from .store import get_store
 from .tailor import generate_tailoring
 
@@ -151,6 +152,17 @@ class ApplicationUpdate(BaseModel):
     body: str | None = None
 
 
+class SettingsUpdate(BaseModel):
+    """Credentials + model tier set from the Settings page. None = leave unchanged,
+    "" = clear. Keys are written to a local owner-only file, never the DB, never returned."""
+    anthropic_key: str | None = None
+    rapidapi_key: str | None = None
+    adzuna_app_id: str | None = None
+    adzuna_app_key: str | None = None
+    jooble_key: str | None = None
+    model: str | None = None
+
+
 class ProfileUpdate(BaseModel):
     """User corrections to the parsed CV profile. Only provided fields are changed."""
     name: str | None = None
@@ -180,8 +192,8 @@ def sources() -> dict:
     return {
         "sources": available_sources(),
         "default_sources": settings.default_sources,
-        "jsearch_key_present": settings.jsearch_key_present,   # kept for compatibility
-        "keyed": settings.keyed_present,                       # {source: key_present}
+        "jsearch_key_present": secrets_store.present()["jsearch"],   # kept for compatibility
+        "keyed": secrets_store.present(),                      # {source: key_present}
     }
 
 
@@ -304,7 +316,7 @@ def search(req: SearchRequest) -> JSONResponse:
 def draft_config() -> dict:
     return {
         "llm_available": llm_available(),
-        "model": settings.model,
+        "model": secrets_store.model(),
         "statuses": STATUSES,
         "suggested_next": SUGGESTED_NEXT,
         # Disclose the one egress so the UI can show it: with a key, the Claude path sends
@@ -315,6 +327,52 @@ def draft_config() -> dict:
             "redact_default": settings.redact_pii_default,
         },
     }
+
+
+# Selectable Claude model tiers (with a rough relative cost, for the Settings cost hint).
+_MODEL_TIERS = [
+    {"id": "claude-opus-4-8", "label": "Opus 4.8 — best quality", "cost": "$$$", "per_letter": "~$0.06"},
+    {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6 — balanced", "cost": "$$", "per_letter": "~$0.015"},
+    {"id": "claude-haiku-4-5", "label": "Haiku 4.5 — fastest / cheapest", "cost": "$", "per_letter": "~$0.004"},
+]
+_MODEL_IDS = {m["id"] for m in _MODEL_TIERS}
+# logical secret -> the env var name shown to the user as the override that "locks" it
+_KEY_ENV = {"anthropic_key": "ANTHROPIC_API_KEY", "rapidapi_key": "RAPIDAPI_KEY",
+            "adzuna_app_id": "ADZUNA_APP_ID", "adzuna_app_key": "ADZUNA_APP_KEY",
+            "jooble_key": "JOOBLE_API_KEY", "model": "JOBFINDER_MODEL"}
+
+
+def _settings_payload() -> dict:
+    """Settings state — credential *presence* only (never the values), model + tiers, and
+    which fields are locked by an environment variable."""
+    get = secrets_store.get
+    return {
+        "present": {
+            "anthropic": secrets_store.anthropic_present(),
+            "rapidapi": bool(get("rapidapi_key")),
+            "adzuna": bool(get("adzuna_app_id") and get("adzuna_app_key")),
+            "jooble": bool(get("jooble_key")),
+        },
+        "env_locked": {name: secrets_store.is_env(name) for name in _KEY_ENV},
+        "model": secrets_store.model(),
+        "models": _MODEL_TIERS,
+        "llm_available": llm_available(),
+        "redact_pii_default": settings.redact_pii_default,
+    }
+
+
+@app.get("/api/settings")
+def get_settings() -> dict:
+    return _settings_payload()
+
+
+@app.post("/api/settings")
+def update_settings(req: SettingsUpdate) -> JSONResponse:
+    values = {k: v for k, v in req.model_dump().items() if v is not None}
+    if values.get("model") and values["model"] not in _MODEL_IDS:
+        raise HTTPException(status_code=422, detail="Unknown model tier.")
+    secrets_store.set_many(values)
+    return JSONResponse(_settings_payload())
 
 
 @app.post("/api/examples")

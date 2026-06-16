@@ -188,6 +188,22 @@ input[type=range] { accent-color: var(--accent); }
   border-radius: 8px; background: var(--bg); display: flex; flex-direction: column; gap: 5px; }
 .egress-note .chk.small { font-size: 12px; color: var(--text); display: flex; align-items: center; gap: 6px; }
 
+/* Settings panel */
+.settings-body { max-width: 620px; }
+.set-section { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.set-section h3 { margin: 0 0 10px; font-size: 14px; }
+.set-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 5px; }
+.set-row label { font-size: 13px; color: var(--text); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.set-row input, .set-row select {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px;
+}
+.set-row input:disabled, .set-row select:disabled { opacity: .55; cursor: not-allowed; }
+.set-ok { color: #34d399; font-size: 11.5px; }
+.set-no { color: var(--muted); font-size: 11.5px; }
+.set-env { color: var(--accent); font-size: 11.5px; }
+.set-actions { display: flex; align-items: center; gap: 10px; margin-top: 16px; }
+
 .score-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .why-toggle {
   background: none; border: none; color: var(--muted); font-size: 11px; font-weight: 600;

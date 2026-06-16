@@ -2,6 +2,29 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.15.0] — 2026-06-16
+
+### Added
+- **Settings page (no more environment variables required).** A new **⚙ Settings** tab lets you
+  paste your API keys — **Anthropic** (Claude writer), **RapidAPI** (JSearch), **Adzuna**, **Jooble**
+  — and pick the **Claude model tier** (Opus / Sonnet / Haiku, with a per-letter cost hint), right
+  in the app. Saving a key immediately lights up the matching source / the Claude option without a
+  restart.
+- Keys are kept in a **local, owner-only `secrets.json`** in the app data dir — **never** in the
+  database, and the API only ever exposes whether a key is *set* (a boolean), never the value. An
+  environment variable, if present, always wins (so existing setups are unchanged), and such fields
+  are shown as **locked** in the UI. `jobfinder/secrets_store.py`; `GET/POST /api/settings`.
+
+### Fixed (from review)
+- The "saved" confirmation helper was scoped to the drawer, so saving in Settings threw a
+  `ReferenceError` — showing a false error and (worse) skipping the re-gate, so a newly-added key
+  didn't light up its source until reload. The helper is now module-scope; saving works and the
+  source/Claude option activates immediately.
+
+### Tests
+- 202 → 208 (overlay env-precedence / persistence / clearing; Settings API sets a key, flips
+  presence, and never returns the value; unknown-model rejected; env-locked surfaced).
+
 ## [1.14.0] — 2026-06-16
 
 ### Fixed (security)

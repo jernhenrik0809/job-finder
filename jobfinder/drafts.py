@@ -13,18 +13,13 @@ edit and send themselves — it never auto-submits anywhere.
 """
 from __future__ import annotations
 
-import os
 import secrets
 from dataclasses import dataclass, field, asdict
 
-from .config import settings
 from .cv_parser import CVProfile
 from .guardrails import PLACEHOLDER_RE as _PLACEHOLDER_RE  # single source of truth
 from .privacy import redact_pii
-
-# Model tier comes from config (JOBFINDER_MODEL): use Haiku/Sonnet to cut cost,
-# Opus for best quality. Defaults to claude-opus-4-8.
-DEFAULT_MODEL = settings.model
+from . import secrets_store
 
 
 # ---------------------------------------------------------------------------
@@ -58,8 +53,8 @@ class ApplicationDraft:
 
 
 def llm_available() -> bool:
-    """True if a Claude API key is present (the SDK is an optional dependency)."""
-    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+    """True if a Claude API key is configured (env or Settings) and the SDK is installed."""
+    if not secrets_store.get("anthropic_key"):
         return False
     try:
         import anthropic  # noqa: F401
@@ -218,11 +213,13 @@ def _tone_hint(tone: str) -> str:
 
 def generate_llm(profile: CVProfile, job: dict, options: DraftOptions,
                  examples: list[str] | None = None,
-                 model: str = DEFAULT_MODEL) -> ApplicationDraft:
+                 model: str | None = None) -> ApplicationDraft:
     """Generate a tailored letter with Claude. Raises on failure (caller may fall back)."""
     import anthropic
 
-    client = anthropic.Anthropic()
+    # Pass the key explicitly so a key set via the Settings page (local file, not env) works.
+    client = anthropic.Anthropic(api_key=secrets_store.get("anthropic_key"))
+    model = model or secrets_store.model()
 
     title = _job_get(job, "title", default="this role")
     company = _job_get(job, "company")

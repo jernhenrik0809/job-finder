@@ -76,12 +76,11 @@ def test_no_secret_in_get_responses(monkeypatch):
 def test_no_secret_in_search_warnings(monkeypatch):
     """A keyed source whose request fails must not echo its key (which rides in the request
     URL as a query param / path) into the /api/search warnings."""
-    patched = dataclasses.replace(config.settings, **_SENTINELS)
-    monkeypatch.setattr(config, "settings", patched)
-    monkeypatch.setattr(web, "settings", patched)
-    for name in ("adzuna", "jooble", "jsearch"):
-        mod = importlib.import_module(f"jobfinder.sources.{name}")
-        monkeypatch.setattr(mod, "settings", patched, raising=False)
+    # give the keyed sources their sentinel keys via env (the overlay honours env first)
+    monkeypatch.setenv("ADZUNA_APP_ID", _SENTINELS["adzuna_app_id"])
+    monkeypatch.setenv("ADZUNA_APP_KEY", _SENTINELS["adzuna_app_key"])
+    monkeypatch.setenv("JOOBLE_API_KEY", _SENTINELS["jooble_key"])
+    monkeypatch.setenv("RAPIDAPI_KEY", _SENTINELS["rapidapi_key"])
 
     # Fail every request with the worst case: a message embedding the fully-prepared URL
     # (the real leak vector — urllib3 puts the key-bearing URL into the exception text).

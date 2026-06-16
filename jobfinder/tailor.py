@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import re
 
-from .config import settings
 from .cv_parser import CVProfile
 from .drafts import llm_available
 from .matcher import _tfidf_similarities
 from .privacy import redact_pii
+from . import secrets_store
 from .skills import extract_skills, skill_overlap
 
 _BULLET_PREFIX = re.compile(r"^\s*[-•*–—>·∙]+\s*")
@@ -104,7 +104,7 @@ def _rewrite_bullets_llm(bullets: list[dict], job: dict, model: str, redact: boo
     if not bullets:
         return
     import anthropic
-    client = anthropic.Anthropic()
+    client = anthropic.Anthropic(api_key=secrets_store.get("anthropic_key"))
     _scrub = redact_pii if redact else (lambda t: t)
     numbered = "\n".join(f"{i + 1}. {_scrub(b['text'])}" for i, b in enumerate(bullets))
     user = (
@@ -135,7 +135,7 @@ def generate_tailoring(profile: CVProfile, job: dict, use_llm: bool = True, top_
     result = tailor_resume(profile, job, top_n=top_n)
     if use_llm and llm_available() and result["bullets"]:
         try:
-            _rewrite_bullets_llm(result["bullets"], job, settings.model, redact=redact_pii)
+            _rewrite_bullets_llm(result["bullets"], job, secrets_store.model(), redact=redact_pii)
             result["generator"] = "llm"
         except Exception as e:
             result["note"] = f"Claude rewrite unavailable ({type(e).__name__}); showing the ranked originals."

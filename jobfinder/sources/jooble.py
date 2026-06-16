@@ -15,7 +15,7 @@ import re
 import requests
 
 from .base import Job, JobSource
-from ..config import settings
+from .. import secrets_store
 
 _HEADERS = {"User-Agent": "JobFinder/1.0 (personal job search)", "Content-Type": "application/json"}
 
@@ -35,7 +35,7 @@ class JoobleSource(JobSource):
     name = "jooble"
 
     def __init__(self, api_key: str | None = None, default_location: str = "Denmark"):
-        self.api_key = api_key or settings.jooble_key
+        self.api_key = api_key or secrets_store.get("jooble_key")
         self.default_location = default_location
 
     def search(self, keywords: str, location: str = "", limit: int = 25,

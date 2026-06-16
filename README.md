@@ -68,7 +68,12 @@ database, so they **survive a restart**. By default it lives at
 `%LOCALAPPDATA%\JobFinder\jobfinder.db` (Windows) / `~/.local/share/jobfinder/`
 (Linux/macOS). Nothing is uploaded anywhere.
 
-### Configuration (all optional, via environment variables)
+### Configuration
+
+API keys and the Claude model tier can be set **in the app** — open the **⚙ Settings** tab and
+paste them (Anthropic, RapidAPI/JSearch, Adzuna, Jooble). They're saved to a local owner-only file
+(never the database, never echoed back), and the matching source / Claude option lights up
+immediately. Everything below also works as **environment variables**, which take precedence:
 
 | Variable | Default | What it does |
 |---|---|---|

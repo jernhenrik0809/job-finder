@@ -8,7 +8,7 @@ shared, or used for analytics. There is no account, no login, and no telemetry.
 | Data | Where | Notes |
 |---|---|---|
 | Parsed CVs, style examples, applications/pipeline, saved searches | A local **SQLite** database at `%LOCALAPPDATA%\JobFinder\` (Windows) / `~/.local/share/jobfinder/` (Linux/macOS), or `./data` under Docker | Survives restarts; never leaves your machine. Override with `JOBFINDER_DATA_DIR` / `JOBFINDER_DB`, or use `JOBFINDER_STORAGE=memory` for an ephemeral, nothing-on-disk run. |
-| API keys (Anthropic, RapidAPI, Adzuna, Jooble) | Environment variables only | Never written to the database and never included in any API response (enforced in CI). |
+| API keys (Anthropic, RapidAPI, Adzuna, Jooble) | Environment variables, **or** a local owner-only `secrets.json` in the data dir (set from the **⚙ Settings** page) | Never written to the application database and never returned in any API response — only their *presence* is exposed (enforced in CI). Environment variables take precedence. |
 
 Uploaded CV files are parsed **in memory** and never written to a temporary file, so a
 crash can't leave a plaintext CV on disk.
