@@ -1,7 +1,10 @@
 """SQLite-backed store — persists profiles, examples and drafts across restarts.
 
-Stdlib ``sqlite3`` only (no ORM). WAL + busy_timeout + a process-level write lock keep
-the single foreground writer and the (future) background scheduler from contending.
+Stdlib ``sqlite3`` only (no ORM). A single connection is shared across FastAPI's
+threadpool (check_same_thread=False), so a process-level lock serializes EVERY read and
+write — a sqlite3 Connection/Cursor is not safe for concurrent use by multiple threads
+even under WAL (the corruption is at the Python object level, not the file lock). WAL +
+busy_timeout still help the file-level writer/reader story.
 Profiles and drafts are stored as JSON blobs and round-tripped through their dataclasses.
 ``ON CONFLICT ... DO UPDATE`` preserves a row's ``created`` time on update so the outbox
 keeps a stable order when a draft is edited.
@@ -68,7 +71,8 @@ class SqliteStore(Store):
             self._evict("profiles", "cv_id", MAX_PROFILES)
 
     def get_profile(self, cv_id: str) -> CVProfile | None:
-        row = self._conn.execute("SELECT data FROM profiles WHERE cv_id=?", (cv_id,)).fetchone()
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM profiles WHERE cv_id=?", (cv_id,)).fetchone()
         return CVProfile(**json.loads(row["data"])) if row else None
 
     # --- examples ---
@@ -82,9 +86,10 @@ class SqliteStore(Store):
             self._evict("examples", "id", MAX_EXAMPLES)
 
     def list_examples(self) -> list[dict]:
-        rows = self._conn.execute(
-            "SELECT id, name, text, chars FROM examples ORDER BY created ASC"
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, name, text, chars FROM examples ORDER BY created ASC"
+            ).fetchall()
         return [dict(r) for r in rows]
 
     def delete_example(self, example_id: str) -> None:
@@ -102,11 +107,13 @@ class SqliteStore(Store):
             self._evict("drafts", "id", MAX_DRAFTS)
 
     def get_draft(self, draft_id: str) -> ApplicationDraft | None:
-        row = self._conn.execute("SELECT data FROM drafts WHERE id=?", (draft_id,)).fetchone()
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM drafts WHERE id=?", (draft_id,)).fetchone()
         return ApplicationDraft(**json.loads(row["data"])) if row else None
 
     def list_drafts(self) -> list[ApplicationDraft]:
-        rows = self._conn.execute("SELECT data FROM drafts ORDER BY created ASC").fetchall()
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM drafts ORDER BY created ASC").fetchall()
         return [ApplicationDraft(**json.loads(r["data"])) for r in rows]
 
     def delete_draft(self, draft_id: str) -> None:

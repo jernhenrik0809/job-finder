@@ -28,9 +28,14 @@ Foundations + the persistence hinge from [`docs/ROADMAP.md`](docs/ROADMAP.md) (N
 - **Plaintext-CV temp-file leak.** Uploaded CVs/examples are now parsed fully in memory
   (`BytesIO`) instead of a `NamedTemporaryFile(delete=False)` — a crash mid-parse can no
   longer leave a plaintext CV in the OS temp dir.
+- **SQLite concurrency (from review).** Reads on the shared connection are now serialized
+  by the same lock as writes — a concurrent read+write across FastAPI's threadpool could
+  previously corrupt cursor state and 500. Hardened the placeholder detector against false
+  positives, and extended the AI prompt-injection guard to the CV and style examples.
 
 ### Tests
-- 30 passing (added persistence round-trip / restart-survival, config, and draft-guardrail tests).
+- 32 passing (persistence round-trip / restart-survival, **concurrent read+write**, config,
+  and draft-guardrail / placeholder-precision tests).
 
 ## [1.0.0] — 2026-06-09
 

@@ -114,7 +114,16 @@ def test_system_prompt_forbids_placeholders_and_injection():
     from jobfinder.drafts import _SYSTEM_BASE
     low = _SYSTEM_BASE.lower()
     assert "placeholder" in low                       # no [Company]/[Your Name]
-    assert "not instructions" in low or "ignore any directives" in low  # prompt-injection guard
+    assert "not instructions" in low or "ignore any directives" in low  # JD injection guard
+    assert "untrusted" in low                          # CV/examples injection guard
+
+
+def test_placeholder_regex_precision():
+    from jobfinder.drafts import _PLACEHOLDER_RE
+    assert _PLACEHOLDER_RE.search("Dear [Company] team")            # real placeholder flagged
+    assert _PLACEHOLDER_RE.search("[insert the role title here]")   # long placeholder flagged
+    assert not _PLACEHOLDER_RE.search("I rank in the [top 5%]")     # legit prose, not flagged
+    assert not _PLACEHOLDER_RE.search("array[i] notation")          # legit prose, not flagged
 
 
 def test_generate_llm_flags_leftover_placeholder():

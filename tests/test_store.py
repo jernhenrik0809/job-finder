@@ -52,6 +52,45 @@ def test_sqlite_update_preserves_order_and_edits(tmp_path):
     s.close()
 
 
+def test_sqlite_concurrent_read_write(tmp_path):
+    # Regression for the shared-connection corruption: concurrent reads + writes across
+    # threads (as FastAPI's threadpool does) must not raise or corrupt data.
+    import threading
+    s = SqliteStore(tmp_path / "jf.db")
+    s.save_draft(_draft("seed"))
+    errors: list[Exception] = []
+    stop = threading.Event()
+
+    def reader():
+        while not stop.is_set():
+            try:
+                s.list_drafts(); s.get_draft("seed"); s.list_examples()
+            except Exception as e:  # any exception is a failure of the lock discipline
+                errors.append(e); return
+
+    def writer(n):
+        for i in range(40):
+            try:
+                s.save_draft(_draft(f"w{n}-{i}", f"Role {i}"))
+                s.save_example({"id": f"e{n}-{i}", "name": "x", "text": "y", "chars": 1})
+            except Exception as e:
+                errors.append(e); return
+
+    threads = [threading.Thread(target=reader) for _ in range(4)] + \
+              [threading.Thread(target=writer, args=(n,)) for n in range(3)]
+    for t in threads[4:]:
+        t.start()
+    for t in threads[:4]:
+        t.start()
+    for t in threads[4:]:
+        t.join()
+    stop.set()
+    for t in threads[:4]:
+        t.join()
+    s.close()
+    assert not errors, f"concurrency errors: {errors[:3]}"
+
+
 def test_memory_store_basics():
     s = MemoryStore()
     s.save_profile("cv1", build_profile(CV))
