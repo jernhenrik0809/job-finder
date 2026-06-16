@@ -24,6 +24,7 @@ from .config import settings
 from .cv_parser import CVProfile, build_profile, extract_text_from_bytes, looks_empty
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
+from .insights import compute_insights
 from .sources import available_sources
 from .store import get_store
 
@@ -350,6 +351,15 @@ def export_application(aid: str) -> PlainTextResponse:
     return PlainTextResponse(content, headers={
         "Content-Disposition": f'attachment; filename="{filename}"'
     })
+
+
+# ---------------------------------------------------------------------------
+# Insights (pipeline analytics, derived from applications)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/insights")
+def insights() -> dict:
+    return compute_insights(store.list_applications())
 
 
 # Static assets (css/js)

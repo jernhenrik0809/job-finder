@@ -2,6 +2,22 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.3.0] — 2026-06-16
+
+### Added
+- **Insights dashboard** (new *Insights* tab) — a funnel
+  (`saved → drafted → applied → interviewing → offer`) with stage-to-stage conversion,
+  key metrics (applied, **response rate**, offers, **avg. time-to-response**),
+  applications-by-source, and an 8-week "added per week" sparkline. All computed offline
+  from your pipeline's event timelines — no telemetry.
+- **Follow-up nudges** ("Needs attention"): applications sitting in *applied* for ≥7 days
+  or *ready* for ≥3 days are surfaced; clicking one jumps to its pipeline card. No
+  background scheduler — nudges are derived when you open the app.
+- API: `GET /api/insights`; `jobfinder/insights.py` (`compute_insights`).
+
+### Tests
+- 44 → 52 (funnel math, response rate, time-to-response, nudges, by-source, endpoint).
+
 ## [1.2.0] — 2026-06-16
 
 The retention core from [`docs/ROADMAP.md`](docs/ROADMAP.md): the Outbox becomes a

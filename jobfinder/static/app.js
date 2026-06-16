@@ -19,8 +19,9 @@ const el = {
   searchBtn: $('#searchBtn'), hint: $('#hint'),
   resultMeta: $('#resultMeta'), warnings: $('#warnings'),
   loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'), jsearchChk: $('#jsearchChk'),
-  tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), pipelineCount: $('#pipelineCount'),
-  viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'),
+  tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), tabInsights: $('#tabInsights'), pipelineCount: $('#pipelineCount'),
+  viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'), viewInsights: $('#view-insights'),
+  insightsEmpty: $('#insightsEmpty'), insightsBody: $('#insightsBody'),
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
   examples: $('#examples'), addExample: $('#addExample'), exampleFile: $('#exampleFile'),
   tone: $('#tone'), length: $('#length'), useLlm: $('#useLlm'), llmHint: $('#llmHint'), useLlmWrap: $('#useLlmWrap'),
@@ -107,13 +108,18 @@ function renderProfile(p) {
 // ---------- tabs ----------
 el.tabMatches.addEventListener('click', () => switchTab('matches'));
 el.tabPipeline.addEventListener('click', () => { switchTab('pipeline'); loadPipeline(); });
+el.tabInsights.addEventListener('click', () => { switchTab('insights'); loadInsights(); });
 
 function switchTab(name) {
-  const matches = name === 'matches';
-  el.tabMatches.classList.toggle('active', matches);
-  el.tabPipeline.classList.toggle('active', !matches);
-  el.viewMatches.classList.toggle('hidden', !matches);
-  el.viewPipeline.classList.toggle('hidden', matches);
+  const map = {
+    matches: [el.tabMatches, el.viewMatches],
+    pipeline: [el.tabPipeline, el.viewPipeline],
+    insights: [el.tabInsights, el.viewInsights],
+  };
+  for (const [k, [tab, view]] of Object.entries(map)) {
+    tab.classList.toggle('active', k === name);
+    view.classList.toggle('hidden', k !== name);
+  }
 }
 
 // ---------- search ----------
@@ -452,6 +458,64 @@ function wireDrawer(id) {
     renderBoard();
     closeDrawer();
   });
+}
+
+// ---------- insights ----------
+async function loadInsights() {
+  try { renderInsights(await (await fetch('/api/insights')).json()); }
+  catch { /* ignore */ }
+}
+
+function renderInsights(r) {
+  const empty = (r.total || 0) === 0;
+  el.insightsEmpty.classList.toggle('hidden', !empty);
+  el.insightsBody.classList.toggle('hidden', empty);
+  if (empty) { el.insightsBody.innerHTML = ''; return; }
+
+  const fn = Object.fromEntries(r.funnel.map(f => [f.stage, f.count]));
+  const ttr = r.avg_time_to_response_days == null ? '—' : r.avg_time_to_response_days;
+
+  const metrics = `<div class="metrics">
+    <div class="metric-card"><div class="v">${r.total}</div><div class="k">in pipeline</div></div>
+    <div class="metric-card"><div class="v">${fn.applied || 0}</div><div class="k">applied</div></div>
+    <div class="metric-card"><div class="v">${r.response_rate}<small>%</small></div><div class="k">response rate</div></div>
+    <div class="metric-card"><div class="v">${r.offers}</div><div class="k">offers</div></div>
+    <div class="metric-card"><div class="v">${ttr}${ttr === '—' ? '' : '<small> d</small>'}</div><div class="k">avg. response time</div></div>
+  </div>`;
+
+  const maxv = Math.max(1, r.funnel[0].count);
+  const funnel = `<div class="insights-section"><h3>Funnel</h3>${r.funnel.map((f, i) => {
+    const w = Math.max(3, Math.round(f.count / maxv * 100));
+    const prev = i > 0 ? r.funnel[i - 1].count : null;
+    const conv = (i > 0 && prev > 0) ? `${Math.round(f.count / prev * 100)}%` : '';
+    return `<div class="funnel-row"><span class="name">${esc(f.stage)}</span>
+      <div class="funnel-bar"><div class="funnel-fill" style="width:${w}%">${f.count}</div></div>
+      <span class="conv">${conv}</span></div>`;
+  }).join('')}</div>`;
+
+  const nudges = (r.nudges && r.nudges.length) ? `<div class="insights-section"><h3>Needs attention</h3>
+    <div class="nudges-list">${r.nudges.map(n => `
+      <div class="nudge" data-id="${esc(n.id)}">
+        <span class="n-main"><b>${esc(n.title)}</b>${n.company ? ' · ' + esc(n.company) : ''}<div class="n-msg">${esc(n.message)}</div></span>
+        <span class="go">open ↗</span></div>`).join('')}</div></div>` : '';
+
+  const bySource = (r.by_source && r.by_source.length) ? `<div class="insights-section"><h3>Applications by source</h3>
+    <table class="src-table">${r.by_source.map(s => `<tr><td>${esc(s.source)}</td><td class="n">${s.applied}</td></tr>`).join('')}</table></div>` : '';
+
+  const ot = r.over_time || [];
+  const omax = Math.max(1, ...ot.map(b => b.count));
+  const spark = ot.length ? `<div class="insights-section"><h3>Added per week</h3>
+    <div class="spark">${ot.map(b => `<div class="bar" style="height:${Math.round(b.count / omax * 100)}%" title="${esc(b.label)}: ${b.count}"></div>`).join('')}</div>
+    <div class="spark-labels">${ot.map(b => `<span>${esc(b.label)}</span>`).join('')}</div></div>` : '';
+
+  el.insightsBody.innerHTML = metrics + funnel + nudges + bySource + spark;
+
+  el.insightsBody.querySelectorAll('.nudge').forEach(nd => nd.addEventListener('click', async () => {
+    const id = nd.dataset.id;
+    switchTab('pipeline');
+    await loadPipeline();
+    openDrawer(id);
+  }));
 }
 
 // ---------- style examples ----------

@@ -127,6 +127,17 @@ works either way.
 
 ---
 
+## Insights
+
+The **Insights** tab turns your pipeline into a funnel
+(`saved → drafted → applied → interviewing → offer`) with stage-to-stage conversion,
+your **response rate**, average **time-to-response**, applications-by-source, and a
+weekly trend — all computed locally from your own data. A **Needs attention** list
+nudges you to follow up on applications that have gone quiet (applied ≥7 days ago, or
+drafted but not sent).
+
+---
+
 ## How matching works
 
 Each job gets a 0–100 score:

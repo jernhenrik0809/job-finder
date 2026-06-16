@@ -83,6 +83,17 @@ def test_generate_rejects_empty_jobs():
     assert client.post("/api/applications/generate", json={"cv_id": cv_id, "jobs": []}).status_code == 400
 
 
+def test_insights_endpoint():
+    cv_id = _upload_cv()
+    aid = client.post("/api/applications/generate", json={"cv_id": cv_id, "jobs": [JOB], "use_llm": False}).json()["applications"][0]["id"]
+    client.patch(f"/api/applications/{aid}", json={"status": "applied"})
+    ins = client.get("/api/insights").json()
+    assert {"funnel", "response_rate", "nudges", "by_source", "over_time"} <= set(ins)
+    assert {f["stage"] for f in ins["funnel"]} == {"saved", "drafted", "applied", "interviewing", "offer"}
+    assert ins["total"] >= 1
+    client.delete(f"/api/applications/{aid}")
+
+
 def test_examples_add_list_delete():
     r = client.post("/api/examples-text", data={"text": "My example letter.", "name": "ex1"})
     assert r.status_code == 200

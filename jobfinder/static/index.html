@@ -109,6 +109,7 @@
         <div class="tabs">
           <button class="tab active" data-tab="matches" id="tabMatches">Matches</button>
           <button class="tab" data-tab="pipeline" id="tabPipeline">Pipeline <span id="pipelineCount" class="badge">0</span></button>
+          <button class="tab" data-tab="insights" id="tabInsights">Insights</button>
         </div>
         <div id="resultMeta" class="muted small"></div>
       </div>
@@ -174,6 +175,15 @@
           <p>Your pipeline is empty. In <b>Matches</b>, tick roles and <b>Draft applications</b>, or hit <b>＋ Save</b> on a card.</p>
         </div>
         <div id="board" class="board"></div>
+      </div>
+
+      <!-- ===== Insights view ===== -->
+      <div id="view-insights" class="hidden">
+        <div id="insightsEmpty" class="empty">
+          <div class="empty-art">📊</div>
+          <p>Insights appear once you have applications in your <b>Pipeline</b>.</p>
+        </div>
+        <div id="insightsBody"></div>
       </div>
     </section>
   </main>
