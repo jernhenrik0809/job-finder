@@ -5,7 +5,9 @@
 Upload your CV and get **ranked, live job matches** — scored against your actual
 skills and experience. Runs entirely on your local PC with a clean web UI.
 
-![steps](https://img.shields.io/badge/1-Upload%20CV-6c8cff) ![steps](https://img.shields.io/badge/2-Search-8b5cf6) ![steps](https://img.shields.io/badge/3-Ranked%20matches-34d399)
+![steps](https://img.shields.io/badge/1-Upload%20CV-6c8cff) ![steps](https://img.shields.io/badge/2-Search-8b5cf6) ![steps](https://img.shields.io/badge/3-Ranked%20matches-34d399) ![steps](https://img.shields.io/badge/4-Draft%20Outbox-fbbf24)
+
+> **Where this is headed:** see [`docs/VISION.md`](docs/VISION.md) for the full target-state vision (private local-first career co-pilot) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan (Now → Next → Later → Vision).
 
 ---
 
