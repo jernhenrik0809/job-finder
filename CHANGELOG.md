@@ -2,6 +2,22 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.5.0] — 2026-06-16
+
+### Added
+- **Résumé tailoring.** From an application's drawer, **Tailor résumé to this job** ranks
+  *your own* CV bullets by relevance to the role (TF-IDF), each shown with **provenance**
+  (the exact source line — this is selection + reordering, never fabrication), plus the
+  **skills to emphasize** (matched) and **gaps** to address (missing). With a key, an optional
+  **Claude rewrite** rephrases each bullet *grounded strictly in the original* (which is shown
+  alongside so you can verify) — it is instructed never to add a fact not in your CV.
+- `jobfinder/tailor.py`; API `POST /api/applications/{id}/tailor`. Skill-list lines are
+  excluded from accomplishment bullets.
+
+### Tests
+- 62 → 68 (bullet segmentation incl. skill-list filter, relevance ranking + provenance,
+  emphasize/gaps, mocked Claude rewrite, endpoint).
+
 ## [1.4.0] — 2026-06-16
 
 ### Added

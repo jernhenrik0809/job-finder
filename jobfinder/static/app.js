@@ -477,6 +477,12 @@ function openDrawer(id) {
     </div>
 
     <div class="dw-section">
+      <span class="lbl">Tailor résumé</span>
+      <div id="tailorOut" class="tailor-out"></div>
+      <div class="dw-actions"><button class="btn mini ghost tailor">✨ Tailor résumé to this job</button></div>
+    </div>
+
+    <div class="dw-section">
       <span class="lbl">Timeline</span>
       <ul class="timeline">${events || '<li>No events yet.</li>'}</ul>
     </div>`;
@@ -533,6 +539,23 @@ function wireDrawer(id) {
     try { await navigator.clipboard.writeText(`Subject: ${subjectEl.value}\n\n${bodyEl.value}`); flash('.dw-actions .msg'); } catch {}
   });
   panel.querySelector('.download').addEventListener('click', () => { window.location.href = `/api/applications/${id}/export`; });
+
+  panel.querySelector('.tailor').addEventListener('click', async () => {
+    const btn = panel.querySelector('.tailor'); btn.disabled = true; btn.textContent = 'Tailoring…';
+    try {
+      const resp = await fetch(`/api/applications/${id}/tailor`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cv_id: cvId || '', use_llm: el.useLlm.checked }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.detail || 'Tailoring failed');
+      const out = panel.querySelector('#tailorOut');
+      if (out) renderTailoring(out, data);
+      btn.textContent = 'Re-tailor';
+    } catch (err) { showWarnings(['Tailor: ' + err.message]); btn.textContent = 'Retry'; }
+    finally { btn.disabled = false; }
+  });
+
   panel.querySelector('.del').addEventListener('click', async () => {
     const a = appsById.get(id);
     const jobId = a && a.job && a.job.id;
@@ -546,6 +569,23 @@ function wireDrawer(id) {
     renderBoard();
     closeDrawer();
   });
+}
+
+function renderTailoring(box, data) {
+  const skills = (data.emphasize_skills || []).map(s => `<span class="chip matched">${esc(s)}</span>`).join('');
+  const gaps = (data.gaps || []).map(s => `<span class="chip missing">${esc(s)}</span>`).join('');
+  const bullets = (data.bullets || []).map(b => `<li>
+      ${b.rewritten ? `<div class="b-rw">${esc(b.rewritten)}</div><div class="b-src">from your CV: ${esc(b.text)}</div>` : `<div>${esc(b.text)}</div>`}
+      <span class="b-score">${b.score || 0}</span></li>`).join('');
+  box.innerHTML = `
+    ${data.note ? `<p class="dw-note">⚠ ${esc(data.note)}</p>` : ''}
+    ${skills ? `<div class="t-row"><span class="t-lbl">Emphasize</span><span class="chips">${skills}</span></div>` : ''}
+    ${bullets ? `<div class="t-lbl" style="margin-top:10px">Lead with these — ranked from your real CV</div><ul class="tailor-bullets">${bullets}</ul>`
+      : '<p class="muted small">No résumé bullets detected — make sure your CV includes experience lines.</p>'}
+    ${gaps ? `<div class="t-row" style="margin-top:8px"><span class="t-lbl">Address gaps</span><span class="chips">${gaps}</span></div>` : ''}
+    <p class="muted small">${data.generator === 'llm'
+      ? '✨ Bullets rephrased by Claude — grounded in your CV; the original is shown for you to verify.'
+      : 'Selected & ranked from your real CV — nothing invented.'}</p>`;
 }
 
 // ---------- insights ----------

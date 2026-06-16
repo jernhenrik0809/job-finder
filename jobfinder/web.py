@@ -28,6 +28,7 @@ from .insights import compute_insights
 from .saved_searches import new_saved_search, register_run, mark_seen
 from .sources import available_sources
 from .store import get_store
+from .tailor import generate_tailoring
 
 app = FastAPI(title="Job Finder", version=__version__)
 
@@ -109,6 +110,11 @@ class RegenerateRequest(BaseModel):
     cv_id: str = ""
     tone: str = "professional"
     length: str = "standard"
+    use_llm: bool = True
+
+
+class TailorRequest(BaseModel):
+    cv_id: str = ""
     use_llm: bool = True
 
 
@@ -345,6 +351,19 @@ def regenerate_application(aid: str, req: RegenerateRequest) -> JSONResponse:
     a.cv_id = cv_id
     store.save_application(a)
     return JSONResponse(a.to_dict())
+
+
+@app.post("/api/applications/{aid}/tailor")
+def tailor_application(aid: str, req: TailorRequest) -> JSONResponse:
+    a = store.get_application(aid)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    cv_id = req.cv_id or a.cv_id
+    profile = store.get_profile(cv_id) if cv_id else None
+    if profile is None:
+        raise HTTPException(status_code=400,
+                            detail="The CV for this application isn't available — re-upload your CV.")
+    return JSONResponse(generate_tailoring(profile, job_snapshot(a), use_llm=req.use_llm))
 
 
 @app.delete("/api/applications/{aid}")

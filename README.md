@@ -138,6 +138,17 @@ drafted but not sent).
 
 ---
 
+## Résumé tailoring
+
+Open any application in the **Pipeline** and click **✨ Tailor résumé to this job**. It ranks
+*your own* CV bullets by how well they fit the role, shows the **skills to emphasize** and the
+**gaps** to address, and — crucially — every bullet is shown with its **provenance** (the exact
+line from your CV). It selects and reorders your real experience; it never invents anything.
+With an `ANTHROPIC_API_KEY` set, an optional **Claude rewrite** rephrases each bullet for the
+job, grounded strictly in your original (shown alongside to verify).
+
+---
+
 ## Saved searches
 
 Click **★ Save this search** to store a query. Your saved searches live in the sidebar

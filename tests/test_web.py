@@ -65,6 +65,17 @@ def test_generate_creates_trackable_applications():
     assert all(x["id"] != aid for x in client.get("/api/applications").json()["applications"])
 
 
+def test_tailor_endpoint():
+    cv_id = _upload_cv()
+    aid = client.post("/api/applications/generate", json={"cv_id": cv_id, "jobs": [JOB], "use_llm": False}).json()["applications"][0]["id"]
+    r = client.post(f"/api/applications/{aid}/tailor", json={"use_llm": False})
+    assert r.status_code == 200
+    data = r.json()
+    assert {"emphasize_skills", "bullets", "gaps"} <= set(data)
+    assert all("text" in b and "source_index" in b for b in data["bullets"])   # provenance
+    client.delete(f"/api/applications/{aid}")
+
+
 def test_save_to_pipeline_without_a_letter():
     cv_id = _upload_cv()
     r = client.post("/api/applications", json={"cv_id": cv_id, "job": JOB})
