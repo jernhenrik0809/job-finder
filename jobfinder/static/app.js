@@ -255,8 +255,8 @@ el.checkNew.addEventListener('click', async () => {
   el.checkNew.textContent = 'checking…'; el.checkNew.disabled = true;
   try {
     const data = await (await fetch('/api/saved-searches/run-all', { method: 'POST' })).json();
-    renderSavedList(data.searches || []);
     const total = (data.searches || []).reduce((n, s) => n + (s.new_count || 0), 0);
+    await loadSavedSearches();      // repaint from full summaries (keeps the location/source sub-line)
     el.checkNew.textContent = total ? `${total} new ✓` : 'no new';
   } catch { el.checkNew.textContent = 'check for new'; }
   finally { setTimeout(() => { el.checkNew.textContent = 'check for new'; el.checkNew.disabled = false; }, 2500); }
