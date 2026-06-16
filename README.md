@@ -182,6 +182,15 @@ roles without re-typing the same search. (No background polling — searches run
 
 ---
 
+## Confirm your profile
+
+Parsing a CV is heuristic — a skill can be missed, a title mis-read. After uploading, click
+**✎ Confirm / edit** on the profile card to fix it: add or remove **skills**, set your **target
+title(s)**, **location**, **years** and **seniority**. Your corrections are saved and used for
+the next search, so a single fix lifts every match. (It's the cheapest way to improve results.)
+
+---
+
 ## How matching works
 
 Each job gets a 0–100 score:

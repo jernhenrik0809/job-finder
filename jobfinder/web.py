@@ -21,7 +21,7 @@ from .applications import (
     STATUSES, SUGGESTED_NEXT, attach_letter, job_snapshot, new_application, set_status,
 )
 from .config import settings
-from .cv_parser import CVProfile, build_profile, extract_text_from_bytes, looks_empty
+from .cv_parser import CVProfile, build_profile, default_query, extract_text_from_bytes, looks_empty
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
 from .insights import compute_insights
@@ -137,6 +137,16 @@ class ApplicationUpdate(BaseModel):
     body: str | None = None
 
 
+class ProfileUpdate(BaseModel):
+    """User corrections to the parsed CV profile. Only provided fields are changed."""
+    name: str | None = None
+    titles: list[str] | None = None
+    skills: list[str] | None = None
+    location: str | None = None
+    seniority: str | None = None
+    years_experience: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
@@ -191,6 +201,56 @@ async def upload_text(text: str = Form(...)) -> JSONResponse:
     profile = build_profile(text)
     cv_id = _store_profile(profile)
     return JSONResponse({"cv_id": cv_id, "profile": _profile_summary(profile), "warning": None})
+
+
+def _clean_list(values: list[str] | None, *, lower: bool = False, cap: int = 100) -> list[str]:
+    """Strip/dedupe a user-supplied list, dropping blanks. Order-preserving, bounded."""
+    out: list[str] = []
+    seen: set[str] = set()
+    for v in values or []:
+        v = (str(v) if v is not None else "").strip()
+        if lower:
+            v = v.lower()
+        if v and v not in seen:
+            seen.add(v)
+            out.append(v)
+        if len(out) >= cap:
+            break
+    return out
+
+
+@app.patch("/api/profile/{cv_id}")
+async def update_profile(cv_id: str, req: ProfileUpdate) -> JSONResponse:
+    """Apply the user's corrections to a parsed profile — the whole funnel's accuracy
+    rests on cv_parser heuristics, so letting the user fix them lifts every later step."""
+    profile = store.get_profile(cv_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="CV not found — upload it again.")
+
+    # Only fields the client actually sent are touched (None = leave unchanged).
+    if req.skills is not None:
+        profile.skills = _clean_list(req.skills, lower=True)
+    if req.titles is not None:
+        profile.titles = _clean_list(req.titles, cap=20)
+    if req.name is not None:
+        profile.name = req.name.strip() or None
+    if req.location is not None:
+        profile.location = req.location.strip() or None
+    if req.seniority is not None:
+        profile.seniority = (req.seniority.strip().lower() or None)
+    if req.years_experience is not None:
+        try:
+            profile.years_experience = max(0, min(int(req.years_experience), 80))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="years_experience must be a number.")
+
+    # A corrected title/skill must also drive the default search query, otherwise an
+    # empty keyword box would still search for the parser's original wrong guess.
+    if req.titles is not None or req.skills is not None:
+        profile.suggested_keywords = default_query(profile.titles, profile.skills)
+
+    store.save_profile(cv_id, profile)
+    return JSONResponse({"cv_id": cv_id, "profile": _profile_summary(profile)})
 
 
 def _build_settings(keywords, location, sources, limit_per_source, remote, days, semantic, min_score) -> SearchSettings:

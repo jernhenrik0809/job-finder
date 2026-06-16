@@ -242,14 +242,6 @@ def build_profile(text: str) -> CVProfile:
     seniority = _detect_seniority(text, years)
     location = _detect_location(text)
 
-    # Build a sensible default search query: most specific title + top skills.
-    query_bits: list[str] = []
-    if titles:
-        query_bits.append(titles[0])
-    elif skills:
-        query_bits.append(skills[0])
-    suggested = " ".join(query_bits).strip()
-
     return CVProfile(
         raw_text=text,
         name=_detect_name(text),
@@ -258,8 +250,21 @@ def build_profile(text: str) -> CVProfile:
         years_experience=years,
         location=location,
         seniority=seniority,
-        suggested_keywords=suggested,
+        suggested_keywords=default_query(titles, skills),
     )
+
+
+def default_query(titles: list[str], skills: list[str]) -> str:
+    """The default search-query seed: most specific title, else top skill.
+
+    Shared by build_profile and the profile-edit endpoint so a user's corrected
+    title/skills feed the next default search instead of the stale parsed guess.
+    """
+    if titles:
+        return titles[0].strip()
+    if skills:
+        return skills[0].strip()
+    return ""
 
 
 def looks_empty(text: str) -> bool:

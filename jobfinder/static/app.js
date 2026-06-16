@@ -16,6 +16,7 @@ const el = {
   pasteToggle: $('#pasteToggle'), pasteArea: $('#pasteArea'), cvText: $('#cvText'), usePaste: $('#usePaste'),
   profileCard: $('#profileCard'), pTitle: $('#pTitle'), pSeniority: $('#pSeniority'),
   pYears: $('#pYears'), pSkills: $('#pSkills'),
+  editProfileBtn: $('#editProfileBtn'), profileEdit: $('#profileEdit'),
   keywords: $('#keywords'), location: $('#location'), days: $('#days'), limit: $('#limit'),
   remote: $('#remote'), semantic: $('#semantic'), minScore: $('#minScore'), minScoreVal: $('#minScoreVal'),
   searchBtn: $('#searchBtn'), hint: $('#hint'),
@@ -98,7 +99,10 @@ async function postProfile(url, fd) {
   }
 }
 
+let currentProfile = null;
+
 function renderProfile(p) {
+  currentProfile = p;
   el.profileCard.classList.remove('hidden');
   el.pTitle.textContent = (p.titles && p.titles[0]) || (p.name || 'CV loaded');
   el.pSeniority.textContent = p.seniority || '';
@@ -106,13 +110,103 @@ function renderProfile(p) {
   el.pYears.textContent = p.years_experience ? `${p.years_experience} yrs exp` : '';
   el.pYears.classList.toggle('hidden', !p.years_experience);
   el.pSkills.innerHTML = '';
-  (p.skills || []).slice(0, 20).forEach(s => {
+  (p.skills || []).slice(0, 30).forEach(s => {
     const c = document.createElement('span'); c.className = 'chip'; c.textContent = s;
     el.pSkills.appendChild(c);
   });
   if (!el.keywords.value && p.suggested_keywords) el.keywords.value = p.suggested_keywords;
   if (!el.location.value && p.location) el.location.value = p.location;
+  closeProfileEdit();
 }
+
+// ---------- confirm / edit the parsed profile ----------
+// The whole funnel rests on the CV parser's guesses — let the user fix them.
+function closeProfileEdit() {
+  el.profileEdit.classList.add('hidden');
+  el.profileEdit.innerHTML = '';
+  el.profileCard.classList.remove('editing');
+}
+
+function openProfileEdit() {
+  if (!currentProfile) return;
+  const p = currentProfile;
+  let editSkills = [...(p.skills || [])];
+  const box = el.profileEdit;
+  box.innerHTML = `
+    <div class="pe-grid">
+      <label>Name<input id="peName" type="text"></label>
+      <label>Target title(s)<input id="peTitles" type="text" placeholder="comma-separated"></label>
+      <label>Location<input id="peLocation" type="text"></label>
+      <label>Years exp<input id="peYears" type="number" min="0" max="80"></label>
+      <label>Level<select id="peSeniority">
+        <option value="">(unknown)</option><option value="junior">junior</option><option value="mid">mid</option><option value="senior">senior</option><option value="lead">lead</option>
+      </select></label>
+    </div>
+    <p class="muted small" style="margin:.6rem 0 .2rem">Skills — click × to remove</p>
+    <div id="peSkills" class="chips"></div>
+    <div class="pe-add"><input id="peSkillInput" type="text" placeholder="add a skill"><button id="peAddSkill" type="button">＋ Add</button></div>
+    <div class="pe-actions"><button id="peSave" type="button" class="primary">Save profile</button><button id="peCancel" type="button">Cancel</button></div>`;
+  box.classList.remove('hidden');
+  el.profileCard.classList.add('editing');
+  box.querySelector('#peName').value = p.name || '';
+  box.querySelector('#peTitles').value = (p.titles || []).join(', ');
+  box.querySelector('#peLocation').value = p.location || '';
+  box.querySelector('#peYears').value = p.years_experience || '';
+  box.querySelector('#peSeniority').value = p.seniority || '';
+
+  const skillsBox = box.querySelector('#peSkills');
+  function renderEditSkills() {
+    skillsBox.innerHTML = '';
+    editSkills.forEach((s, i) => {
+      const c = document.createElement('span'); c.className = 'chip removable'; c.textContent = s;
+      const x = document.createElement('button');
+      x.type = 'button'; x.className = 'chip-x'; x.textContent = '×';
+      x.setAttribute('aria-label', `remove ${s}`);
+      x.addEventListener('click', () => { editSkills.splice(i, 1); renderEditSkills(); });
+      c.appendChild(x); skillsBox.appendChild(c);
+    });
+  }
+  renderEditSkills();
+  function addSkill() {
+    const inp = box.querySelector('#peSkillInput');
+    const v = inp.value.trim();
+    if (v && !editSkills.some(s => s.toLowerCase() === v.toLowerCase())) editSkills.push(v);
+    inp.value = ''; inp.focus(); renderEditSkills();
+  }
+  box.querySelector('#peAddSkill').addEventListener('click', addSkill);
+  box.querySelector('#peSkillInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); addSkill(); }
+  });
+  box.querySelector('#peCancel').addEventListener('click', closeProfileEdit);
+  box.querySelector('#peSave').addEventListener('click', () => saveProfile(editSkills, box));
+}
+
+async function saveProfile(editSkills, box) {
+  if (!cvId) return;
+  const titles = box.querySelector('#peTitles').value.split(',').map(s => s.trim()).filter(Boolean);
+  const yearsRaw = box.querySelector('#peYears').value.trim();
+  const payload = {
+    name: box.querySelector('#peName').value.trim(),
+    titles, skills: editSkills,
+    location: box.querySelector('#peLocation').value.trim(),
+    seniority: box.querySelector('#peSeniority').value,
+  };
+  if (yearsRaw !== '') payload.years_experience = parseInt(yearsRaw, 10);
+  const saveBtn = box.querySelector('#peSave'); saveBtn.disabled = true;
+  try {
+    const resp = await fetch(`/api/profile/${cvId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Save failed');
+    renderProfile(data.profile);     // re-render read-only view + close edit
+    el.hint.textContent = 'Profile updated — your edits will be used for matching.';
+  } catch (err) { showWarnings(['Profile: ' + err.message]); saveBtn.disabled = false; }
+}
+
+if (el.editProfileBtn) el.editProfileBtn.addEventListener('click', () => {
+  if (el.profileEdit.classList.contains('hidden')) openProfileEdit(); else closeProfileEdit();
+});
 
 // ---------- tabs ----------
 el.tabMatches.addEventListener('click', () => switchTab('matches'));

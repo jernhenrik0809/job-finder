@@ -2,6 +2,27 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.9.0] — 2026-06-16
+
+### Added
+- **Confirm / edit your parsed profile.** The whole match funnel rests on the CV parser's
+  guesses, so you can now fix them. The profile card has a **✎ Confirm / edit** toggle that opens
+  inline controls: editable **skill chips** (remove with ×, add your own), plus your **name**,
+  **target title(s)**, **location**, **years** and **seniority level**. Saving updates the stored
+  profile, so your corrected skills and titles are what the next search scores against.
+- API: `PATCH /api/profile/{cv_id}` (only provided fields change; lists are stripped/deduped,
+  skills lowercased, years clamped 0–80; unknown `cv_id` → 404). `jobfinder/web.py`.
+
+### Fixed (from review)
+- Correcting your **title/skills** now also refreshes the **default search query**
+  (`suggested_keywords`) — previously a search with an empty keyword box still queried the job
+  boards with the parser's *original* wrong guess, defeating the point of the edit. Derivation is
+  shared with `build_profile` via `cv_parser.default_query`.
+
+### Tests
+- 90 → 94 (corrections applied + persisted to the store, partial update, years clamp + 404,
+  corrected title/skill refreshes the default query).
+
 ## [1.8.0] — 2026-06-16
 
 ### Security

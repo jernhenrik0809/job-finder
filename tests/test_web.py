@@ -140,3 +140,52 @@ def test_examples_add_list_delete():
     assert any(e["id"] == eid for e in client.get("/api/examples").json()["examples"])
     assert client.delete(f"/api/examples/{eid}").status_code == 200
     assert all(e["id"] != eid for e in client.get("/api/examples").json()["examples"])
+
+
+def test_profile_update_applies_corrections_and_persists():
+    cv_id = _upload_cv()
+    r = client.patch(f"/api/profile/{cv_id}", json={
+        "skills": ["Python", "  django ", "django", ""],    # dedupe + strip + drop blanks
+        "titles": ["Backend Engineer"],
+        "location": "Copenhagen",
+        "seniority": "Senior",
+        "years_experience": 9,
+    })
+    assert r.status_code == 200
+    p = r.json()["profile"]
+    assert p["skills"] == ["python", "django"]              # lowercased, deduped
+    assert p["titles"] == ["Backend Engineer"]
+    assert p["location"] == "Copenhagen" and p["seniority"] == "senior"
+    assert p["years_experience"] == 9
+
+    # persisted in the store, and the corrected skills are what the matcher will use
+    import jobfinder.web as web
+    stored = web.store.get_profile(cv_id)
+    assert stored.skills == ["python", "django"] and stored.titles == ["Backend Engineer"]
+
+
+def test_profile_update_partial_leaves_other_fields():
+    cv_id = _upload_cv()
+    before = client.patch(f"/api/profile/{cv_id}", json={"location": "Aarhus"}).json()["profile"]
+    # titles/skills from the parsed CV are untouched by a location-only edit
+    after = client.patch(f"/api/profile/{cv_id}", json={"seniority": "lead"}).json()["profile"]
+    assert after["location"] == "Aarhus"                    # earlier edit retained
+    assert after["seniority"] == "lead"
+
+
+def test_profile_update_clamps_years_and_rejects_unknown_cv():
+    cv_id = _upload_cv()
+    p = client.patch(f"/api/profile/{cv_id}", json={"years_experience": 999}).json()["profile"]
+    assert p["years_experience"] == 80                       # clamped
+    assert client.patch("/api/profile/does-not-exist", json={"location": "x"}).status_code == 404
+
+
+def test_profile_update_refreshes_suggested_keywords():
+    # correcting the title must also drive the default search query (regression):
+    # an empty keyword box should search the corrected role, not the parsed guess.
+    cv_id = _upload_cv()
+    p = client.patch(f"/api/profile/{cv_id}", json={"titles": ["Machine Learning Engineer"]}).json()["profile"]
+    assert p["suggested_keywords"] == "Machine Learning Engineer"
+    # falls back to the top skill when there is no title
+    p2 = client.patch(f"/api/profile/{cv_id}", json={"titles": [], "skills": ["Kubernetes"]}).json()["profile"]
+    assert p2["suggested_keywords"] == "kubernetes"
