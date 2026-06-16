@@ -55,7 +55,12 @@ class JoobleSource(JobSource):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            raise RuntimeError(f"Jooble request failed: {e}") from e
+            # Never echo the exception text: it embeds the request URL, which carries the
+            # API key in its path (the message reaches /api/search warnings).
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            raise RuntimeError(
+                f"Jooble request failed ({type(e).__name__}" + (f", HTTP {status}" if status else "") + ")"
+            ) from e
 
         jobs: list[Job] = []
         for item in (data.get("jobs") or [])[:limit]:

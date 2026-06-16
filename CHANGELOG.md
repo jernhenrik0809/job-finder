@@ -2,6 +2,33 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.14.0] — 2026-06-16
+
+### Fixed (security)
+- **API keys could leak into a search warning.** Adzuna and Jooble carry their key in the
+  request URL (query param / path); on a network error the raised message embedded that URL,
+  and `/api/search` returns source warnings in its JSON. Both now report only the error *type*
+  (e.g. `Adzuna request failed (ConnectionError)`) — never the URL. *(Found by the review of the
+  suite below.)*
+- **Removed a stray third-party egress:** the page preconnected to `fonts.googleapis.com` while
+  using a system-font stack — a pointless call to Google on every load. Deleted.
+
+### Security
+- **CI security-regression suite** (`tests/test_security_invariants.py`) — three core invariants
+  enforced on every CI run:
+  1. **No secret in any response** — sweeps every no-arg GET with sentinel keys loaded **and**
+     drives the `/api/search` warning path (the one that leaked above); sentinels are derived
+     from a single `config.SECRET_FIELDS`, so a new key is auto-covered.
+  2. **No unexpected outbound host** — enforced at **runtime**: the network layer is patched to
+     record every host each source actually contacts, so an `f"https://{host}"` can't slip past
+     a source-text scan; backed by a cheap literal-string lint as a secondary check.
+  3. **No auto-submit machinery** — an import smoke test (`smtplib`, `selenium`, `playwright`, …),
+     anchored to import/call sites so a *comment* can't trip it; the real "drafts, never sends"
+     guarantee is the design plus the runtime host allow-list.
+
+### Tests
+- 196 → 202.
+
 ## [1.13.0] — 2026-06-16
 
 ### Security / privacy
