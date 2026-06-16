@@ -220,6 +220,12 @@ that are a better real-world fit: **freshly posted**, a **location / genuine-rem
 decisive relevance gap — and each one is shown as a green band in the **Why?** breakdown. (Salary
 is shown on the card but never scored — cross-board salary text isn't reliably comparable.)
 
+The final score is shown as a **calibrated band** — **Strong** (≥65) · **Good** (≥40) ·
+**Fair** (≥25) · **Weak** — so a number has a consistent meaning. Those thresholds aren't guessed:
+a labeled set of CV×JD fixtures (real-style strong / partial / unrelated pairs across several job
+fields) is checked in CI to make sure strong matches keep landing in **Strong**, unrelated roles
+stay low, and the best-matching job for any CV is always ranked on top.
+
 ### Why this score? (transparent breakdown)
 
 Every match card has a **Why?** toggle. It opens a breakdown showing each component's

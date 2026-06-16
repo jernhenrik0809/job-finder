@@ -1,0 +1,311 @@
+[
+  {
+    "domain": "backend software engineering (Python/Django/AWS)",
+    "cv_text": "Mikkel Sørensen\nBackend Software Engineer — Copenhagen, Denmark\n\nSUMMARY\nBackend engineer with around 6 years building and operating Python web services in production. I focus on designing clean REST APIs, keeping data models sane as products grow, and making sure things stay observable once they hit real traffic. Comfortable owning a service end to end, from schema design through deployment and on-call. I enjoy mentoring newer teammates and pushing for pragmatic, well-tested code over clever code.\n\nSKILLS\nPython, Django, Django REST Framework, PostgreSQL, Celery, Redis, Docker, AWS (EC2, RDS, S3, Lambda), Terraform, CI/CD with GitHub Actions, pytest, Git, REST API design, message queues. Working knowledge of Kubernetes and basic React for internal tooling.\n\nEXPERIENCE\nSenior Backend Engineer — Pleo, Copenhagen (2021–present)\nOwn core expense-platform services handling payments reconciliation for thousands of European companies. Led a migration that split a Django monolith into three services, cutting p95 latency on the busiest endpoint by 40%. Built an async pipeline with Celery and Redis to process card transactions, and moved infrastructure to Terraform-managed AWS. Set up structured logging and alerting that reduced mean time to detection on incidents. Mentor two junior engineers and run our internal API design reviews.\n\nBackend Developer — Trustpilot, Copenhagen (2018–2021)\nWorked on the reviews ingestion API in Python and Django, serving millions of requests daily. Introduced contract tests and raised coverage on the team's services from roughly 45% to 80%. Helped move batch jobs onto AWS Lambda and S3, lowering nightly processing cost. Participated in on-call rotation and post-incident reviews.\n\nEDUCATION\nBSc in Software Development, IT University of Copenhagen, 2018.\nFluent in Danish and English.",
+    "cv_titles": [
+      "Senior Backend Engineer",
+      "Backend Developer"
+    ],
+    "cv_skills": [
+      "python",
+      "django",
+      "django rest framework",
+      "postgresql",
+      "celery",
+      "redis",
+      "docker",
+      "aws",
+      "terraform",
+      "rest api",
+      "pytest",
+      "github actions",
+      "lambda",
+      "ci/cd"
+    ],
+    "cv_seniority": "senior",
+    "jobs": [
+      {
+        "title": "Senior Backend Engineer (Python/Django)",
+        "description": "We are growing our platform team and looking for an experienced backend engineer to help us scale our Django-based services. You will own features end to end: designing the data model, building well-documented REST APIs, and making sure they hold up under production load. Day to day you will work in Python with Django and Django REST Framework, lean on PostgreSQL for our core data, and use Celery and Redis for the asynchronous parts of our pipeline. Our infrastructure runs on AWS and is provisioned with Terraform, with deployments shipped through GitHub Actions. We care a lot about testing and expect you to be comfortable with pytest and writing code that is easy for the next person to change. Responsibilities include leading technical design discussions, reviewing pull requests, improving observability, and mentoring less experienced developers. Requirements: 5+ years of professional Python backend experience, strong Django knowledge, solid relational database skills, and hands-on experience operating services in a cloud environment. Experience with containerization (Docker) and on-call ownership is a plus. This is a hybrid role based in our Copenhagen office.",
+        "location": "Copenhagen",
+        "expected_tier": "strong"
+      },
+      {
+        "title": "Platform Engineer (Infrastructure / DevOps)",
+        "description": "Join our platform reliability team to build and operate the foundations that our product engineers ship on top of. This role is infrastructure-first: you will spend most of your time in Terraform and Kubernetes, designing CI/CD pipelines, managing our AWS accounts, and tightening security and cost controls across environments. You will set up observability tooling (Prometheus, Grafana, structured logging) and help teams debug production issues. We work primarily in Go for our internal tooling, though scripting in Python is common and welcome. Responsibilities include owning the Kubernetes clusters, automating environment provisioning, running an on-call rotation, and partnering with application teams to improve deployment reliability. Requirements: strong experience with infrastructure-as-code, deep AWS knowledge, container orchestration with Kubernetes, and a track record of building robust delivery pipelines. While you will collaborate closely with backend developers, this is not primarily an application-development role — the focus is on platform, reliability, and developer experience. Remote within Denmark, with occasional travel to Aarhus.",
+        "location": "Aarhus",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Registered Nurse — Medical Ward",
+        "description": "Aarhus University Hospital is seeking a dedicated registered nurse to join our busy internal medicine ward. You will be responsible for the direct care of patients, administering prescribed medications, monitoring vital signs, and updating care plans in close collaboration with physicians and the wider clinical team. The role involves day, evening, and night shifts on a rotating schedule, and you will support patients and their families with compassion and clear communication throughout their stay. Responsibilities include patient assessment, wound care, coordinating discharges, and accurate documentation in the electronic patient record. Requirements: a Danish nursing authorisation (autorisation som sygeplejerske), strong clinical judgement, and the ability to stay calm under pressure in a fast-paced environment. Newly qualified nurses are welcome to apply and will receive structured onboarding and mentoring. Danish language skills at a professional level are essential for patient communication and documentation. We offer a supportive team, continued professional development, and a meaningful role caring for patients when they need it most.",
+        "location": "Aarhus",
+        "expected_tier": "unrelated"
+      },
+      {
+        "title": "Backend Engineer — Node.js / TypeScript",
+        "description": "We are a fast-moving fintech startup looking for a backend engineer to help build our payments platform. Our stack is Node.js and TypeScript, with services exposed over REST and GraphQL, backed by PostgreSQL and Redis. You will design and ship API endpoints, model new domains as the product evolves, and make sure our services are reliable and well tested. The infrastructure runs on AWS (ECS, RDS, SQS) and we deploy continuously through our CI pipeline, so you should be comfortable owning a service from code to production. Responsibilities include collaborating with product to break down features, writing clean and tested code, participating in code review, and sharing the on-call rotation as we scale. Requirements: solid commercial experience building backend services, strong JavaScript/TypeScript skills, good relational database fundamentals, and familiarity with cloud deployment. We value engineers who care about API design and testing. If you come from another backend language and are excited to work in the Node ecosystem, we are happy to support the transition. Hybrid role based in central Copenhagen.",
+        "location": "Copenhagen",
+        "expected_tier": "partial"
+      }
+    ]
+  },
+  {
+    "domain": "data science / ML (Python, pandas, scikit-learn)",
+    "cv_text": "Sofie Lindqvist\nData Scientist — Copenhagen, Denmark\n\nSUMMARY\nData scientist with around five years of experience turning messy operational data into models that ship. I work end to end: framing the business question, wrangling data in Python, building and validating models, and getting them into production behind an API. Comfortable owning a problem from first SQL query to monitored endpoint. Danish (native) and English (fluent).\n\nSKILLS\nPython, pandas, NumPy, scikit-learn, statistical modelling, classification and regression, feature engineering, cross-validation, gradient boosting (XGBoost), SQL (PostgreSQL), data visualisation with matplotlib and seaborn, A/B testing, Git, Docker, and deploying models with FastAPI. Some exposure to PyTorch for a side project.\n\nEXPERIENCE\nData Scientist, Trustpilot — Copenhagen (2022–present)\nBuilt a churn-prediction model for B2B customers using gradient-boosted trees, lifting retention-team precision by 18% over the previous heuristic. Owned the full pipeline: pulled data from Postgres, engineered behavioural features in pandas, tuned with cross-validated grid search, and shipped predictions through a FastAPI service running in Docker. Ran A/B tests to measure intervention impact and presented results to non-technical stakeholders.\n\nJunior Data Analyst, Danske Bank — Copenhagen (2019–2022)\nAutomated weekly fraud-monitoring reports with Python and SQL, cutting manual effort by roughly ten hours a week. Built logistic-regression and random-forest baselines for transaction risk scoring and visualised findings in dashboards for the compliance team.\n\nEDUCATION\nMSc in Mathematical Modelling and Computation, Technical University of Denmark (DTU), 2019\nBSc in Statistics, University of Copenhagen, 2017\n\nSide interests: Kaggle competitions, contributing small fixes to open-source pandas tooling.",
+    "cv_titles": [
+      "Data Scientist",
+      "Machine Learning Engineer"
+    ],
+    "cv_skills": [
+      "python",
+      "pandas",
+      "numpy",
+      "scikit-learn",
+      "xgboost",
+      "sql",
+      "postgresql",
+      "fastapi",
+      "docker",
+      "git",
+      "matplotlib",
+      "seaborn",
+      "a/b testing",
+      "feature engineering"
+    ],
+    "cv_seniority": "mid",
+    "jobs": [
+      {
+        "title": "Data Scientist",
+        "description": "We are looking for a Data Scientist to join our analytics team and help us build predictive models that drive product and retention decisions. You will work end to end: exploring data, framing the problem with stakeholders, building models, and helping ship them to production. Responsibilities include developing classification and regression models, engineering features from large behavioural datasets, designing and analysing A/B tests, and communicating findings clearly to non-technical colleagues. You will collaborate closely with engineers to deploy models as services and monitor their performance over time. Requirements: strong Python skills with pandas and NumPy, hands-on experience with scikit-learn and gradient-boosting libraries such as XGBoost or LightGBM, solid SQL for pulling and shaping data (we use PostgreSQL), and a good grasp of model validation and cross-validation. Experience packaging models with Docker and serving them via an API is a clear plus. We value people who can own a problem from the first query to a monitored endpoint. A degree in a quantitative field (statistics, mathematics, computer science, or similar) is expected. Danish is helpful but not required; the working language is English.",
+        "location": "Copenhagen",
+        "expected_tier": "strong"
+      },
+      {
+        "title": "Senior Machine Learning Engineer",
+        "description": "Join our platform team to design and operate large-scale ML infrastructure powering recommendation and ranking systems used by millions. This is a senior, engineering-heavy role focused on productionising deep-learning models rather than ad-hoc analysis. You will own training pipelines built on PyTorch and TensorFlow, optimise GPU utilisation, and build the serving and feature-store layers that keep latency low at high throughput. Responsibilities include architecting distributed training jobs, implementing CI/CD for model deployment on Kubernetes, managing data flows with Spark and Kafka, and mentoring junior engineers. Requirements: 7+ years of software engineering experience, deep expertise in at least one deep-learning framework, strong systems and distributed-computing knowledge, and fluency with cloud infrastructure (AWS or GCP), Kubernetes, and MLOps tooling such as MLflow or Kubeflow. You should be comfortable reading and optimising low-level performance and owning services on call. Classic tabular machine learning is part of the picture but the emphasis is on scale, deep learning, and infrastructure. Based in our Aarhus office with hybrid flexibility.",
+        "location": "Aarhus",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Registered Nurse — Intensive Care Unit",
+        "description": "Aarhus University Hospital is seeking a dedicated Registered Nurse for our Intensive Care Unit. You will provide direct patient care for critically ill adults, monitor vital signs and life-support equipment, administer medication under physician direction, and respond rapidly to changes in patient condition. Responsibilities include developing and updating individual care plans, supporting families during difficult moments, documenting accurately in the electronic patient record, and collaborating with the multidisciplinary care team during rounds. You will participate in a rotating shift schedule including nights and weekends. Requirements: a Danish nursing authorisation (autorisation som sygeplejerske), at least two years of clinical experience preferably in acute or critical care, current certification in advanced life support, and the ability to stay calm and precise under pressure. Strong communication skills in Danish are essential for patient and family interaction. We offer continuing-education opportunities, a supportive team environment, and competitive public-sector terms. This is a full-time permanent position.",
+        "location": "Aarhus",
+        "expected_tier": "unrelated"
+      },
+      {
+        "title": "Data Analyst",
+        "description": "We are hiring a Data Analyst to turn business questions into clear, actionable insight. You will spend most of your time querying our data warehouse, building dashboards, and presenting trends to commercial and operations teams. Responsibilities include writing and optimising SQL queries, maintaining reporting pipelines, performing exploratory analysis in Python or R, designing KPI dashboards in Power BI or Tableau, and supporting stakeholders with ad-hoc data requests. Some lightweight statistical analysis and A/B test reporting is part of the role, but this is primarily an analytics and reporting position rather than a modelling-heavy one. Requirements: solid SQL, comfort with a scripting language such as Python for data wrangling with pandas, experience building dashboards in a BI tool, and the ability to explain numbers to non-technical audiences. Familiarity with statistics and experiment analysis is a plus. A relevant degree or equivalent experience is expected. The role is fully remote within Denmark with occasional team meetups in Copenhagen.",
+        "location": "Remote",
+        "expected_tier": "partial"
+      }
+    ]
+  },
+  {
+    "domain": "frontend / web (React, TypeScript, CSS)",
+    "cv_text": "Mette Sørensen\nFrontend Engineer — Copenhagen, Denmark\n\nSummary\nFrontend engineer with around six years building responsive, accessible web applications for Danish and Nordic companies. I specialise in React and TypeScript, care a lot about clean component architecture, and enjoy turning Figma designs into pixel-accurate, performant interfaces. Comfortable owning features end to end, from API integration to polished UI, and mentoring less experienced colleagues.\n\nSkills\nReact, TypeScript, JavaScript (ES2022), HTML5, modern CSS (Flexbox, Grid, CSS Modules), Sass, styled-components, Redux Toolkit and React Query for state, Vite and webpack, Jest and React Testing Library, Cypress for end-to-end tests, Storybook, REST and GraphQL APIs, web accessibility (WCAG 2.1), Git, and CI with GitHub Actions.\n\nExperience\nSenior Frontend Developer, Trustpilot — Copenhagen (2021–present)\nLed the rebuild of the public business profile pages in React and TypeScript, improving Largest Contentful Paint by 40% through code-splitting and image optimisation. Built a shared component library in Storybook used by four product teams. Drove the migration from class components to hooks and introduced React Query, cutting boilerplate and stale-data bugs. Mentored two junior developers.\n\nFrontend Developer, Templafy — Copenhagen (2019–2021)\nDeveloped customer-facing dashboards with React, Redux, and styled-components. Implemented a design system aligned with Figma specs and improved Lighthouse accessibility scores from 72 to 96. Wrote unit and integration tests with Jest and React Testing Library.\n\nJunior Web Developer, Shape A/S — Copenhagen (2018–2019)\nBuilt marketing sites and small SPAs in JavaScript and React, collaborating closely with designers and back-end engineers.\n\nEducation\nBSc in Software Development, IT University of Copenhagen, 2018.\n\nLanguages: Danish (native), English (fluent).",
+    "cv_titles": [
+      "Frontend Engineer",
+      "Senior Frontend Developer"
+    ],
+    "cv_skills": [
+      "react",
+      "typescript",
+      "javascript",
+      "css",
+      "sass",
+      "styled-components",
+      "redux",
+      "react-query",
+      "vite",
+      "webpack",
+      "jest",
+      "cypress",
+      "storybook",
+      "graphql",
+      "accessibility"
+    ],
+    "cv_seniority": "senior",
+    "jobs": [
+      {
+        "title": "Senior Frontend Engineer (React/TypeScript)",
+        "description": "We are looking for a Senior Frontend Engineer to join our product team building a SaaS analytics platform used by thousands of European businesses. You will own significant parts of our React and TypeScript codebase, shape the component architecture, and partner with designers to ship polished, accessible interfaces.\n\nResponsibilities:\n- Build and maintain feature-rich UI using React, TypeScript and modern CSS\n- Improve performance, bundle size and Core Web Vitals across the app\n- Maintain and extend our shared component library and Storybook documentation\n- Write unit and end-to-end tests to keep the product stable\n- Mentor mid-level engineers and contribute to frontend standards\n\nRequirements:\n- 5+ years of professional frontend experience\n- Strong command of React, TypeScript and the modern JavaScript ecosystem\n- Solid CSS skills (Flexbox, Grid) and experience with a styling solution such as styled-components or CSS Modules\n- Experience with state and data-fetching libraries like Redux Toolkit or React Query\n- Familiarity with testing tools (Jest, React Testing Library, Cypress)\n- Care for accessibility and clean, maintainable code\n\nWe offer flexible hours, a strong engineering culture, and a central office in Copenhagen.",
+        "location": "Copenhagen",
+        "expected_tier": "strong"
+      },
+      {
+        "title": "Full-Stack Developer (Node.js & React)",
+        "description": "Our growing fintech startup is hiring a Full-Stack Developer to work across our web platform. You will spend roughly half your time on the React frontend and half on Node.js backend services, so we are looking for someone comfortable on both sides of the stack.\n\nResponsibilities:\n- Develop and maintain features in our React single-page application\n- Build and operate Node.js/Express REST APIs and background workers\n- Design and query PostgreSQL databases and write performant SQL\n- Participate in code reviews, on-call rotation and deployment via Docker and AWS\n\nRequirements:\n- 3+ years building web applications\n- Good knowledge of JavaScript/TypeScript and React on the frontend\n- Hands-on experience with Node.js, Express and relational databases\n- Comfortable with cloud infrastructure (AWS), Docker and CI/CD pipelines\n- A pragmatic, ownership-driven mindset\n\nThis role leans heavily on backend and infrastructure work alongside the frontend. If you enjoy touching the whole stack rather than going deep on the UI, you'll thrive here. Remote within Denmark with occasional visits to our Aarhus office.",
+        "location": "Aarhus",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Registered Nurse — Intensive Care Unit",
+        "description": "Rigshospitalet is seeking a dedicated Registered Nurse to join our Intensive Care Unit. You will provide high-quality care to critically ill patients, working in a multidisciplinary team of physicians, nurses and specialists in a demanding but rewarding environment.\n\nResponsibilities:\n- Monitor and care for critically ill patients, including ventilated patients\n- Administer medication and operate life-support and monitoring equipment\n- Document patient status accurately and communicate with families\n- Respond calmly and effectively to emergencies\n\nRequirements:\n- Danish nursing authorisation (autorisation som sygeplejerske)\n- Completed nursing degree and ideally ICU specialisation\n- Experience in acute or critical care preferred\n- Strong communication skills and ability to work shifts, including nights and weekends\n- Fluent Danish is required for patient communication\n\nWe offer structured onboarding, continuing education, and a supportive team. Join one of Denmark's leading hospitals and make a real difference in patients' lives.",
+        "location": "Copenhagen",
+        "expected_tier": "unrelated"
+      },
+      {
+        "title": "Frontend Developer — Design Systems",
+        "description": "We are a Danish e-commerce company looking for a Frontend Developer to help build and maintain our design system and component library. You'll work closely with designers and product teams to deliver reusable, accessible UI components used across multiple web properties.\n\nResponsibilities:\n- Build and document components in React and TypeScript using Storybook\n- Translate Figma designs into clean, responsive CSS (Sass and CSS Modules)\n- Ensure components meet WCAG accessibility standards\n- Collaborate with product teams to roll out the design system and gather feedback\n- Write tests with Jest and React Testing Library\n\nRequirements:\n- 2+ years of frontend development experience\n- Solid React, TypeScript and modern CSS skills\n- Eye for detail and a passion for great UI and accessibility\n- Experience with Storybook and component-driven development is a plus\n\nThis is a focused UI-engineering role with strong skill overlap, though it is pitched at a more mid-level scope than a senior lead position. Hybrid setup based in Odense.",
+        "location": "Odense",
+        "expected_tier": "strong"
+      }
+    ]
+  },
+  {
+    "domain": "product design / UX (Figma, research, prototyping)",
+    "cv_text": "Sofie Mortensen\nProduct Designer (UX/UI) — Copenhagen, Denmark\n\nSummary\nProduct designer with 6 years of experience turning messy problem spaces into clear, usable digital products. I work end-to-end: framing the problem with research, sketching flows, building interactive Figma prototypes, and pairing closely with engineers to ship. Comfortable owning a feature from discovery through launch and measuring whether it actually worked. Strong advocate for design systems and accessibility (WCAG 2.1 AA).\n\nSkills\nFigma, FigJam, interaction design, wireframing, high-fidelity prototyping, user research, usability testing, user interviews, journey mapping, information architecture, design systems, component libraries, accessibility, WCAG, A/B testing, HTML/CSS basics, Maze, Hotjar, design tokens.\n\nExperience\n\nSenior Product Designer — Pleo, Copenhagen (2021–present)\nLead designer for the expense-management onboarding flow used by 30,000+ SMEs. Ran moderated and unmoderated usability studies (Maze, UserTesting) that cut first-week drop-off by 22%. Built and maintained shared Figma component library and design tokens adopted across four squads. Partnered daily with React engineers and PMs in a continuous-discovery setup; facilitated weekly design critiques.\n\nProduct Designer — Trustpilot, Copenhagen (2019–2021)\nDesigned reviewer-facing features for web and mobile. Led generative research (15+ interviews) that reshaped the review-writing experience, lifting completion rate by 14%. Prototyped and validated flows in Figma before handoff; introduced an accessibility checklist now used team-wide.\n\nUX Designer — Shape A/S (agency), Aarhus (2018–2019)\nDelivered app concepts for Danish clients across fintech and public sector. Produced wireframes, clickable prototypes, and usability test plans on tight agency timelines.\n\nEducation\nMSc in Digitalisation & IT Management, Copenhagen Business School (2018)\nBA in Information Studies, Aarhus University (2016)\n\nLanguages: Danish (native), English (fluent)",
+    "cv_titles": [
+      "Product Designer",
+      "UX Designer"
+    ],
+    "cv_skills": [
+      "figma",
+      "user research",
+      "usability testing",
+      "prototyping",
+      "wireframing",
+      "interaction design",
+      "design systems",
+      "accessibility",
+      "journey mapping",
+      "information architecture",
+      "user interviews",
+      "a/b testing",
+      "figjam",
+      "maze"
+    ],
+    "cv_seniority": "senior",
+    "jobs": [
+      {
+        "title": "Senior Product Designer",
+        "description": "We are looking for a Senior Product Designer to join our growing product team and take ownership of core user journeys in our B2B SaaS platform. You will lead the full design process: discovery research, concept sketching, interactive prototyping in Figma, and close collaboration with engineers through to launch. Responsibilities include planning and running usability studies, contributing to and evolving our design system and component library, and championing accessibility across the product. You'll work in a continuous-discovery model alongside product managers and React developers, facilitating regular design critiques and presenting your thinking to stakeholders. Requirements: 5+ years designing digital products end-to-end; a portfolio that demonstrates strong interaction and visual craft in Figma; hands-on experience with user interviews and usability testing tools such as Maze or UserTesting; comfort working with and contributing to design systems and design tokens; solid grasp of accessibility standards (WCAG). Experience designing for SMEs or fintech is a plus. We value people who can frame ambiguous problems, validate ideas with real users, and measure impact after shipping. Danish language skills are a bonus but not required.",
+        "location": "Copenhagen",
+        "expected_tier": "strong"
+      },
+      {
+        "title": "UX Researcher",
+        "description": "Join our research practice as a UX Researcher embedded with two product squads. You will own the research roadmap end-to-end: scoping questions with product and design, recruiting participants, and running a mix of generative and evaluative studies including in-depth interviews, diary studies, surveys, and moderated usability sessions. You'll synthesise findings into clear, actionable insights and socialise them across the organisation through readouts, journey maps, and an internal insights repository. Responsibilities include defining research operations, mentoring designers on lightweight research methods, and partnering with data analysts to triangulate qualitative and quantitative signals. Requirements: 4+ years in a dedicated user research role; deep fluency in qualitative methods and study design; experience with survey tools and quantitative analysis; strong storytelling and stakeholder-management skills. Familiarity with Figma and prototyping is helpful for collaborating with designers, but this is a pure research role rather than a hands-on visual design position. You should be comfortable being the voice of the user in strategic conversations and shaping what the team chooses to build.",
+        "location": "Aarhus",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Frontend Engineer (React)",
+        "description": "We're hiring a Frontend Engineer to build and maintain the web applications behind our logistics platform. You will implement responsive, accessible interfaces in React and TypeScript, collaborate with designers to translate Figma specs into pixel-accurate components, and contribute to our shared component library. Responsibilities include writing clean, well-tested code, optimising rendering performance, integrating REST and GraphQL APIs, and participating in code reviews and on-call rotation. Requirements: 3+ years of professional frontend development; strong JavaScript/TypeScript and modern React (hooks, context, state management); experience with CSS-in-JS, build tooling, and automated testing frameworks such as Jest and Playwright; familiarity with CI/CD pipelines. Nice to have: experience with Node.js backends, WebSockets, and design-system implementation. You'll join a cross-functional squad and work closely with product and design, but your core focus is engineering robust, maintainable frontend code. We offer flexible hours and a hybrid setup from our Copenhagen office.",
+        "location": "Copenhagen",
+        "expected_tier": "unrelated"
+      },
+      {
+        "title": "Product Designer",
+        "description": "Our scale-up is looking for a Product Designer to help shape a consumer mobile app used across the Nordics. You'll own features from early exploration to polished delivery: sketching concepts, building interactive prototypes in Figma, running quick usability tests, and handing off to a tight-knit engineering team. We work in short, iterative cycles and expect designers to talk to users regularly, contribute to our growing design system, and keep accessibility front of mind. Responsibilities include facilitating workshops, mapping user journeys, and presenting design decisions to founders and stakeholders. Requirements: 3+ years designing digital products with a portfolio showing strong end-to-end work; confident in Figma for both prototyping and visual design; experience planning and moderating usability tests; an eye for clean, accessible interaction design. Bonus points for mobile-first design experience and familiarity with research tools like Maze or Hotjar. This is a hands-on individual-contributor role on a small team where you'll have a lot of ownership and direct impact on the product roadmap. Remote within the EU, with quarterly meetups in Copenhagen.",
+        "location": "Remote",
+        "expected_tier": "strong"
+      }
+    ]
+  },
+  {
+    "domain": "digital marketing / growth (SEO, analytics, campaigns)",
+    "cv_text": "Mette Sørensen\nCopenhagen, Denmark | mette.sorensen@email.dk | +45 31 22 84 50\n\nSUMMARY\nData-driven digital marketing specialist with 5 years of experience growing organic and paid channels for Danish B2C and SaaS brands. I turn search and analytics insights into measurable revenue, owning the full funnel from keyword research and on-page SEO to multi-channel campaign execution. Comfortable in both Danish and English markets, fluent in Nordic consumer behaviour, and happiest when a dashboard tells a clear story.\n\nSKILLS\nSEO (technical and on-page), Google Analytics 4, Google Tag Manager, Google Ads, Meta Ads Manager, Looker Studio, Ahrefs, Semrush, A/B testing, conversion rate optimisation, content marketing, email marketing (HubSpot, Mailchimp), basic SQL, HTML/CSS, Danish (native), English (fluent).\n\nEXPERIENCE\n\nDigital Marketing Specialist — Nordisk Retail Group, Copenhagen (2022–present)\nOwn organic search and paid social for three e-commerce brands. Rebuilt the site's technical SEO (structured data, Core Web Vitals, internal linking), lifting non-branded organic traffic 64% year over year. Run Google Ads and Meta campaigns on a 1.2M DKK annual budget, improving blended ROAS from 2.4 to 3.7 through audience segmentation and creative testing. Build GA4 and Looker Studio dashboards used weekly by the commercial team.\n\nMarketing Coordinator — Bjerg SaaS ApS, Aarhus (2020–2022)\nManaged content calendar and inbound funnel in HubSpot. Grew the blog to 40k monthly sessions via keyword-led content clusters and on-page optimisation. Ran A/B tests on landing pages and email flows, raising trial sign-up conversion by 18%.\n\nMarketing Intern — Kystby Media, Odense (2019–2020)\nSupported SEO audits, social scheduling, and monthly performance reporting in Google Analytics.\n\nEDUCATION\nBA in Marketing and Management Communication — Aarhus University (2016–2019)\nGoogle Analytics and Google Ads certified.",
+    "cv_titles": [
+      "Digital Marketing Specialist",
+      "SEO Specialist"
+    ],
+    "cv_skills": [
+      "seo",
+      "google analytics",
+      "google ads",
+      "google tag manager",
+      "meta ads",
+      "looker studio",
+      "ahrefs",
+      "semrush",
+      "a/b testing",
+      "conversion rate optimisation",
+      "content marketing",
+      "email marketing",
+      "hubspot",
+      "sql",
+      "html"
+    ],
+    "cv_seniority": "mid",
+    "jobs": [
+      {
+        "title": "SEO & Performance Marketing Specialist",
+        "description": "We are a fast-growing Copenhagen e-commerce company looking for an SEO & Performance Marketing Specialist to take ownership of our organic and paid acquisition. You will lead our search strategy end to end: technical site audits, keyword research, on-page optimisation, and content planning together with our editorial team. On the paid side, you will plan and optimise campaigns across Google Ads and Meta, managing a six-figure DKK monthly budget against clear ROAS targets. You will build and maintain reporting in GA4 and Looker Studio so the wider business can see what is working. We expect you to run continuous A/B and CRO experiments on landing pages and to keep a close eye on Core Web Vitals and crawl health. Requirements: 3+ years in digital marketing with hands-on SEO and paid media; strong command of Google Analytics 4, Tag Manager, and at least one of Ahrefs or Semrush; comfort reading data and turning it into action; fluent English, Danish a strong plus. You will join a small, ambitious marketing team and have real autonomy over channel budgets and roadmap.",
+        "location": "Copenhagen",
+        "expected_tier": "strong"
+      },
+      {
+        "title": "Marketing Automation Manager (Martech)",
+        "description": "Our SaaS scale-up is hiring a Marketing Automation Manager to own our lifecycle and CRM marketing. You will architect and run nurture programmes, lead-scoring models, and segmentation inside our marketing automation stack, working closely with sales operations to keep the funnel healthy. The role is heavily focused on Marketo and Salesforce: you will build complex multi-step journeys, manage data hygiene and field mapping, and integrate the platform with our wider revenue tooling via APIs and webhooks. Experience with HubSpot or email lifecycle marketing is helpful, but the core of this job is deep marketing-automation engineering and CRM administration rather than search or paid media. Responsibilities include designing attribution reporting, running deliverability and consent compliance, and partnering with RevOps on pipeline forecasting. Requirements: 4+ years in martech or marketing operations; certified Marketo or Salesforce admin strongly preferred; SQL and a structured, systems-minded approach to data; experience operating in a B2B demand-gen environment. This is an adjacent marketing role with a notably different toolset and a stronger automation/CRM engineering focus than channel growth.",
+        "location": "Aarhus",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Content Marketing Lead",
+        "description": "A Danish media and lifestyle brand is looking for a Content Marketing Lead to set editorial direction across our blog, newsletter, and social channels. You will own the content roadmap, brief and edit freelance writers, and shape brand voice for a primarily Danish-speaking audience. SEO awareness matters: you should understand keyword research and on-page basics so content ranks, and you will work with our growth team on distribution. However, this is a craft-and-storytelling role first, with day-to-day spent on editorial calendars, commissioning, and brand narrative rather than paid media or technical analytics. Responsibilities include managing the content production pipeline, growing organic reach through quality publishing, light reporting on engagement metrics, and collaborating with design on multimedia formats. Requirements: 4+ years in content or editorial roles; excellent Danish writing and English working proficiency; familiarity with SEO content principles and tools such as Semrush; comfort with a CMS and basic analytics. You will lead a small content pod and report to the Head of Marketing. Strong editorial taste and people-management instincts matter more than performance-marketing or paid-channel expertise here.",
+        "location": "Remote",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Registered Nurse — Medical Ward",
+        "description": "Rigshospitalet is recruiting a Registered Nurse to join our medical ward in central Copenhagen. As part of an interdisciplinary care team, you will assess patients, administer medication, monitor vital signs, and coordinate care plans alongside physicians and specialists. You will document accurately in the electronic patient record, support patients and families with compassion, and follow strict clinical and hygiene protocols. The role involves rotating day, evening, and night shifts, including weekends. Responsibilities include wound care, IV management, pre- and post-operative monitoring, and participating in ward handovers. We value calm decision-making under pressure and clear communication with both colleagues and patients. Requirements: Danish nursing authorisation (autorisation som sygeplejerske); a completed nursing degree; fluent spoken and written Danish; ability to work shifts; and a current right to work in Denmark. Newly qualified nurses are welcome, and we offer a structured onboarding programme, clinical supervision, and continuing professional development. Join a supportive team committed to high-quality patient care in one of Denmark's leading hospitals.",
+        "location": "Copenhagen",
+        "expected_tier": "unrelated"
+      }
+    ]
+  },
+  {
+    "domain": "finance / accounting (controlling, reporting, Excel/SAP)",
+    "cv_text": "Mette Sørensen\nFinancial Controller | Copenhagen, Denmark\n\nSUMMARY\nDetail-driven financial controller with 7 years of experience in management reporting, budgeting, and month-end close for mid-sized manufacturing and retail groups. I turn messy ERP data into reliable numbers that leadership actually uses, and I enjoy automating the boring parts of the close. Comfortable bridging finance and IT, and used to working across Danish and group reporting standards. Fluent Danish and English.\n\nSKILLS\nMonth-end and year-end close, management reporting, budgeting and forecasting, variance analysis, cost accounting, consolidation, cash flow reporting, IFRS and Danish GAAP (Årsregnskabsloven), VAT/moms reconciliation. SAP FICO, Microsoft Excel (advanced: pivot tables, Power Query, complex modelling), Power BI, and basic SQL for pulling data from the data warehouse.\n\nEXPERIENCE\nFinancial Controller — Nordic Components A/S, Copenhagen (2021–present)\nOwn the monthly close for two legal entities and deliver the management reporting pack to the CFO within four working days. Built a Power Query model that replaced manual Excel copy-paste and cut reporting time by roughly 30%. Run the annual budget and rolling forecast in SAP, lead variance analysis against plan, and present deviations to department heads. Partnered with IT to clean up the SAP cost centre structure.\n\nBusiness Controller — Aarhus Retail Group, Aarhus (2018–2021)\nResponsible for gross-margin and inventory reporting across 40 stores. Developed Power BI dashboards for weekly sales and stock KPIs used by regional managers. Supported the external audit and prepared consolidation schedules for the group accounts under Danish GAAP.\n\nJunior Accountant — Bech Revision, Aarhus (2017–2018)\nHandled bookkeeping, VAT returns, and bank reconciliations for SME clients; assisted with annual report preparation.\n\nEDUCATION\nMSc in Accounting, Strategy and Control (cand.merc.aud.), Copenhagen Business School, 2017\nBSc in Business Administration, Aarhus University, 2015",
+    "cv_titles": [
+      "Financial Controller",
+      "Business Controller"
+    ],
+    "cv_skills": [
+      "financial controlling",
+      "management reporting",
+      "budgeting",
+      "forecasting",
+      "variance analysis",
+      "month-end close",
+      "consolidation",
+      "sap",
+      "excel",
+      "power bi",
+      "power query",
+      "ifrs",
+      "danish gaap",
+      "sql",
+      "cost accounting"
+    ],
+    "cv_seniority": "mid",
+    "jobs": [
+      {
+        "title": "Financial Controller",
+        "description": "We are looking for a Financial Controller to join the group finance team of a growing industrial company. You will take ownership of the monthly and annual closing process for several Nordic entities, prepare the management reporting package for senior leadership, and ensure our figures are accurate and delivered on time. A key part of the role is the annual budget and quarterly forecasting cycle, where you will coordinate input from business units and analyse deviations against plan. You will work daily in SAP and are expected to be a strong Excel user; experience building reports in Power BI is a plus, as we want to continue automating manual reporting. Responsibilities also include supporting the external audit, maintaining the chart of accounts and cost-centre structure, and acting as a sparring partner to budget owners. Requirements: a relevant finance degree, 4+ years in a controlling or reporting role, solid knowledge of Danish accounting rules and ideally IFRS, and an analytical, hands-on mindset. You communicate comfortably in Danish and English. We offer flexible hours and a central office.",
+        "location": "Copenhagen",
+        "expected_tier": "strong"
+      },
+      {
+        "title": "Group Reporting & Consolidation Manager",
+        "description": "Our international group is seeking a Group Reporting and Consolidation Manager to lead the consolidation of more than 30 subsidiaries and own the IFRS group accounts. You will manage the monthly consolidation in our group reporting system (Tagetik/OneStream), eliminate intercompany transactions, handle currency translation, and prepare the consolidated financial statements and notes for the annual report. The role carries direct responsibility for the technical accounting agenda, including new IFRS standards, purchase price allocations on acquisitions, and impairment testing. You will manage a small team of two reporting accountants and act as the main contact for the group auditors. We expect deep IFRS expertise, prior consolidation experience at group level, and the ability to operate in a complex multi-currency environment. A state-authorised auditor background (statsautoriseret revisor) or several years in a Big Four audit/advisory role is strongly preferred. This is a senior, technically demanding position with significant stakeholder exposure at board level. Strong English required; Danish is an advantage.",
+        "location": "Aarhus",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Accounts Payable Assistant",
+        "description": "We are hiring an Accounts Payable Assistant to join our busy shared-service centre. In this role you will register and code incoming supplier invoices, match them against purchase orders and goods receipts, prepare weekly payment runs, and reconcile vendor statements. You will respond to supplier queries, chase missing approvals from budget holders, and help keep the AP inbox under control. The position is ideal for someone early in their finance career who enjoys high-volume, accurate transactional work and wants to learn a large ERP environment. Requirements: a finance or office-administration qualification, good attention to detail, basic Excel, and a service-minded attitude. Experience with an ERP system such as SAP, Dynamics or Visma is helpful but not required, as full training is provided. You should be comfortable working to month-end payment deadlines and collaborating with colleagues across the company. We offer a structured onboarding, a friendly team, and good public-transport access. Danish language skills are required for supplier communication.",
+        "location": "Odense",
+        "expected_tier": "partial"
+      },
+      {
+        "title": "Registered Nurse - Surgical Ward",
+        "description": "Aarhus University Hospital is seeking a dedicated Registered Nurse for our surgical ward. You will provide pre- and post-operative care, administer medication, monitor vital signs, and support patients and their families throughout the surgical journey. Working in close collaboration with surgeons, anaesthetists, and fellow nurses, you will plan and document individualised care, manage wound care and drains, and respond promptly to changes in patient condition. We work in three-shift rotation including nights and weekends. Requirements: a Danish nursing authorisation (autorisation som sygeplejerske), strong clinical judgement, and excellent communication skills in Danish. Newly qualified nurses are welcome to apply and will receive structured mentoring; experience from a surgical or acute setting is an advantage. We offer a supportive multidisciplinary team, continuing professional development, and a meaningful role at the heart of patient care. Compassion, resilience, and the ability to stay calm under pressure are essential. Apply with your CV and authorisation details.",
+        "location": "Aarhus",
+        "expected_tier": "unrelated"
+      }
+    ]
+  }
+]

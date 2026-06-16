@@ -2,6 +2,30 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.12.0] — 2026-06-16
+
+### Added
+- **Calibrated score bands.** The 0–100 score now has a defined, named meaning —
+  **Strong** (≥65) · **Good** (≥40) · **Fair** (≥25) · **Weak** — shown on each match card (colour
+  + label) and in the *Why?* header. Thresholds were calibrated against a labeled fixture set so
+  the bands actually mean something.
+- **Calibration fixture suite (regression guard).** A diverse, Denmark-relevant set of CV×JD
+  fixtures (`tests/fixtures/calibration.json`), each job labeled *strong / partial / unrelated*,
+  with assertions that run in CI: every strong match lands in the **Strong** band, unrelated roles
+  stay out of the top bands, partials never reach **Strong**, and — for every CV — the
+  **best-matching job is ranked on top**. This locks the scoring against silent drift as the
+  matcher evolves. `score_band()` / `SCORE_BANDS` are the single source of truth (`matcher.py`),
+  surfaced as `explanation.band` / `band_label`.
+
+### Fixed (from review)
+- The calibration tests now **derive** the band thresholds from `SCORE_BANDS` instead of
+  duplicating them, and the "partial never reaches Strong" guard is anchored to the band *name* —
+  so changing a threshold can't silently let a partial role read as a strong match.
+
+### Tests
+- 113 → 188 (band thresholds + 24 labeled fixtures × calibration assertions + per-CV monotonicity).
+  Fixtures authored via a multi-agent workflow spanning six job domains.
+
 ## [1.11.0] — 2026-06-16
 
 ### Added

@@ -54,6 +54,24 @@ NUDGE_CAP = 2.5              # hard cap on total bonus (1.5 + 0.5 + 0.5)
 # Title tokens that signal a senior-level role (mirror the 'lead' tier of cv_parser).
 _SENIOR_TITLE_TOKENS = {"senior", "sr", "lead", "principal", "staff", "head", "chief", "director"}
 
+# Named calibration bands — give the 0-100 score a defined, regression-protected meaning.
+# Thresholds calibrated against a labeled CV×JD fixture set (tests/fixtures/calibration.json,
+# checked by tests/test_calibration.py): strong matches land ≥65, unrelated roles stay <25.
+SCORE_BANDS = (
+    (65.0, "strong", "Strong match"),
+    (40.0, "good", "Good match"),
+    (25.0, "fair", "Fair match"),
+    (0.0, "weak", "Weak match"),
+)
+
+
+def score_band(score: float) -> tuple[str, str]:
+    """Map a 0-100 score to its (band_key, label)."""
+    for threshold, key, label in SCORE_BANDS:
+        if score >= threshold:
+            return key, label
+    return "weak", "Weak match"
+
 
 @dataclass
 class MatchConfig:
@@ -316,8 +334,11 @@ def _build_explanation(job: Job, comps: list[dict], wsum: float, profile: CVProf
             "bonus": True,
         })
 
+    band_key, band_label = score_band(job.score)
     return {
         "score": job.score,
+        "band": band_key,                      # calibrated band: strong | good | fair | weak
+        "band_label": band_label,
         "components": components,
         "reasons": _reasons(job, comps, profile),
         "boost_reasons": boost_reasons,        # plain reasons for the bonus (recency / fit / seniority)

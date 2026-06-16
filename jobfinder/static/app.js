@@ -280,7 +280,11 @@ function jobCard(j) {
   const card = document.createElement('div');
   card.className = 'job';
   card.dataset.jobId = j.id;
-  const cls = j.score >= 70 ? 'high' : j.score >= 45 ? 'mid' : 'low';
+  // Calibrated band from the matcher (falls back to thresholds for older payloads).
+  const band = (j.explanation && j.explanation.band) ||
+    (j.score >= 65 ? 'strong' : j.score >= 40 ? 'good' : j.score >= 25 ? 'fair' : 'weak');
+  const bandLabel = (j.explanation && j.explanation.band_label) || 'Match';
+  const bandWord = bandLabel.split(' ')[0];     // "Strong" / "Good" / "Fair" / "Weak"
   const url = safeUrl(j.url);
   const matched = (j.matched_skills || []).slice(0, 8).map(s => `<span class="chip matched">${esc(s)}</span>`).join('');
   const missing = (j.missing_skills || []).slice(0, 6).map(s => `<span class="chip missing">${esc(s)}</span>`).join('');
@@ -294,7 +298,7 @@ function jobCard(j) {
   card.innerHTML = `
     <div class="job-pick"><input type="checkbox" aria-label="Select for drafting" /></div>
     <div class="score-wrap">
-      <div class="score ${cls}">${Math.round(j.score)}<small>match</small></div>
+      <div class="score ${band}" title="${esc(bandLabel)}">${Math.round(j.score)}<small>${esc(bandWord)}</small></div>
       ${j.explanation && j.explanation.components && j.explanation.components.length ? `<button class="why-toggle" type="button" aria-expanded="false">Why?</button>` : ''}
     </div>
     <div class="job-main">
@@ -339,7 +343,7 @@ function whyPanel(j) {
     ? `<p class="why-note">No skills were detected in this posting, so skill overlap was left out and the score reflects text &amp; title only.</p>` : '';
   return `
     <div class="why" hidden>
-      <div class="why-head">Why ${Math.round(j.score)}?</div>
+      <div class="why-head">Why ${Math.round(j.score)}?${ex.band_label ? ` · <span class="why-band">${esc(ex.band_label)}</span>` : ''}</div>
       <div class="why-bars">${bars}</div>
       ${reasons ? `<ul class="why-reasons">${reasons}</ul>` : ''}
       ${note}
