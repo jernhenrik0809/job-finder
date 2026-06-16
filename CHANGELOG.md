@@ -2,6 +2,33 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.2.0] — 2026-06-16
+
+The retention core from [`docs/ROADMAP.md`](docs/ROADMAP.md): the Outbox becomes a
+tracked application pipeline.
+
+### Added
+- **Application pipeline / Kanban tracker.** Every job you pursue is now a durable
+  **Application** with a lifecycle (`saved → drafting → ready → applied → screening →
+  interview → offer → rejected/withdrawn`), an immutable **event timeline**, private
+  **notes**, and the cover letter as its current artifact. New `jobfinder/applications.py`
+  (state machine) + `applications` store table.
+- **Kanban board UI** (the renamed *Pipeline* tab): drag a card between columns to change
+  status; a **detail drawer** to edit the letter, add notes, regenerate, copy/download,
+  and view the timeline.
+- **＋ Save to pipeline** on match cards (save a role without drafting yet).
+- **Regenerate** a letter from the stored job snapshot + CV (no re-search needed).
+- API: `POST/GET /api/applications`, `GET/PATCH/DELETE /api/applications/{id}`,
+  `POST /api/applications/{id}/regenerate`, `…/export`, `POST /api/applications/generate`.
+  `set_status` validates transitions and logs events (replacing the old draft|ready whitelist).
+
+### Changed
+- The draft Outbox is superseded by the Application pipeline; generation now creates
+  tracked applications instead of standalone drafts. `/api/drafts/*` → `/api/applications/*`.
+
+### Tests
+- 32 → 40 (Application state machine, application store round-trip, pipeline API endpoints).
+
 ## [1.1.0] — 2026-06-10
 
 Foundations + the persistence hinge from [`docs/ROADMAP.md`](docs/ROADMAP.md) (Now phase).

@@ -1,13 +1,13 @@
-"""SQLite-backed store — persists profiles, examples and drafts across restarts.
+"""SQLite-backed store — persists profiles, examples and applications across restarts.
 
 Stdlib ``sqlite3`` only (no ORM). A single connection is shared across FastAPI's
 threadpool (check_same_thread=False), so a process-level lock serializes EVERY read and
 write — a sqlite3 Connection/Cursor is not safe for concurrent use by multiple threads
 even under WAL (the corruption is at the Python object level, not the file lock). WAL +
 busy_timeout still help the file-level writer/reader story.
-Profiles and drafts are stored as JSON blobs and round-tripped through their dataclasses.
-``ON CONFLICT ... DO UPDATE`` preserves a row's ``created`` time on update so the outbox
-keeps a stable order when a draft is edited.
+Profiles and applications are stored as JSON blobs and round-tripped through their
+dataclasses. ``ON CONFLICT ... DO UPDATE`` preserves a row's ``created`` time on update so
+the pipeline keeps a stable order when an application is edited.
 """
 from __future__ import annotations
 
@@ -17,17 +17,17 @@ import threading
 import time
 from pathlib import Path
 
-from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_DRAFTS
+from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS
+from ..applications import Application
 from ..cv_parser import CVProfile
-from ..drafts import ApplicationDraft
 
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS profiles (cv_id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS examples (id TEXT PRIMARY KEY, created REAL NOT NULL, name TEXT, text TEXT, chars INTEGER);
-CREATE TABLE IF NOT EXISTS drafts   (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS profiles     (cv_id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS examples     (id TEXT PRIMARY KEY, created REAL NOT NULL, name TEXT, text TEXT, chars INTEGER);
+CREATE TABLE IF NOT EXISTS applications (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 class SqliteStore(Store):
@@ -96,29 +96,29 @@ class SqliteStore(Store):
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM examples WHERE id=?", (example_id,))
 
-    # --- drafts ---
-    def save_draft(self, draft: ApplicationDraft) -> None:
+    # --- applications ---
+    def save_application(self, app: Application) -> None:
         with self._lock, self._conn:
             self._conn.execute(
-                "INSERT INTO drafts(id, created, data) VALUES(?,?,?) "
+                "INSERT INTO applications(id, created, data) VALUES(?,?,?) "
                 "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
-                (draft.id, time.time(), json.dumps(draft.to_dict())),
+                (app.id, time.time(), json.dumps(app.to_dict())),
             )
-            self._evict("drafts", "id", MAX_DRAFTS)
+            self._evict("applications", "id", MAX_APPLICATIONS)
 
-    def get_draft(self, draft_id: str) -> ApplicationDraft | None:
+    def get_application(self, app_id: str) -> Application | None:
         with self._lock:
-            row = self._conn.execute("SELECT data FROM drafts WHERE id=?", (draft_id,)).fetchone()
-        return ApplicationDraft(**json.loads(row["data"])) if row else None
+            row = self._conn.execute("SELECT data FROM applications WHERE id=?", (app_id,)).fetchone()
+        return Application(**json.loads(row["data"])) if row else None
 
-    def list_drafts(self) -> list[ApplicationDraft]:
+    def list_applications(self) -> list[Application]:
         with self._lock:
-            rows = self._conn.execute("SELECT data FROM drafts ORDER BY created ASC").fetchall()
-        return [ApplicationDraft(**json.loads(r["data"])) for r in rows]
+            rows = self._conn.execute("SELECT data FROM applications ORDER BY created ASC").fetchall()
+        return [Application(**json.loads(r["data"])) for r in rows]
 
-    def delete_draft(self, draft_id: str) -> None:
+    def delete_application(self, app_id: str) -> None:
         with self._lock, self._conn:
-            self._conn.execute("DELETE FROM drafts WHERE id=?", (draft_id,))
+            self._conn.execute("DELETE FROM applications WHERE id=?", (app_id,))
 
     def close(self) -> None:
         self._conn.close()

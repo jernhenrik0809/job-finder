@@ -1,14 +1,14 @@
 """In-memory store — ephemeral, fast, used for tests and the privacy-paranoid mode.
 
 This is the behaviour the app had before persistence: dicts that vanish on restart.
-Dict insertion order gives us FIFO eviction; re-assigning an existing key (a draft
-update) preserves its position.
+Dict insertion order gives us FIFO eviction; re-assigning an existing key (an
+application update) preserves its position.
 """
 from __future__ import annotations
 
-from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_DRAFTS
+from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS
+from ..applications import Application
 from ..cv_parser import CVProfile
-from ..drafts import ApplicationDraft
 
 
 def _evict(d: dict, cap: int) -> None:
@@ -20,7 +20,7 @@ class MemoryStore(Store):
     def __init__(self) -> None:
         self._profiles: dict[str, CVProfile] = {}
         self._examples: dict[str, dict] = {}
-        self._drafts: dict[str, ApplicationDraft] = {}
+        self._apps: dict[str, Application] = {}
 
     def save_profile(self, cv_id: str, profile: CVProfile) -> None:
         self._profiles[cv_id] = profile
@@ -39,15 +39,15 @@ class MemoryStore(Store):
     def delete_example(self, example_id: str) -> None:
         self._examples.pop(example_id, None)
 
-    def save_draft(self, draft: ApplicationDraft) -> None:
-        self._drafts[draft.id] = draft
-        _evict(self._drafts, MAX_DRAFTS)
+    def save_application(self, app: Application) -> None:
+        self._apps[app.id] = app
+        _evict(self._apps, MAX_APPLICATIONS)
 
-    def get_draft(self, draft_id: str) -> ApplicationDraft | None:
-        return self._drafts.get(draft_id)
+    def get_application(self, app_id: str) -> Application | None:
+        return self._apps.get(app_id)
 
-    def list_drafts(self) -> list[ApplicationDraft]:
-        return list(self._drafts.values())
+    def list_applications(self) -> list[Application]:
+        return list(self._apps.values())
 
-    def delete_draft(self, draft_id: str) -> None:
-        self._drafts.pop(draft_id, None)
+    def delete_application(self, app_id: str) -> None:
+        self._apps.pop(app_id, None)

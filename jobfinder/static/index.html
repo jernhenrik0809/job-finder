@@ -108,7 +108,7 @@
       <div class="results-head">
         <div class="tabs">
           <button class="tab active" data-tab="matches" id="tabMatches">Matches</button>
-          <button class="tab" data-tab="outbox" id="tabOutbox">Outbox <span id="outboxCount" class="badge">0</span></button>
+          <button class="tab" data-tab="pipeline" id="tabPipeline">Pipeline <span id="pipelineCount" class="badge">0</span></button>
         </div>
         <div id="resultMeta" class="muted small"></div>
       </div>
@@ -116,10 +116,10 @@
       <!-- ===== Matches view ===== -->
       <div id="view-matches">
         <div id="selbar" class="selbar hidden">
-          <span><b id="selCount">0</b> role(s) selected for drafting</span>
+          <span><b id="selCount">0</b> role(s) selected</span>
           <div class="selbar-actions">
             <button id="clearSel" class="btn ghost small" type="button">Clear</button>
-            <button id="genDrafts" class="btn primary small" type="button">✍ Generate drafts</button>
+            <button id="genDrafts" class="btn primary small" type="button">✍ Draft applications</button>
           </div>
         </div>
         <div id="warnings" class="warnings hidden"></div>
@@ -134,9 +134,9 @@
         <div id="jobs" class="jobs"></div>
       </div>
 
-      <!-- ===== Outbox view ===== -->
-      <div id="view-outbox" class="hidden">
-        <div class="outbox-controls">
+      <!-- ===== Pipeline view (Kanban) ===== -->
+      <div id="view-pipeline" class="hidden">
+        <div class="pipeline-controls">
           <div class="examples-box">
             <div class="examples-head">
               <span>Style examples <i class="muted small">— optional: upload past applications to match your voice</i></span>
@@ -167,13 +167,13 @@
             </label>
           </div>
         </div>
-        <p class="muted small disclaimer">Drafts are staged here for your review — nothing is sent automatically. Edit, copy or download, then apply yourself.</p>
+        <p class="muted small disclaimer">Your pipeline is private and review-first — nothing is ever sent automatically. Drag a card between columns to update its status; open a card to edit the letter, add notes, and apply yourself.</p>
         <div id="draftLoading" class="loading hidden"><div class="spinner"></div><p>Writing your applications… <span class="muted small">may take a few seconds per role</span></p></div>
-        <div id="draftsEmpty" class="empty">
-          <div class="empty-art">✉️</div>
-          <p>No drafts yet. Tick roles in <b>Matches</b>, then click <b>Generate drafts</b>.</p>
+        <div id="boardEmpty" class="empty">
+          <div class="empty-art">🗂️</div>
+          <p>Your pipeline is empty. In <b>Matches</b>, tick roles and <b>Draft applications</b>, or hit <b>＋ Save</b> on a card.</p>
         </div>
-        <div id="drafts" class="drafts"></div>
+        <div id="board" class="board"></div>
       </div>
     </section>
   </main>
@@ -181,6 +181,12 @@
   <footer class="foot muted small">
     Personal, low-volume job search tool. LinkedIn data comes from public guest pages — be gentle with it.
   </footer>
+
+  <!-- Application detail drawer -->
+  <div id="drawer" class="drawer hidden">
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+    <div class="drawer-panel" id="drawerPanel"></div>
+  </div>
 
   <script src="/static/app.js"></script>
 </body>

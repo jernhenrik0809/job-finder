@@ -1,9 +1,12 @@
 // ---------- state ----------
 let cvId = null;
 let llmAvailable = false;
-const selected = new Map();      // jobId -> job object (roles picked for drafting)
-const jobsById = new Map();      // jobId -> job object (all rendered jobs)
-const draftJobs = new Map();     // draftId -> job object (for regenerate)
+let STATUSES = ["saved", "drafting", "ready", "applied", "screening", "interview", "offer", "rejected", "withdrawn"];
+const selected = new Map();      // jobId -> job (roles ticked for drafting)
+const jobsById = new Map();      // jobId -> job (all rendered matches)
+const savedJobIds = new Set();   // job ids already saved to the pipeline this session
+const appsById = new Map();      // application id -> application
+let dragId = null;
 
 const $ = (sel) => document.querySelector(sel);
 const el = {
@@ -16,15 +19,13 @@ const el = {
   searchBtn: $('#searchBtn'), hint: $('#hint'),
   resultMeta: $('#resultMeta'), warnings: $('#warnings'),
   loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'), jsearchChk: $('#jsearchChk'),
-  // tabs / views
-  tabMatches: $('#tabMatches'), tabOutbox: $('#tabOutbox'), outboxCount: $('#outboxCount'),
-  viewMatches: $('#view-matches'), viewOutbox: $('#view-outbox'),
-  // selection
+  tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), pipelineCount: $('#pipelineCount'),
+  viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'),
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
-  // outbox
   examples: $('#examples'), addExample: $('#addExample'), exampleFile: $('#exampleFile'),
   tone: $('#tone'), length: $('#length'), useLlm: $('#useLlm'), llmHint: $('#llmHint'), useLlmWrap: $('#useLlmWrap'),
-  drafts: $('#drafts'), draftsEmpty: $('#draftsEmpty'), draftLoading: $('#draftLoading'),
+  board: $('#board'), boardEmpty: $('#boardEmpty'), draftLoading: $('#draftLoading'),
+  drawer: $('#drawer'), drawerPanel: $('#drawerPanel'), drawerBackdrop: $('#drawerBackdrop'),
 };
 
 // ---------- init ----------
@@ -38,6 +39,7 @@ fetch('/api/sources').then(r => r.json()).then(d => {
 
 fetch('/api/draft-config').then(r => r.json()).then(d => {
   llmAvailable = !!d.llm_available;
+  if (Array.isArray(d.statuses) && d.statuses.length) STATUSES = d.statuses;
   if (llmAvailable) {
     el.llmHint.textContent = `(${d.model})`;
   } else {
@@ -54,15 +56,9 @@ el.minScore.addEventListener('input', () => { el.minScoreVal.textContent = el.mi
 el.browseBtn.addEventListener('click', () => el.fileInput.click());
 el.dropzone.addEventListener('click', (e) => { if (e.target === el.dropzone || e.target.closest('.dz-inner')) el.fileInput.click(); });
 el.fileInput.addEventListener('change', () => { if (el.fileInput.files[0]) uploadFile(el.fileInput.files[0]); });
-
-['dragenter', 'dragover'].forEach(ev => el.dropzone.addEventListener(ev, e => {
-  e.preventDefault(); el.dropzone.classList.add('drag');
-}));
-['dragleave', 'drop'].forEach(ev => el.dropzone.addEventListener(ev, e => {
-  e.preventDefault(); el.dropzone.classList.remove('drag');
-}));
+['dragenter', 'dragover'].forEach(ev => el.dropzone.addEventListener(ev, e => { e.preventDefault(); el.dropzone.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => el.dropzone.addEventListener(ev, e => { e.preventDefault(); el.dropzone.classList.remove('drag'); }));
 el.dropzone.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) uploadFile(f); });
-
 el.pasteToggle.addEventListener('click', () => el.pasteArea.classList.toggle('hidden'));
 el.usePaste.addEventListener('click', () => {
   const text = el.cvText.value.trim();
@@ -110,28 +106,24 @@ function renderProfile(p) {
 
 // ---------- tabs ----------
 el.tabMatches.addEventListener('click', () => switchTab('matches'));
-el.tabOutbox.addEventListener('click', () => { switchTab('outbox'); loadOutbox(); });
+el.tabPipeline.addEventListener('click', () => { switchTab('pipeline'); loadPipeline(); });
 
 function switchTab(name) {
   const matches = name === 'matches';
   el.tabMatches.classList.toggle('active', matches);
-  el.tabOutbox.classList.toggle('active', !matches);
+  el.tabPipeline.classList.toggle('active', !matches);
   el.viewMatches.classList.toggle('hidden', !matches);
-  el.viewOutbox.classList.toggle('hidden', matches);
+  el.viewPipeline.classList.toggle('hidden', matches);
 }
 
 // ---------- search ----------
 el.searchBtn.addEventListener('click', runSearch);
-
-function selectedSources() {
-  return [...document.querySelectorAll('#sources input:checked')].map(i => i.value);
-}
+function selectedSources() { return [...document.querySelectorAll('#sources input:checked')].map(i => i.value); }
 
 async function runSearch() {
   if (!cvId) return;
   const sources = selectedSources();
   if (sources.length === 0) { showWarnings(['Pick at least one job source.']); return; }
-
   switchTab('matches');
   el.warnings.classList.add('hidden');
   el.empty.classList.add('hidden');
@@ -140,23 +132,14 @@ async function runSearch() {
   el.loading.classList.remove('hidden');
   el.searchBtn.disabled = true;
   el.resultMeta.textContent = '';
-
   const body = {
-    cv_id: cvId,
-    keywords: el.keywords.value.trim(),
-    location: el.location.value.trim(),
-    sources,
-    limit_per_source: parseInt(el.limit.value, 10),
-    remote: el.remote.checked,
+    cv_id: cvId, keywords: el.keywords.value.trim(), location: el.location.value.trim(), sources,
+    limit_per_source: parseInt(el.limit.value, 10), remote: el.remote.checked,
     days: el.days.value ? parseInt(el.days.value, 10) : null,
-    semantic: el.semantic.checked,
-    min_score: parseFloat(el.minScore.value),
+    semantic: el.semantic.checked, min_score: parseFloat(el.minScore.value),
   };
-
   try {
-    const resp = await fetch('/api/search', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    });
+    const resp = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.detail || 'Search failed');
     renderJobs(data);
@@ -172,9 +155,7 @@ function renderJobs(data) {
   const jobs = data.jobs || [];
   const counts = Object.entries(data.counts || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
   el.resultMeta.textContent = [`${jobs.length} matches`, data.query ? `“${data.query}”` : '', counts].filter(Boolean).join('  •  ');
-
   if (data.warnings && data.warnings.length) showWarnings(data.warnings);
-
   if (jobs.length === 0) {
     el.empty.classList.remove('hidden');
     el.empty.querySelector('p').textContent = 'No jobs matched. Try different keywords, a broader location, or more sources.';
@@ -190,20 +171,15 @@ function jobCard(j) {
   card.className = 'job';
   const cls = j.score >= 70 ? 'high' : j.score >= 45 ? 'mid' : 'low';
   const url = safeUrl(j.url);
-
   const matched = (j.matched_skills || []).slice(0, 8).map(s => `<span class="chip matched">${esc(s)}</span>`).join('');
   const missing = (j.missing_skills || []).slice(0, 6).map(s => `<span class="chip missing">${esc(s)}</span>`).join('');
-
   const sub = [
-    j.company ? `<b>${esc(j.company)}</b>` : '',
-    j.location ? esc(j.location) : '',
-    j.salary ? `💰 ${esc(j.salary)}` : '',
-    j.posted ? `🕑 ${esc(j.posted)}` : '',
+    j.company ? `<b>${esc(j.company)}</b>` : '', j.location ? esc(j.location) : '',
+    j.salary ? `💰 ${esc(j.salary)}` : '', j.posted ? `🕑 ${esc(j.posted)}` : '',
     `<span class="src">${esc(j.source)}</span>`,
   ].filter(Boolean).join('<span> · </span>');
-
   const desc = j.description ? `<p class="job-desc">${esc(j.description.slice(0, 280))}${j.description.length > 280 ? '…' : ''}</p>` : '';
-
+  const isSaved = savedJobIds.has(j.id);
   card.innerHTML = `
     <div class="job-pick"><input type="checkbox" aria-label="Select for drafting" /></div>
     <div class="score ${cls}">${Math.round(j.score)}<small>match</small></div>
@@ -213,55 +189,60 @@ function jobCard(j) {
       ${desc}
       ${matched ? `<div class="skill-row"><span class="lbl">✓ you have</span>${matched}</div>` : ''}
       ${missing ? `<div class="skill-row" style="margin-top:6px"><span class="lbl">gaps</span>${missing}</div>` : ''}
-      ${url ? `<div class="apply"><a href="${esc(url)}" target="_blank" rel="noopener">View &amp; apply ↗</a></div>` : ''}
+      <button class="save-pipeline${isSaved ? ' saved' : ''}" type="button">${isSaved ? '✓ Saved' : '＋ Save to pipeline'}</button>
+      ${url ? ` <a class="apply-link" href="${esc(url)}" target="_blank" rel="noopener" style="margin-left:8px;font-size:13px">View ↗</a>` : ''}
     </div>`;
-
   const cb = card.querySelector('.job-pick input');
-  cb.addEventListener('change', () => {
-    if (cb.checked) selected.set(j.id, j); else selected.delete(j.id);
-    updateSelbar();
-  });
+  cb.addEventListener('change', () => { if (cb.checked) selected.set(j.id, j); else selected.delete(j.id); updateSelbar(); });
+  const saveBtn = card.querySelector('.save-pipeline');
+  saveBtn.addEventListener('click', () => saveToPipeline(j, saveBtn));
   return card;
 }
 
-// ---------- selection ----------
+async function saveToPipeline(job, btn) {
+  if (savedJobIds.has(job.id)) { switchTab('pipeline'); loadPipeline(); return; }
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/applications', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cv_id: cvId || '', job }),
+    });
+    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Save failed'); }
+    savedJobIds.add(job.id);
+    btn.classList.add('saved'); btn.textContent = '✓ Saved';
+    bumpPipelineCount(1);
+  } catch (err) { showWarnings(['Save: ' + err.message]); }
+  finally { btn.disabled = false; }
+}
+
+// ---------- selection → generate ----------
 el.clearSel.addEventListener('click', () => {
   selected.clear();
   document.querySelectorAll('.job-pick input:checked').forEach(c => { c.checked = false; });
   updateSelbar();
 });
-el.genDrafts.addEventListener('click', generateDrafts);
+el.genDrafts.addEventListener('click', generateApplications);
+function updateSelbar() { el.selCount.textContent = selected.size; el.selbar.classList.toggle('hidden', selected.size === 0); }
 
-function updateSelbar() {
-  el.selCount.textContent = selected.size;
-  el.selbar.classList.toggle('hidden', selected.size === 0);
-}
-
-// ---------- outbox: drafts ----------
-async function generateDrafts() {
+async function generateApplications() {
   if (!cvId || selected.size === 0) return;
   const jobs = [...selected.values()];
-  switchTab('outbox');
-  el.draftsEmpty.classList.add('hidden');
+  switchTab('pipeline');
+  el.boardEmpty.classList.add('hidden');
   el.draftLoading.classList.remove('hidden');
   el.genDrafts.disabled = true;
-
   try {
-    const resp = await fetch('/api/drafts/generate', {
+    const resp = await fetch('/api/applications/generate', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        cv_id: cvId, jobs,
-        tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked,
-      }),
+      body: JSON.stringify({ cv_id: cvId, jobs, tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked }),
     });
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) throw new Error(data.detail || 'Generation failed');
-    (data.drafts || []).forEach((d, i) => { if (jobs[i]) draftJobs.set(d.id, jobs[i]); });
-    await loadOutbox();
-    // clear the selection now that drafts exist
+    jobs.forEach(j => savedJobIds.add(j.id));
     selected.clear();
     document.querySelectorAll('.job-pick input:checked').forEach(c => { c.checked = false; });
     updateSelbar();
+    await loadPipeline();
   } catch (err) {
     showWarnings(['Draft error: ' + err.message]);
     switchTab('matches');
@@ -271,105 +252,203 @@ async function generateDrafts() {
   }
 }
 
-async function loadOutbox() {
+// ---------- pipeline / Kanban ----------
+async function loadPipeline() {
   await loadExamples();
   try {
-    const data = await (await fetch('/api/drafts')).json();
-    renderDrafts(data.drafts || []);
+    const data = await (await fetch('/api/applications')).json();
+    if (Array.isArray(data.statuses) && data.statuses.length) STATUSES = data.statuses;
+    appsById.clear();
+    (data.applications || []).forEach(a => appsById.set(a.id, a));
+    renderBoard();
   } catch { /* ignore */ }
 }
 
-function renderDrafts(drafts) {
-  el.outboxCount.textContent = drafts.length;
-  el.draftsEmpty.classList.toggle('hidden', drafts.length > 0);
-  el.drafts.innerHTML = '';
-  drafts.forEach(d => el.drafts.appendChild(draftCard(d)));
+function bumpPipelineCount(delta) {
+  const n = Math.max(0, (parseInt(el.pipelineCount.textContent, 10) || 0) + delta);
+  el.pipelineCount.textContent = n;
 }
 
-function draftCard(d) {
+function renderBoard() {
+  const apps = [...appsById.values()];
+  el.pipelineCount.textContent = apps.length;
+  el.boardEmpty.classList.toggle('hidden', apps.length > 0);
+  el.board.classList.toggle('hidden', apps.length === 0);
+  el.board.innerHTML = '';
+  STATUSES.forEach(status => {
+    const inCol = apps.filter(a => a.status === status);
+    const col = document.createElement('div');
+    col.className = 'col';
+    col.dataset.status = status;
+    col.innerHTML = `<div class="col-head st-${status}"><span>${esc(status)}</span><span class="cnt">${inCol.length}</span></div><div class="col-body"></div>`;
+    const body = col.querySelector('.col-body');
+    inCol.forEach(a => body.appendChild(pcard(a)));
+    // drop target wiring
+    body.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drop-target'); });
+    body.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) col.classList.remove('drop-target'); });
+    body.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('drop-target'); onDrop(status); });
+    el.board.appendChild(col);
+  });
+}
+
+function pcard(a) {
   const card = document.createElement('div');
-  card.className = 'draft' + (d.status === 'ready' ? ' ready' : '');
-  const url = safeUrl(d.job_url);
-  const titleHtml = url
-    ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(d.job_title)}</a>`
-    : esc(d.job_title);
-  const genTag = d.generator === 'llm'
-    ? '<span class="gen-tag llm">✨ Claude</span>'
-    : '<span class="gen-tag">template</span>';
-
+  card.className = `pcard st-${a.status}`;
+  card.draggable = true;
+  card.dataset.id = a.id;
+  const gen = a.generator === 'llm' ? '<span class="pc-tag llm">✨ Claude letter</span>'
+    : a.generator === 'template' ? '<span class="pc-tag">letter ready</span>'
+      : '<span class="pc-tag">no letter yet</span>';
   card.innerHTML = `
-    <div class="draft-head">
-      <h3>${titleHtml}${d.company ? ' — ' + esc(d.company) : ''}</h3>
-      ${genTag}
-    </div>
-    <input class="subject" value="${esc(d.subject)}" />
-    <textarea spellcheck="true">${esc(d.body)}</textarea>
-    ${d.note ? `<p class="draft-note">⚠ ${esc(d.note)}</p>` : ''}
-    <div class="draft-actions">
-      <button class="btn mini ok save">Save</button>
-      <button class="btn mini ghost copy">Copy</button>
-      <button class="btn mini ghost download">Download</button>
-      <button class="btn mini ghost regen">Regenerate</button>
-      <span class="msg copied" style="display:none">saved</span>
-      <span class="spacer"></span>
-      <button class="btn mini ghost ready">${d.status === 'ready' ? '✓ Ready' : 'Mark ready'}</button>
-      <button class="btn mini danger del">Delete</button>
-    </div>`;
-
-  const subjectEl = card.querySelector('.subject');
-  const bodyEl = card.querySelector('textarea');
-  const msg = card.querySelector('.msg');
-  const flash = (t) => { msg.textContent = t; msg.style.display = 'inline'; setTimeout(() => { msg.style.display = 'none'; }, 1500); };
-
-  card.querySelector('.save').addEventListener('click', async () => {
-    await fetch(`/api/drafts/${d.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ subject: subjectEl.value, body: bodyEl.value }),
-    });
-    flash('saved');
-  });
-  card.querySelector('.copy').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(`Subject: ${subjectEl.value}\n\n${bodyEl.value}`); flash('copied'); }
-    catch { flash('copy blocked'); }
-  });
-  card.querySelector('.download').addEventListener('click', () => {
-    window.location.href = `/api/drafts/${d.id}/export`;
-  });
-  card.querySelector('.regen').addEventListener('click', async () => {
-    const job = draftJobs.get(d.id) || { title: d.job_title, company: d.company, url: d.job_url, source: d.job_source, score: d.score };
-    await fetch(`/api/drafts/${d.id}`, { method: 'DELETE' });
-    draftJobs.delete(d.id);
-    el.draftLoading.classList.remove('hidden');
-    try {
-      const resp = await fetch('/api/drafts/generate', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cv_id: cvId, jobs: [job], tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked }),
-      });
-      const data = await resp.json();
-      (data.drafts || []).forEach(nd => draftJobs.set(nd.id, job));
-    } finally {
-      el.draftLoading.classList.add('hidden');
-      loadOutbox();
-    }
-  });
-  card.querySelector('.ready').addEventListener('click', async () => {
-    const next = d.status === 'ready' ? 'draft' : 'ready';
-    await fetch(`/api/drafts/${d.id}`, {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: next }),
-    });
-    d.status = next;
-    card.classList.toggle('ready', next === 'ready');
-    card.querySelector('.ready').textContent = next === 'ready' ? '✓ Ready' : 'Mark ready';
-  });
-  card.querySelector('.del').addEventListener('click', async () => {
-    await fetch(`/api/drafts/${d.id}`, { method: 'DELETE' });
-    draftJobs.delete(d.id);
-    loadOutbox();
-  });
+    <h4>${esc(a.job_title)}</h4>
+    <div class="pc-sub"><span>${esc(a.company || '')}</span><span class="pc-score">${Math.round(a.score || 0)}</span></div>
+    ${gen}`;
+  card.addEventListener('dragstart', e => { dragId = a.id; card.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+  card.addEventListener('dragend', () => { dragId = null; card.classList.remove('dragging'); document.querySelectorAll('.drop-target').forEach(c => c.classList.remove('drop-target')); });
+  card.addEventListener('click', () => openDrawer(a.id));
   return card;
 }
 
-// ---------- outbox: style examples ----------
+async function onDrop(newStatus) {
+  const id = dragId;
+  if (!id) return;
+  const a = appsById.get(id);
+  if (!a || a.status === newStatus) return;
+  const updated = await patchApp(id, { status: newStatus });
+  if (updated) { appsById.set(id, updated); renderBoard(); }
+}
+
+async function patchApp(id, fields) {
+  try {
+    const resp = await fetch(`/api/applications/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Update failed');
+    return data;
+  } catch (err) { showWarnings(['Update: ' + err.message]); return null; }
+}
+
+// ---------- detail drawer ----------
+el.drawerBackdrop.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !el.drawer.classList.contains('hidden')) closeDrawer(); });
+function closeDrawer() { el.drawer.classList.add('hidden'); el.drawerPanel.innerHTML = ''; }
+
+function openDrawer(id) {
+  const a = appsById.get(id);
+  if (!a) return;
+  const url = safeUrl(a.job_url);
+  const statusBtns = STATUSES.map(s =>
+    `<button class="st-btn st-${s}${s === a.status ? ' active' : ''}" data-status="${s}">${esc(s)}</button>`).join('');
+  const events = (a.events || []).slice().reverse().map(ev =>
+    `<li><span class="t">${esc(ev.detail || ev.type)}</span><span>${fmtTime(ev.ts)}</span></li>`).join('');
+  const genLabel = a.body ? 'Regenerate letter' : 'Generate letter';
+
+  el.drawerPanel.innerHTML = `
+    <div class="dw-head">
+      <div>
+        <h2>${esc(a.job_title)}</h2>
+        <div class="sub">${esc(a.company || '')}${a.location ? ' · ' + esc(a.location) : ''} · score ${Math.round(a.score || 0)}
+          ${url ? ` · <a class="apply-link" href="${esc(url)}" target="_blank" rel="noopener">open posting ↗</a>` : ''}</div>
+      </div>
+      <button class="dw-close" title="Close (Esc)">×</button>
+    </div>
+
+    <div class="dw-section">
+      <span class="lbl">Status</span>
+      <div class="status-pills">${statusBtns}</div>
+    </div>
+
+    <div class="dw-section">
+      <span class="lbl">Notes</span>
+      <textarea class="notes" placeholder="Private notes — contacts, recruiter, next steps…">${esc(a.notes || '')}</textarea>
+      <div class="dw-actions"><button class="btn mini ok save-notes">Save notes</button><span class="msg copied" style="display:none">saved</span></div>
+    </div>
+
+    <div class="dw-section">
+      <span class="lbl">Cover letter</span>
+      <input class="subject" value="${esc(a.subject || '')}" placeholder="Subject" />
+      <textarea class="body" placeholder="No letter yet — click “${esc(genLabel)}”.">${esc(a.body || '')}</textarea>
+      ${a.gen_note ? `<p class="dw-note">⚠ ${esc(a.gen_note)}</p>` : ''}
+      <div class="dw-actions">
+        <button class="btn mini ok save-letter">Save</button>
+        <button class="btn mini ghost regen">${esc(genLabel)}</button>
+        <button class="btn mini ghost copy">Copy</button>
+        <button class="btn mini ghost download">Download</button>
+        <span class="msg copied" style="display:none">saved</span>
+        <span class="spacer"></span>
+        <button class="btn mini danger del">Delete</button>
+      </div>
+    </div>
+
+    <div class="dw-section">
+      <span class="lbl">Timeline</span>
+      <ul class="timeline">${events || '<li>No events yet.</li>'}</ul>
+    </div>`;
+
+  el.drawer.classList.remove('hidden');
+  wireDrawer(a.id);
+}
+
+function wireDrawer(id) {
+  const panel = el.drawerPanel;
+  const subjectEl = panel.querySelector('.subject');
+  const bodyEl = panel.querySelector('.body');
+  const notesEl = panel.querySelector('.notes');
+  const flash = (sel) => { const m = panel.querySelector(sel); if (m) { m.style.display = 'inline'; setTimeout(() => { m.style.display = 'none'; }, 1400); } };
+
+  panel.querySelector('.dw-close').addEventListener('click', closeDrawer);
+
+  panel.querySelectorAll('.st-btn').forEach(btn => btn.addEventListener('click', async () => {
+    const updated = await patchApp(id, { status: btn.dataset.status });
+    if (updated) {
+      appsById.set(id, updated);
+      panel.querySelectorAll('.st-btn').forEach(b => b.classList.toggle('active', b.dataset.status === updated.status));
+      renderBoard();
+      // refresh timeline
+      openDrawer(id);
+    }
+  }));
+
+  panel.querySelector('.save-notes').addEventListener('click', async () => {
+    const updated = await patchApp(id, { notes: notesEl.value });
+    if (updated) { appsById.set(id, updated); flash('.dw-section .msg'); }
+  });
+
+  panel.querySelector('.save-letter').addEventListener('click', async () => {
+    const updated = await patchApp(id, { subject: subjectEl.value, body: bodyEl.value });
+    if (updated) { appsById.set(id, updated); renderBoard(); flash('.dw-actions .msg'); }
+  });
+
+  panel.querySelector('.regen').addEventListener('click', async () => {
+    const btn = panel.querySelector('.regen'); btn.disabled = true; btn.textContent = 'Writing…';
+    try {
+      const resp = await fetch(`/api/applications/${id}/regenerate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cv_id: cvId || '', tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.detail || 'Generation failed');
+      appsById.set(id, data);
+      renderBoard();
+      openDrawer(id);
+    } catch (err) { showWarnings(['Generate: ' + err.message]); btn.disabled = false; btn.textContent = 'Retry'; }
+  });
+
+  panel.querySelector('.copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(`Subject: ${subjectEl.value}\n\n${bodyEl.value}`); flash('.dw-actions .msg'); } catch {}
+  });
+  panel.querySelector('.download').addEventListener('click', () => { window.location.href = `/api/applications/${id}/export`; });
+  panel.querySelector('.del').addEventListener('click', async () => {
+    await fetch(`/api/applications/${id}`, { method: 'DELETE' });
+    appsById.delete(id);
+    // un-mark the matching job's Save button if visible
+    renderBoard();
+    closeDrawer();
+  });
+}
+
+// ---------- style examples ----------
 el.addExample.addEventListener('click', () => el.exampleFile.click());
 el.exampleFile.addEventListener('change', async () => {
   const f = el.exampleFile.files[0];
@@ -410,16 +489,16 @@ function showWarnings(list) {
   el.warnings.classList.remove('hidden');
   el.warnings.innerHTML = '<strong>Heads up</strong><ul>' + list.map(w => `<li>${esc(w)}</li>`).join('') + '</ul>';
 }
-
+function fmtTime(ts) {
+  if (!ts) return '';
+  try { return new Date(ts * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
+}
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-
-// Only allow absolute http(s) links; block empty, relative and javascript:/data: URLs.
 function safeUrl(u) {
   if (!u) return '';
-  try {
-    const url = new URL(u);
-    return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : '';
-  } catch { return ''; }
+  try { const url = new URL(u); return (url.protocol === 'http:' || url.protocol === 'https:') ? url.href : ''; }
+  catch { return ''; }
 }

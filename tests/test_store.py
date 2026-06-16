@@ -4,8 +4,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from jobfinder.applications import Application, set_status
 from jobfinder.cv_parser import build_profile
-from jobfinder.drafts import ApplicationDraft
 from jobfinder.store.sqlite import SqliteStore
 from jobfinder.store.memory import MemoryStore
 from jobfinder.store import get_store
@@ -14,9 +14,9 @@ from jobfinder.config import load_settings
 CV = "Jane Doe\nSenior Python Engineer\n8 years of experience. Skills: Python, Django, AWS."
 
 
-def _draft(did="d1", title="Backend Engineer"):
-    return ApplicationDraft(job_title=title, company="Acme", subject="Application for " + title,
-                            body="Dear team, ...", generator="template", id=did)
+def _app(aid="a1", title="Backend Engineer"):
+    return Application(job_title=title, company="Acme", id=aid, status="saved",
+                       subject="Application for " + title, body="Dear team, ...")
 
 
 def test_sqlite_persists_across_reopen(tmp_path):
@@ -24,7 +24,7 @@ def test_sqlite_persists_across_reopen(tmp_path):
     s1 = SqliteStore(db)
     s1.save_profile("cv1", build_profile(CV))
     s1.save_example({"id": "e1", "name": "ex", "text": "my letter", "chars": 9})
-    s1.save_draft(_draft("d1"))
+    s1.save_application(_app("a1"))
     s1.close()
 
     # Reopen a brand-new store over the same file — state must survive (the #1 fix).
@@ -32,23 +32,22 @@ def test_sqlite_persists_across_reopen(tmp_path):
     prof = s2.get_profile("cv1")
     assert prof is not None and prof.name == "Jane Doe" and "python" in prof.skills
     assert [e["id"] for e in s2.list_examples()] == ["e1"]
-    d = s2.get_draft("d1")
-    assert d is not None and d.job_title == "Backend Engineer" and d.company == "Acme"
+    a = s2.get_application("a1")
+    assert a is not None and a.job_title == "Backend Engineer" and a.company == "Acme"
     s2.close()
 
 
 def test_sqlite_update_preserves_order_and_edits(tmp_path):
     s = SqliteStore(tmp_path / "jf.db")
-    s.save_draft(_draft("a", "A"))
-    s.save_draft(_draft("b", "B"))
-    # edit the first draft; order must stay [a, b] and the edit must persist
-    d = s.get_draft("a"); d.status = "ready"; d.body = "edited"
-    s.save_draft(d)
-    drafts = s.list_drafts()
-    assert [d.id for d in drafts] == ["a", "b"]
-    assert s.get_draft("a").status == "ready" and s.get_draft("a").body == "edited"
-    s.delete_draft("a")
-    assert s.get_draft("a") is None and [d.id for d in s.list_drafts()] == ["b"]
+    s.save_application(_app("a", "A"))
+    s.save_application(_app("b", "B"))
+    a = s.get_application("a"); set_status(a, "ready"); a.body = "edited"
+    s.save_application(a)
+    apps = s.list_applications()
+    assert [x.id for x in apps] == ["a", "b"]
+    assert s.get_application("a").status == "ready" and s.get_application("a").body == "edited"
+    s.delete_application("a")
+    assert s.get_application("a") is None and [x.id for x in s.list_applications()] == ["b"]
     s.close()
 
 
@@ -57,21 +56,21 @@ def test_sqlite_concurrent_read_write(tmp_path):
     # threads (as FastAPI's threadpool does) must not raise or corrupt data.
     import threading
     s = SqliteStore(tmp_path / "jf.db")
-    s.save_draft(_draft("seed"))
+    s.save_application(_app("seed"))
     errors: list[Exception] = []
     stop = threading.Event()
 
     def reader():
         while not stop.is_set():
             try:
-                s.list_drafts(); s.get_draft("seed"); s.list_examples()
-            except Exception as e:  # any exception is a failure of the lock discipline
+                s.list_applications(); s.get_application("seed"); s.list_examples()
+            except Exception as e:
                 errors.append(e); return
 
     def writer(n):
         for i in range(40):
             try:
-                s.save_draft(_draft(f"w{n}-{i}", f"Role {i}"))
+                s.save_application(_app(f"w{n}-{i}", f"Role {i}"))
                 s.save_example({"id": f"e{n}-{i}", "name": "x", "text": "y", "chars": 1})
             except Exception as e:
                 errors.append(e); return
@@ -95,10 +94,10 @@ def test_memory_store_basics():
     s = MemoryStore()
     s.save_profile("cv1", build_profile(CV))
     assert s.get_profile("cv1").name == "Jane Doe"
-    s.save_draft(_draft("d1"))
-    assert len(s.list_drafts()) == 1
-    s.delete_draft("d1")
-    assert s.list_drafts() == []
+    s.save_application(_app("a1"))
+    assert len(s.list_applications()) == 1
+    s.delete_application("a1")
+    assert s.list_applications() == []
 
 
 def test_factory_and_config_defaults(monkeypatch):

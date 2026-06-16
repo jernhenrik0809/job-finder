@@ -1,12 +1,14 @@
 """FastAPI backend serving the Job Finder UI and JSON API.
 
 State lives in a Store (memory or SQLite) behind the repository interface — not in
-module-global dicts — so the Outbox and parsed CVs survive a restart when the SQLite
-backend is active (the default).
+module-global dicts — so the pipeline and parsed CVs survive a restart when the SQLite
+backend is active (the default). The durable unit is the Application (a tracked job in
+your pipeline); a generated cover letter is its current artifact.
 """
 from __future__ import annotations
 
 import secrets
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -15,6 +17,9 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
+from .applications import (
+    STATUSES, SUGGESTED_NEXT, attach_letter, job_snapshot, new_application, set_status,
+)
 from .config import settings
 from .cv_parser import CVProfile, build_profile, extract_text_from_bytes, looks_empty
 from .drafts import DraftOptions, generate_draft, llm_available
@@ -72,6 +77,11 @@ class SearchRequest(BaseModel):
     min_score: float = 0.0
 
 
+class SaveApplicationRequest(BaseModel):
+    cv_id: str = ""
+    job: dict
+
+
 class GenerateRequest(BaseModel):
     cv_id: str
     jobs: list[dict] = []
@@ -80,10 +90,18 @@ class GenerateRequest(BaseModel):
     use_llm: bool = True
 
 
-class DraftUpdate(BaseModel):
+class RegenerateRequest(BaseModel):
+    cv_id: str = ""
+    tone: str = "professional"
+    length: str = "standard"
+    use_llm: bool = True
+
+
+class ApplicationUpdate(BaseModel):
+    status: str | None = None
+    notes: str | None = None
     subject: str | None = None
     body: str | None = None
-    status: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -172,12 +190,17 @@ def search(req: SearchRequest) -> JSONResponse:
 
 
 # ---------------------------------------------------------------------------
-# Application drafts (the "auto-apply" outbox) + style examples
+# Generation config + style examples
 # ---------------------------------------------------------------------------
 
 @app.get("/api/draft-config")
 def draft_config() -> dict:
-    return {"llm_available": llm_available(), "model": settings.model}
+    return {
+        "llm_available": llm_available(),
+        "model": settings.model,
+        "statuses": STATUSES,
+        "suggested_next": SUGGESTED_NEXT,
+    }
 
 
 @app.post("/api/examples")
@@ -220,8 +243,23 @@ def delete_example(eid: str) -> dict:
     return {"ok": True}
 
 
-@app.post("/api/drafts/generate")
-def generate_drafts(req: GenerateRequest) -> JSONResponse:
+# ---------------------------------------------------------------------------
+# Applications (the pipeline / tracker)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/applications")
+def save_application(req: SaveApplicationRequest) -> JSONResponse:
+    """Save a job to the pipeline as a 'saved' application (no letter yet)."""
+    if not req.job or not req.job.get("title"):
+        raise HTTPException(status_code=400, detail="Missing job.")
+    appn = new_application(req.job, cv_id=req.cv_id, status="saved")
+    store.save_application(appn)
+    return JSONResponse(appn.to_dict())
+
+
+@app.post("/api/applications/generate")
+def generate_applications(req: GenerateRequest) -> JSONResponse:
+    """Create applications for the selected jobs and generate a cover letter for each."""
     profile = store.get_profile(req.cv_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="CV not found — please upload your CV again.")
@@ -232,46 +270,83 @@ def generate_drafts(req: GenerateRequest) -> JSONResponse:
     examples = [e["text"] for e in store.list_examples()]
     created = []
     for job in req.jobs[:_MAX_JOBS_PER_BATCH]:
+        appn = new_application(job, cv_id=req.cv_id)
         draft = generate_draft(profile, job, options, examples=examples)
-        store.save_draft(draft)
-        created.append(draft.to_dict())
-    return JSONResponse({"drafts": created, "used_llm": options.use_llm and llm_available()})
+        attach_letter(appn, draft.subject, draft.body, draft.generator, draft.note)
+        store.save_application(appn)
+        created.append(appn.to_dict())
+    return JSONResponse({"applications": created, "used_llm": options.use_llm and llm_available()})
 
 
-@app.get("/api/drafts")
-def list_drafts() -> dict:
-    return {"drafts": [d.to_dict() for d in store.list_drafts()]}
+@app.get("/api/applications")
+def list_applications() -> dict:
+    return {"applications": [a.to_dict() for a in store.list_applications()], "statuses": STATUSES}
 
 
-@app.put("/api/drafts/{did}")
-def update_draft(did: str, upd: DraftUpdate) -> JSONResponse:
-    draft = store.get_draft(did)
-    if draft is None:
-        raise HTTPException(status_code=404, detail="Draft not found.")
+@app.get("/api/applications/{aid}")
+def get_application(aid: str) -> JSONResponse:
+    a = store.get_application(aid)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    return JSONResponse(a.to_dict())
+
+
+@app.patch("/api/applications/{aid}")
+def update_application(aid: str, upd: ApplicationUpdate) -> JSONResponse:
+    a = store.get_application(aid)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    if upd.status is not None:
+        try:
+            set_status(a, upd.status)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    if upd.notes is not None:
+        a.notes = upd.notes
+        a.updated = time.time()
     if upd.subject is not None:
-        draft.subject = upd.subject
+        a.subject = upd.subject
+        a.updated = time.time()
     if upd.body is not None:
-        draft.body = upd.body
-    if upd.status is not None and upd.status in ("draft", "ready"):
-        draft.status = upd.status
-    store.save_draft(draft)            # persist the edit (backend-agnostic)
-    return JSONResponse(draft.to_dict())
+        a.body = upd.body
+        a.updated = time.time()
+    store.save_application(a)
+    return JSONResponse(a.to_dict())
 
 
-@app.delete("/api/drafts/{did}")
-def delete_draft(did: str) -> dict:
-    store.delete_draft(did)
+@app.post("/api/applications/{aid}/regenerate")
+def regenerate_application(aid: str, req: RegenerateRequest) -> JSONResponse:
+    a = store.get_application(aid)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    cv_id = req.cv_id or a.cv_id
+    profile = store.get_profile(cv_id) if cv_id else None
+    if profile is None:
+        raise HTTPException(status_code=400,
+                            detail="The CV for this application isn't available — re-upload your CV.")
+    options = DraftOptions(tone=req.tone, length=req.length, use_llm=req.use_llm)
+    examples = [e["text"] for e in store.list_examples()]
+    draft = generate_draft(profile, job_snapshot(a), options, examples=examples)
+    attach_letter(a, draft.subject, draft.body, draft.generator, draft.note)
+    a.cv_id = cv_id
+    store.save_application(a)
+    return JSONResponse(a.to_dict())
+
+
+@app.delete("/api/applications/{aid}")
+def delete_application(aid: str) -> dict:
+    store.delete_application(aid)
     return {"ok": True}
 
 
-@app.get("/api/drafts/{did}/export")
-def export_draft(did: str) -> PlainTextResponse:
-    draft = store.get_draft(did)
-    if draft is None:
-        raise HTTPException(status_code=404, detail="Draft not found.")
-    safe = "".join(c if c.isalnum() or c in " -_" else "" for c in f"{draft.company}_{draft.job_title}").strip()
+@app.get("/api/applications/{aid}/export")
+def export_application(aid: str) -> PlainTextResponse:
+    a = store.get_application(aid)
+    if a is None:
+        raise HTTPException(status_code=404, detail="Application not found.")
+    safe = "".join(c if c.isalnum() or c in " -_" else "" for c in f"{a.company}_{a.job_title}").strip()
     filename = (safe or "application")[:60].replace(" ", "_") + ".txt"
-    content = f"Subject: {draft.subject}\n\n{draft.body}\n"
+    content = f"Subject: {a.subject}\n\n{a.body}\n"
     return PlainTextResponse(content, headers={
         "Content-Disposition": f'attachment; filename="{filename}"'
     })

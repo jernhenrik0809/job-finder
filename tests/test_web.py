@@ -1,10 +1,9 @@
-"""API-level tests for the draft/outbox endpoints (no network, template generator)."""
+"""API-level tests for the application/pipeline endpoints (no network, template generator)."""
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pytest
 from fastapi.testclient import TestClient
 
 from jobfinder.web import app
@@ -14,7 +13,7 @@ SAMPLE = (Path(__file__).parent / "sample_cv.txt").read_text(encoding="utf-8")
 
 JOB = {
     "title": "Backend Engineer", "company": "Globex", "url": "https://example.com/j",
-    "source": "LinkedIn", "score": 70, "description": "Python, Django, AWS.",
+    "source": "LinkedIn", "score": 70, "location": "Remote", "description": "Python, Django, AWS.",
     "matched_skills": ["python", "django", "aws"], "missing_skills": ["rust"],
 }
 
@@ -25,49 +24,63 @@ def _upload_cv() -> str:
     return r.json()["cv_id"]
 
 
-def test_draft_config():
+def test_draft_config_exposes_statuses():
     d = client.get("/api/draft-config").json()
     assert "llm_available" in d and "model" in d
+    assert "saved" in d["statuses"] and "offer" in d["statuses"]
 
 
-def test_generate_list_update_delete_draft():
+def test_generate_creates_trackable_applications():
     cv_id = _upload_cv()
-    # generate (force template so the test never needs a key/network)
-    r = client.post("/api/drafts/generate", json={"cv_id": cv_id, "jobs": [JOB], "use_llm": False})
+    r = client.post("/api/applications/generate", json={"cv_id": cv_id, "jobs": [JOB], "use_llm": False})
     assert r.status_code == 200
-    drafts = r.json()["drafts"]
-    assert len(drafts) == 1
-    did = drafts[0]["id"]
-    assert drafts[0]["generator"] == "template"
-    assert "Backend Engineer" in drafts[0]["subject"]
-    assert "Jane Doe" in drafts[0]["body"]
+    apps = r.json()["applications"]
+    assert len(apps) == 1
+    a = apps[0]; aid = a["id"]
+    assert a["generator"] == "template" and a["status"] == "ready"
+    assert "Backend Engineer" in a["subject"] and "Jane Doe" in a["body"]
+    assert a["cv_id"] == cv_id and a["job"]["matched_skills"] == ["python", "django", "aws"]
 
-    # appears in the outbox list
-    assert any(d["id"] == did for d in client.get("/api/drafts").json()["drafts"])
+    # appears in the pipeline list
+    assert any(x["id"] == aid for x in client.get("/api/applications").json()["applications"])
 
-    # edit + mark ready
-    r = client.put(f"/api/drafts/{did}", json={"body": "Edited body.", "status": "ready"})
-    assert r.status_code == 200 and r.json()["status"] == "ready" and r.json()["body"] == "Edited body."
+    # lifecycle transition is validated, logs an event, stamps applied_at
+    r = client.patch(f"/api/applications/{aid}", json={"status": "applied", "notes": "called recruiter"})
+    assert r.status_code == 200
+    a2 = r.json()
+    assert a2["status"] == "applied" and a2["applied_at"] and a2["notes"] == "called recruiter"
+    assert any(e["type"] == "status" for e in a2["events"])
 
-    # export
-    r = client.get(f"/api/drafts/{did}/export")
-    assert r.status_code == 200 and "Edited body." in r.text
-    assert "attachment" in r.headers.get("content-disposition", "")
+    # an unknown status is rejected
+    assert client.patch(f"/api/applications/{aid}", json={"status": "promoted"}).status_code == 400
 
-    # delete
-    assert client.delete(f"/api/drafts/{did}").status_code == 200
-    assert all(d["id"] != did for d in client.get("/api/drafts").json()["drafts"])
+    # regenerate reuses the stored cv_id + job snapshot (no cv_id in the request body)
+    r = client.post(f"/api/applications/{aid}/regenerate", json={"use_llm": False})
+    assert r.status_code == 200 and "Backend Engineer" in r.json()["subject"]
+
+    # export + delete
+    r = client.get(f"/api/applications/{aid}/export")
+    assert r.status_code == 200 and "Jane Doe" in r.text and "attachment" in r.headers.get("content-disposition", "")
+    assert client.delete(f"/api/applications/{aid}").status_code == 200
+    assert all(x["id"] != aid for x in client.get("/api/applications").json()["applications"])
+
+
+def test_save_to_pipeline_without_a_letter():
+    cv_id = _upload_cv()
+    r = client.post("/api/applications", json={"cv_id": cv_id, "job": JOB})
+    assert r.status_code == 200
+    a = r.json()
+    assert a["status"] == "saved" and a["body"] == "" and a["generator"] == ""
+    client.delete(f"/api/applications/{a['id']}")
 
 
 def test_generate_requires_known_cv():
-    r = client.post("/api/drafts/generate", json={"cv_id": "nope", "jobs": [JOB]})
-    assert r.status_code == 404
+    assert client.post("/api/applications/generate", json={"cv_id": "nope", "jobs": [JOB]}).status_code == 404
 
 
 def test_generate_rejects_empty_jobs():
     cv_id = _upload_cv()
-    r = client.post("/api/drafts/generate", json={"cv_id": cv_id, "jobs": []})
-    assert r.status_code == 400
+    assert client.post("/api/applications/generate", json={"cv_id": cv_id, "jobs": []}).status_code == 400
 
 
 def test_examples_add_list_delete():

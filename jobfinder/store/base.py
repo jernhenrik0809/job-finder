@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ..applications import Application
 from ..cv_parser import CVProfile
-from ..drafts import ApplicationDraft
 
 MAX_PROFILES = 50
 MAX_EXAMPLES = 10
-MAX_DRAFTS = 100
+MAX_APPLICATIONS = 200
 
 
 class Store(ABC):
@@ -31,15 +31,15 @@ class Store(ABC):
     @abstractmethod
     def delete_example(self, example_id: str) -> None: ...
 
-    # --- application drafts (the outbox) ---
+    # --- applications (the pipeline / outbox) ---
     @abstractmethod
-    def save_draft(self, draft: ApplicationDraft) -> None: ...
+    def save_application(self, app: Application) -> None: ...
     @abstractmethod
-    def get_draft(self, draft_id: str) -> ApplicationDraft | None: ...
+    def get_application(self, app_id: str) -> Application | None: ...
     @abstractmethod
-    def list_drafts(self) -> list[ApplicationDraft]: ...
+    def list_applications(self) -> list[Application]: ...
     @abstractmethod
-    def delete_draft(self, draft_id: str) -> None: ...
+    def delete_application(self, app_id: str) -> None: ...
 
     def close(self) -> None:  # optional; SqliteStore overrides
         pass

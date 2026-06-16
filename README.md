@@ -81,17 +81,30 @@ database, so they **survive a restart**. By default it lives at
 
 ---
 
-## Application drafts — the Outbox
+## Applications — the Pipeline (Kanban tracker)
 
-Tick the roles you like in **Matches**, click **✍ Generate drafts**, and the app
-writes a tailored cover letter for each into the **Outbox** tab. There you can
-**edit, copy, download (.txt), regenerate, mark ready, or delete** each draft.
+Every job you pursue becomes a tracked **Application** on a Kanban board, so your
+search survives across weeks — not just one session.
 
-> **It drafts — it does not auto-submit.** Nothing is sent anywhere automatically.
-> The Outbox stages drafts for *your* review; you copy/download and apply yourself.
-> (Auto-submitting to LinkedIn would violate its ToS and risk your account.)
+- In **Matches**, hit **＋ Save to pipeline** on any card (saved, no letter yet), or
+  tick several roles and **✍ Draft applications** to create them *with* a tailored
+  cover letter.
+- The **Pipeline** tab is a board with a column per stage:
+  **saved → drafting → ready → applied → screening → interview → offer → rejected / withdrawn**.
+  **Drag a card** between columns to update its status (each move is logged on the
+  card's timeline; entering *applied* stamps the date).
+- **Click a card** to open its drawer: edit the cover letter (subject + body), add
+  private **notes**, **regenerate** the letter, **copy / download**, see the
+  **timeline**, or delete.
 
-Two generators, mirroring the matching design:
+> **It drafts and tracks — it never auto-submits.** Nothing is sent anywhere
+> automatically. You review, copy/download, and apply yourself. (Auto-submitting to
+> LinkedIn would violate its ToS and risk your account.)
+
+Everything in the pipeline persists locally (SQLite), so it's all still there when
+you reopen the app.
+
+Two cover-letter generators, mirroring the matching design:
 
 | Mode | Needs a key? | Quality |
 |------|:---:|---------|
@@ -100,7 +113,7 @@ Two generators, mirroring the matching design:
 
 **Tone** (professional / warm / concise / enthusiastic) and **length** are adjustable.
 
-**Style examples:** in the Outbox, upload a few of your past applications (PDF/DOCX/TXT).
+**Style examples:** in the Pipeline tab, upload a few of your past applications (PDF/DOCX/TXT).
 The Claude generator uses them as a voice/style reference (the template generator
 ignores them). To enable Claude:
 
