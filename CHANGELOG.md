@@ -15,8 +15,16 @@ All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
   background scheduler — nudges are derived when you open the app.
 - API: `GET /api/insights`; `jobfinder/insights.py` (`compute_insights`).
 
+### Fixed (from review)
+- Follow-up nudges for a *ready* draft are now anchored to **when the letter became ready**,
+  not `updated` — editing a draft's notes no longer resets its age and suppresses the nudge.
+- `avg_time_to_response` no longer drops apps that reached a response stage without an explicit
+  *applied* step (it falls back to the pipeline-entry baseline), so it matches the response-rate
+  population. Funnel "reached" semantics documented.
+
 ### Tests
-- 44 → 52 (funnel math, response rate, time-to-response, nudges, by-source, endpoint).
+- 44 → 54 (funnel math, response rate, time-to-response incl. no-explicit-applied, nudges incl.
+  edit-survival regression, by-source, endpoint).
 
 ## [1.2.0] — 2026-06-16
 

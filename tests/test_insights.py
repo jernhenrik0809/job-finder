@@ -81,3 +81,23 @@ def test_empty_pipeline_is_safe():
 def test_over_time_has_eight_weekly_buckets():
     r = compute_insights(_apps(), now=NOW)
     assert len(r["over_time"]) == 8 and r["over_time"][-1]["label"] == "now"
+
+
+def test_ready_nudge_survives_a_recent_edit():
+    # a draft sitting in 'ready' for 10 days whose notes were edited yesterday must STILL nudge
+    # (regression: previously the nudge age used `updated`, which any edit reset)
+    a = _app("R", "ready", body="x", generator="template", created=d(10))
+    a.updated = d(1)
+    r = compute_insights([a], now=NOW)
+    assert any(n["id"] == "R" for n in r["nudges"])
+    assert r["nudges"][0]["days"] >= 3
+
+
+def test_ttr_counts_response_without_explicit_applied():
+    # an app moved ready→interview directly (no applied_at) still contributes a TTR sample
+    a = _app("Z", "interview", created=d(10), body="x", generator="llm",
+             events=[{"ts": d(10), "type": "created"},
+                     {"ts": d(8), "type": "status", "detail": "ready → interview"}])
+    r = compute_insights([a], now=NOW)
+    assert r["avg_time_to_response_days"] == 2.0     # baseline=created d10 → interview d8
+    assert r["response_rate"] == 100

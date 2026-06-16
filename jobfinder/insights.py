@@ -36,6 +36,19 @@ def _first_response_ts(app: Application) -> float | None:
     return None
 
 
+def _ready_ts(app: Application) -> float:
+    """When the letter became ready — NOT app.updated (which any notes/body edit bumps)."""
+    for ev in app.events:
+        if ev.get("type") == "draft":            # attach_letter logs this
+            return ev.get("ts") or app.created
+    for ev in app.events:
+        if ev.get("type") == "status":
+            to = ev.get("detail", "").split("→")[-1].strip()
+            if to in ("ready", "drafting"):
+                return ev.get("ts") or app.created
+    return app.created or 0.0
+
+
 def _has_letter(app: Application, seen: set[str]) -> bool:
     return bool(app.body) or bool({"drafting", "ready"} & seen) or app.generator in ("template", "llm")
 
@@ -55,6 +68,8 @@ def compute_insights(apps: list[Application], now: float | None = None) -> dict:
 
     for a in apps:
         seen = _statuses_ever(a)
+        # "reached applied" is funnel semantics: an app now at interview/offer was, by
+        # definition, applied to — even if the user dragged it past 'applied' directly.
         reached_applied = (a.applied_at is not None) or ("applied" in seen) or bool(_RESPONSE & seen)
         reached_interviewing = bool(seen & {"screening", "interview", "offer"})
         reached_offer = "offer" in seen
@@ -71,21 +86,25 @@ def compute_insights(apps: list[Application], now: float | None = None) -> dict:
         if reached_offer:
             offers += 1
 
+        # time-to-response: from the applied baseline (or, if the app skipped the explicit
+        # 'applied' step, from when it entered the pipeline) to the first response event.
         fr = _first_response_ts(a)
-        if a.applied_at and fr and fr >= a.applied_at:
-            ttr_samples.append(fr - a.applied_at)
+        baseline = a.applied_at or a.created
+        if baseline and fr and fr >= baseline:
+            ttr_samples.append(fr - baseline)
 
         # --- follow-up nudges (surfaced when the app is open; no background scheduler) ---
-        ref = a.applied_at or a.updated or a.created
-        age_days = (now - ref) / _DAY if ref else 0
-        if a.status == "applied" and age_days >= 7:
-            nudges.append({"id": a.id, "title": a.job_title, "company": a.company,
-                           "message": f"Applied {int(age_days)} days ago — consider a follow-up.",
-                           "days": int(age_days)})
-        elif a.status in ("ready", "drafting") and age_days >= 3:
-            nudges.append({"id": a.id, "title": a.job_title, "company": a.company,
-                           "message": f"Drafted {int(age_days)} days ago — ready to send.",
-                           "days": int(age_days)})
+        if a.status == "applied":
+            ref = a.applied_at or a.created
+            age = int((now - ref) / _DAY) if ref else 0
+            if age >= 7:
+                nudges.append({"id": a.id, "title": a.job_title, "company": a.company,
+                               "message": f"Applied {age} days ago — consider a follow-up.", "days": age})
+        elif a.status in ("ready", "drafting"):
+            age = int((now - _ready_ts(a)) / _DAY)   # anchored to when it became ready
+            if age >= 3:
+                nudges.append({"id": a.id, "title": a.job_title, "company": a.company,
+                               "message": f"Drafted {age} days ago — ready to send.", "days": age})
     nudges.sort(key=lambda n: n["days"], reverse=True)
 
     funnel = [
