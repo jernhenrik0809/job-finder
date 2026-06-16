@@ -109,6 +109,10 @@ runs a small web server on your machine, it also guards that boundary:
   strips email / phone / links from your CV before sending — your name stays so the letter can sign
   off. With no key set, nothing is ever sent.
 
+For the full picture, see [`docs/PRIVACY.md`](docs/PRIVACY.md) (what's stored and what leaves),
+[`docs/SECURITY.md`](docs/SECURITY.md) (threat model + protections), and
+[`docs/ETHICS.md`](docs/ETHICS.md) (drafts-never-submits, no fabrication, personal-use principles).
+
 ---
 
 ## Applications — the Pipeline (Kanban tracker)
