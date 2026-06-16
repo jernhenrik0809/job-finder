@@ -22,6 +22,7 @@ class Job:
     score: float = 0.0
     matched_skills: list[str] = field(default_factory=list)
     missing_skills: list[str] = field(default_factory=list)
+    explanation: dict = field(default_factory=dict)       # why this score (components + reasons)
 
     @property
     def id(self) -> str:

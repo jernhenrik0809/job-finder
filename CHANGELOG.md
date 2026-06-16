@@ -2,6 +2,29 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.7.0] — 2026-06-16
+
+### Added
+- **"Why this score?" explanation.** Every match card now has a **Why?** toggle that opens a
+  transparent breakdown of its 0–100 score: a bar per component (**text similarity**,
+  **skill overlap**, **title match**) showing each signal's strength and the **points it
+  contributes** — and those points **sum exactly to the displayed score**. A short list of
+  plain-English reasons (ordered by impact) explains the match, e.g. *"Matches 3 of your skills
+  (Python, Django, AWS)"*. When a posting lists no recognisable skills, skill overlap is shown as
+  **left out** (unknown), not scored as zero — and the remaining components re-normalise so the
+  ceilings still sum to 100.
+- `rank_jobs` now attaches a structured `explanation` object to each `Job`
+  (`components` + `reasons` + `skills_detected`); `jobfinder/matcher.py`, surfaced via the
+  existing search API and rendered in `static/app.js`.
+
+### Changed
+- CI actions bumped (`actions/checkout@v5`, `actions/setup-python@v6`) off the deprecated
+  Node 20 runtime.
+
+### Tests
+- 73 → 77 (component points sum to the score, skills-omitted re-normalisation, reasons name
+  matched skills, JSON round-trip through `Job.to_dict`).
+
 ## [1.6.1] — 2026-06-16
 
 ### Fixed (from review)

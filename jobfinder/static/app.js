@@ -199,13 +199,17 @@ function jobCard(j) {
   const isSaved = savedJobIds.has(j.id);
   card.innerHTML = `
     <div class="job-pick"><input type="checkbox" aria-label="Select for drafting" /></div>
-    <div class="score ${cls}">${Math.round(j.score)}<small>match</small></div>
+    <div class="score-wrap">
+      <div class="score ${cls}">${Math.round(j.score)}<small>match</small></div>
+      ${j.explanation && j.explanation.components && j.explanation.components.length ? `<button class="why-toggle" type="button" aria-expanded="false">Why?</button>` : ''}
+    </div>
     <div class="job-main">
       <h3>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(j.title)}</a>` : esc(j.title)}${currentNewIds.has(j.id) ? '<span class="new-flag">NEW</span>' : ''}</h3>
       <div class="job-sub">${sub}</div>
       ${desc}
       ${matched ? `<div class="skill-row"><span class="lbl">✓ you have</span>${matched}</div>` : ''}
       ${missing ? `<div class="skill-row" style="margin-top:6px"><span class="lbl">gaps</span>${missing}</div>` : ''}
+      ${whyPanel(j)}
       <button class="save-pipeline${isSaved ? ' saved' : ''}" type="button">${isSaved ? '✓ Saved' : '＋ Save to pipeline'}</button>
       ${url ? ` <a class="apply-link" href="${esc(url)}" target="_blank" rel="noopener" style="margin-left:8px;font-size:13px">View ↗</a>` : ''}
     </div>`;
@@ -213,7 +217,39 @@ function jobCard(j) {
   cb.addEventListener('change', () => { if (cb.checked) selected.set(j.id, j); else selected.delete(j.id); updateSelbar(); });
   const saveBtn = card.querySelector('.save-pipeline');
   saveBtn.addEventListener('click', () => saveToPipeline(j, saveBtn));
+  const whyBtn = card.querySelector('.why-toggle');
+  if (whyBtn) whyBtn.addEventListener('click', () => {
+    const panel = card.querySelector('.why');
+    const open = panel.hasAttribute('hidden');
+    if (open) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', '');
+    whyBtn.setAttribute('aria-expanded', String(open));
+  });
   return card;
+}
+
+// "Why this score?" — the matcher's explanation object rendered as a breakdown.
+// Component bars show signal strength; the pts show the share each adds to the score
+// (they sum to the score), tied to the published 55/30/15 formula.
+function whyPanel(j) {
+  const ex = j.explanation;
+  if (!ex || !ex.components || !ex.components.length) return '';
+  const bars = ex.components.map(c => `
+    <div class="why-comp">
+      <div class="why-row"><span class="why-lbl">${esc(c.label)}</span>
+        <span class="why-pts">${c.points} / ${c.max_points} pts</span></div>
+      <div class="why-track"><div class="why-fill" style="width:${Math.max(0, Math.min(100, c.strength))}%"></div></div>
+    </div>`).join('');
+  const reasons = (ex.reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
+  const note = ex.skills_detected === false
+    ? `<p class="why-note">No skills were detected in this posting, so skill overlap was left out and the score reflects text &amp; title only.</p>` : '';
+  return `
+    <div class="why" hidden>
+      <div class="why-head">Why ${Math.round(j.score)}?</div>
+      <div class="why-bars">${bars}</div>
+      ${reasons ? `<ul class="why-reasons">${reasons}</ul>` : ''}
+      ${note}
+      <p class="why-formula">Score = 55% text similarity · 30% skill overlap · 15% title match, normalised to the signals present.</p>
+    </div>`;
 }
 
 async function saveToPipeline(job, btn) {

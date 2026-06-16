@@ -133,3 +133,58 @@ def test_rank_jobs_populates_explainability():
 
 def test_rank_jobs_empty_list():
     assert rank_jobs(_profile(), []) == []
+
+
+# --- explanation object ("why this score?") -------------------------------
+
+def test_explanation_components_sum_to_score():
+    profile = _profile()
+    jobs = [Job(title="Senior Python Engineer", company="X",
+                description="Python, Django, AWS, Docker and PostgreSQL for backend APIs.",
+                source="test")]
+    rank_jobs(profile, jobs)
+    ex = jobs[0].explanation
+    assert ex and ex["components"]
+    # the per-component points are an honest decomposition: they sum to the score
+    total = round(sum(c["points"] for c in ex["components"]), 1)
+    assert abs(total - jobs[0].score) < 0.2
+    # and each component's ceiling caps its contribution
+    for c in ex["components"]:
+        assert 0 <= c["points"] <= c["max_points"] + 1e-9
+        assert 0 <= c["strength"] <= 100
+
+
+def test_explanation_skips_skills_when_posting_has_none():
+    profile = _profile()
+    # a posting with no recognisable tech skills — skill overlap is unknown, not zero
+    jobs = [Job(title="Office Coordinator", company="Y",
+                description="Greet visitors, manage calendars and order supplies.",
+                source="test")]
+    rank_jobs(profile, jobs)
+    ex = jobs[0].explanation
+    assert ex["skills_detected"] is False
+    keys = [c["key"] for c in ex["components"]]
+    assert "skills" not in keys            # omitted, not scored as 0
+    # remaining components re-normalise so their ceilings still sum to 100
+    assert abs(sum(c["max_points"] for c in ex["components"]) - 100) < 0.2
+
+
+def test_explanation_reasons_mention_matched_skills():
+    profile = _profile()
+    jobs = [Job(title="Backend Engineer", company="Z",
+                description="Strong Python, Django and AWS experience required.",
+                source="test")]
+    rank_jobs(profile, jobs)
+    reasons = " ".join(jobs[0].explanation["reasons"]).lower()
+    assert "skill" in reasons and any(s in reasons for s in ("python", "django", "aws"))
+
+
+def test_explanation_survives_json_round_trip():
+    profile = _profile()
+    jobs = [Job(title="Python Developer", company="W",
+                description="Python and Docker.", source="test")]
+    rank_jobs(profile, jobs)
+    import json
+    d = jobs[0].to_dict()
+    again = json.loads(json.dumps(d))         # the API serialises Job via to_dict
+    assert again["explanation"]["components"]

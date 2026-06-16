@@ -179,6 +179,15 @@ score = 0.55 · text_similarity     (TF-IDF cosine: your whole CV vs the posting
 - If a posting has no recognisable skills, that component is dropped (not guessed),
   so unrelated jobs aren't inflated.
 
+### Why this score? (transparent breakdown)
+
+Every match card has a **Why?** toggle. It opens a breakdown showing each component's
+strength and the **points it contributes** — and those points **sum exactly to the score** —
+plus a few plain-English reasons (*"Matches 3 of your skills (Python, Django, AWS)"*,
+*"Title matches your target 'Backend Engineer'"*). When a posting lists no recognisable
+skills, skill overlap is shown as *left out* (unknown) rather than counted as zero, and the
+other components re-normalise to fill the 100. Nothing about the score is hidden.
+
 ### Optional: semantic matching
 
 For meaning-aware matching (e.g. "ML" ≈ "machine learning"), install the extra:

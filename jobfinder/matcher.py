@@ -162,18 +162,88 @@ def rank_jobs(profile: CVProfile, jobs: list[Job], config: MatchConfig | None = 
         # the weights used. If a posting has no recognisable skills, skill overlap
         # is genuinely unknown, so we omit it rather than guess (which previously
         # inflated unrelated jobs).
-        parts = [(text_sim, config.w_text), (title_sim, config.w_title)]
+        comps = [
+            {"key": "text", "label": "Text similarity", "value": text_sim, "weight": config.w_text},
+            {"key": "title", "label": "Title match", "value": title_sim, "weight": config.w_title},
+        ]
         if job.job_skills:
             # Recall-oriented: covering the most important ~12 skills of a posting
             # counts as full marks, so a verbose JD listing 30 skills doesn't unfairly
             # tank a strong candidate. Floor of 4 avoids over-rewarding sparse posts.
             denom = max(4, min(len(job.job_skills), 12))
             skill_sim = min(1.0, len(matched) / denom)
-            parts.append((skill_sim, config.w_skills))
+            comps.append({"key": "skills", "label": "Skill overlap", "value": skill_sim, "weight": config.w_skills})
 
-        wsum = sum(w for _, w in parts) or 1.0
-        raw = sum(v * w for v, w in parts) / wsum
+        wsum = sum(c["weight"] for c in comps) or 1.0
+        raw = sum(c["value"] * c["weight"] for c in comps) / wsum
         job.score = round(max(0.0, min(1.0, raw)) * 100, 1)
+        job.explanation = _build_explanation(job, comps, wsum, profile)
 
     jobs.sort(key=lambda j: j.score, reverse=True)
     return jobs
+
+
+# ---------------------------------------------------------------------------
+# Explanation object — makes the 0-100 transparent ("why this score?")
+# ---------------------------------------------------------------------------
+
+def _build_explanation(job: Job, comps: list[dict], wsum: float, profile: CVProfile) -> dict:
+    """Decompose the score into per-component contributions that sum to it, plus a
+    few plain-English reasons. ``points`` for each component is the share it actually
+    contributes (normalised by the weights used), so the components sum to ``score``;
+    ``max_points`` is the most that component could contribute given those weights."""
+    components = []
+    for c in comps:
+        share = c["weight"] / wsum            # this component's slice of the 0-100
+        components.append({
+            "key": c["key"],
+            "label": c["label"],
+            "strength": round(c["value"] * 100),          # how strong this signal is (0-100)
+            "points": round(c["value"] * share * 100, 1),  # points it adds to the final score
+            "max_points": round(share * 100, 1),           # ceiling for this component
+        })
+    return {
+        "score": job.score,
+        "components": components,
+        "reasons": _reasons(job, comps, profile),
+        # 'skills' is omitted from scoring when the posting lists no recognisable
+        # skills — surface that so a missing component reads as "unknown", not "zero".
+        "skills_detected": bool(job.job_skills),
+    }
+
+
+def _reasons(job: Job, comps: list[dict], profile: CVProfile) -> list[str]:
+    """Top human-readable reasons, ordered by how much each component drove the score."""
+    by_key = {c["key"]: c for c in comps}
+    ranked = sorted(comps, key=lambda c: c["value"] * c["weight"], reverse=True)
+    reasons: list[str] = []
+    for c in ranked:
+        v = c["value"]
+        if c["key"] == "text":
+            if v >= 0.7:
+                reasons.append("Closely matches the job description")
+            elif v >= 0.4:
+                reasons.append("Generally aligns with the job description")
+            else:
+                reasons.append("Limited textual overlap with the posting")
+        elif c["key"] == "skills":
+            n = len(job.matched_skills)
+            if n:
+                top = ", ".join(job.matched_skills[:3])
+                more = f" +{n - 3} more" if n > 3 else ""
+                reasons.append(f"Matches {n} of your skills ({top}{more})")
+            else:
+                reasons.append("None of your listed skills were detected in this posting")
+        elif c["key"] == "title":
+            tgt = profile.titles[0] if profile.titles else ""
+            if not tgt:
+                continue
+            if v >= 0.999:
+                reasons.append(f"Title matches your target '{tgt}'")
+            elif v > 0:
+                reasons.append(f"Title partially matches your target '{tgt}'")
+            else:
+                continue
+    if not by_key.get("skills") and job.job_skills == []:
+        reasons.append("No specific skills were detected in this posting")
+    return reasons[:3]
