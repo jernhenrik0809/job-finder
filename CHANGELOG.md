@@ -2,6 +2,21 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.6.0] — 2026-06-16
+
+### Added
+- **Denmark job sources.** Two free-key sources focused on the Danish market:
+  - **Adzuna** — dedicated Denmark endpoint (`dk`, overridable via `JOBFINDER_ADZUNA_COUNTRY`);
+    structured listings + salary. Needs free `ADZUNA_APP_ID` + `ADZUNA_APP_KEY`.
+  - **Jooble** — covers Denmark; defaults the location to *Denmark* when none is given.
+    Needs a free `JOOBLE_API_KEY`.
+- Source checkboxes are now **generically key-gated**: any keyed source without its API key
+  is disabled in the UI (`/api/sources` returns a `keyed` presence map). `jobfinder/sources/adzuna.py`,
+  `jobfinder/sources/jooble.py`.
+
+### Tests
+- 68 → 71 (Adzuna/Jooble parsing with mocked Danish responses, Jooble Denmark-default).
+
 ## [1.5.0] — 2026-06-16
 
 ### Added

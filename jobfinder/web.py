@@ -144,7 +144,8 @@ def sources() -> dict:
     return {
         "sources": available_sources(),
         "default_sources": settings.default_sources,
-        "jsearch_key_present": settings.jsearch_key_present,
+        "jsearch_key_present": settings.jsearch_key_present,   # kept for compatibility
+        "keyed": settings.keyed_present,                       # {source: key_present}
     }
 
 

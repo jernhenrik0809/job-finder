@@ -29,6 +29,10 @@ def _default_data_dir() -> Path:
 class Settings:
     anthropic_key: str | None
     rapidapi_key: str | None
+    adzuna_app_id: str | None
+    adzuna_app_key: str | None
+    adzuna_country: str
+    jooble_key: str | None
     model: str
     storage: str                 # "sqlite" | "memory"
     data_dir: Path
@@ -44,6 +48,23 @@ class Settings:
     @property
     def jsearch_key_present(self) -> bool:
         return bool(self.rapidapi_key)
+
+    @property
+    def adzuna_key_present(self) -> bool:
+        return bool(self.adzuna_app_id and self.adzuna_app_key)
+
+    @property
+    def jooble_key_present(self) -> bool:
+        return bool(self.jooble_key)
+
+    @property
+    def keyed_present(self) -> dict[str, bool]:
+        """Which keyed sources have credentials configured (for the UI to gate)."""
+        return {
+            "jsearch": self.jsearch_key_present,
+            "adzuna": self.adzuna_key_present,
+            "jooble": self.jooble_key_present,
+        }
 
 
 def load_settings() -> Settings:
@@ -63,6 +84,10 @@ def load_settings() -> Settings:
     return Settings(
         anthropic_key=os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"),
         rapidapi_key=os.environ.get("RAPIDAPI_KEY") or os.environ.get("JSEARCH_API_KEY"),
+        adzuna_app_id=os.environ.get("ADZUNA_APP_ID"),
+        adzuna_app_key=os.environ.get("ADZUNA_APP_KEY"),
+        adzuna_country=(os.environ.get("JOBFINDER_ADZUNA_COUNTRY", "dk").strip().lower() or "dk"),
+        jooble_key=os.environ.get("JOOBLE_API_KEY"),
         model=os.environ.get("JOBFINDER_MODEL", "claude-opus-4-8"),
         storage="memory" if storage == "memory" else "sqlite",
         data_dir=data_dir,

@@ -17,7 +17,8 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
    seniority and years of experience.
 2. **Searches live job boards** for matching roles:
    - **LinkedIn** — via the public, no-login guest job search (personal, low-volume use).
-   - **Remotive** & **Arbeitnow** — free, no-key JSON APIs (remote / EU jobs).
+   - **Remotive** & **Arbeitnow** — free, no-key JSON APIs (remote / EU incl. Denmark).
+   - **Adzuna** (Denmark) & **Jooble** (optional) — free-key aggregators with strong Danish coverage.
    - **JSearch** (optional) — aggregates Google for Jobs incl. LinkedIn/Indeed/Glassdoor (needs a free RapidAPI key).
 3. **Scores every job 0–100** against your CV using a transparent hybrid of
    text similarity (TF-IDF), skill overlap, and job-title match — and shows you
@@ -73,6 +74,9 @@ database, so they **survive a restart**. By default it lives at
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | Enables the **Claude** draft writer |
 | `RAPIDAPI_KEY` | — | Enables the **JSearch** source |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | — | Enables the **Adzuna** source (free key at developer.adzuna.com) |
+| `JOBFINDER_ADZUNA_COUNTRY` | `dk` | Adzuna country (Denmark by default; e.g. `gb`, `de`, `se`) |
+| `JOOBLE_API_KEY` | — | Enables the **Jooble** source (free key at jooble.org/api/about) |
 | `JOBFINDER_MODEL` | `claude-opus-4-8` | Claude model tier (e.g. `claude-haiku-4-5` to cut cost) |
 | `JOBFINDER_STORAGE` | `sqlite` | `sqlite` (persistent) or `memory` (ephemeral) |
 | `JOBFINDER_DATA_DIR` / `JOBFINDER_DB` | OS app-data dir | Where the SQLite DB lives |

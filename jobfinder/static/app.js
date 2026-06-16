@@ -21,7 +21,7 @@ const el = {
   searchBtn: $('#searchBtn'), hint: $('#hint'),
   saveSearchBtn: $('#saveSearchBtn'), savedBox: $('#savedBox'), savedList: $('#savedList'), checkNew: $('#checkNew'),
   resultMeta: $('#resultMeta'), warnings: $('#warnings'),
-  loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'), jsearchChk: $('#jsearchChk'),
+  loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'),
   tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), tabInsights: $('#tabInsights'), pipelineCount: $('#pipelineCount'),
   viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'), viewInsights: $('#view-insights'),
   insightsEmpty: $('#insightsEmpty'), insightsBody: $('#insightsBody'),
@@ -34,11 +34,15 @@ const el = {
 
 // ---------- init ----------
 fetch('/api/sources').then(r => r.json()).then(d => {
-  if (!d.jsearch_key_present) {
-    el.jsearchChk.querySelector('input').disabled = true;
-    el.jsearchChk.title = 'Set RAPIDAPI_KEY in your environment to enable JSearch';
-    el.jsearchChk.style.opacity = .55;
-  }
+  // Disable any keyed source that has no API key configured.
+  Object.entries(d.keyed || {}).forEach(([src, present]) => {
+    if (present) return;
+    const input = document.querySelector(`#sources input[value="${src}"]`);
+    if (!input) return;
+    input.disabled = true; input.checked = false;
+    const lab = input.closest('.chk');
+    if (lab) { lab.style.opacity = .55; lab.title = `Set the API key for ${src} to enable it`; }
+  });
 }).catch(() => {});
 
 fetch('/api/draft-config').then(r => r.json()).then(d => {
