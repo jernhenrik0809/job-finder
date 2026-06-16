@@ -328,12 +328,13 @@ function whyPanel(j) {
   const ex = j.explanation;
   if (!ex || !ex.components || !ex.components.length) return '';
   const bars = ex.components.map(c => `
-    <div class="why-comp">
-      <div class="why-row"><span class="why-lbl">${esc(c.label)}</span>
-        <span class="why-pts">${c.points} / ${c.max_points} pts</span></div>
+    <div class="why-comp${c.bonus ? ' bonus' : ''}">
+      <div class="why-row"><span class="why-lbl">${c.bonus ? '✦ ' : ''}${esc(c.label)}</span>
+        <span class="why-pts">${c.bonus ? '+' : ''}${c.points} / ${c.max_points} pts</span></div>
       <div class="why-track"><div class="why-fill" style="width:${Math.max(0, Math.min(100, c.strength))}%"></div></div>
     </div>`).join('');
-  const reasons = (ex.reasons || []).map(r => `<li>${esc(r)}</li>`).join('');
+  const reasons = (ex.reasons || []).map(r => `<li>${esc(r)}</li>`).join('')
+    + (ex.boost_reasons || []).map(r => `<li class="boost">✦ ${esc(r)}</li>`).join('');
   const note = ex.skills_detected === false
     ? `<p class="why-note">No skills were detected in this posting, so skill overlap was left out and the score reflects text &amp; title only.</p>` : '';
   return `

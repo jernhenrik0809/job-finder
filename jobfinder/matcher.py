@@ -18,7 +18,8 @@ for a more meaning-aware similarity. The app works fully without it.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 
 from .cv_parser import CVProfile
 from .skills import extract_skills, skill_overlap
@@ -36,6 +37,23 @@ _TFIDF_SCALE = 0.22       # TF-IDF cosine ~0.22 == excellent textual match
 _JACCARD_SCALE = 0.25
 _SEMANTIC_SCALE = 0.55    # MiniLM cosine ~0.55 == excellent semantic match
 
+# --- Ranking nudges -------------------------------------------------------
+# Small, bounded, NEVER-penalizing bonuses added ON TOP of the base 0-100 score
+# (computed outside the weight machinery, so a job can only score the same or higher
+# than before — no calibration regression). They use already-parsed-but-ignored fields
+# (posted/recency, location/remote, seniority) and each degrades safely to 0 when its
+# signal is absent. Total bonus is hard-capped at NUDGE_CAP.
+RECENCY_PTS_FRESH = 1.5      # posted within RECENCY_FRESH_DAYS
+RECENCY_PTS_RECENT = 0.7     # posted within RECENCY_RECENT_DAYS (0.1-grid so the 1-dp score is exact)
+RECENCY_FRESH_DAYS = 7
+RECENCY_RECENT_DAYS = 30
+LOCATION_PTS = 0.5           # search-location / remote fit
+SENIORITY_PTS = 0.5          # senior/lead title agreement
+NUDGE_CAP = 2.5              # hard cap on total bonus (1.5 + 0.5 + 0.5)
+
+# Title tokens that signal a senior-level role (mirror the 'lead' tier of cv_parser).
+_SENIOR_TITLE_TOKENS = {"senior", "sr", "lead", "principal", "staff", "head", "chief", "director"}
+
 
 @dataclass
 class MatchConfig:
@@ -43,6 +61,9 @@ class MatchConfig:
     w_text: float = W_TEXT
     w_skills: float = W_SKILLS
     w_title: float = W_TITLE
+    today: date = field(default_factory=date.today)   # injectable so recency tests are deterministic
+    search_location: str = ""       # the user's search location (threaded from settings)
+    search_remote: bool = False     # the user asked for remote (threaded from settings)
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +153,78 @@ def _title_score(cv_titles: list[str], job_title: str) -> float:
 # Public API
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Ranking nudges — bounded, never-penalizing, explainable bonuses
+# ---------------------------------------------------------------------------
+
+def _parse_posted(posted: str) -> date | None:
+    """Parse a source's ``posted`` string to a date, or None for empty/non-ISO.
+
+    All sources emit 'YYYY-MM-DD' or '' (some slice an ISO datetime); the [:10] re-slice
+    is defensive. Never raises — a bad value just means 'unknown age', not a penalty."""
+    raw = (posted or "").strip()[:10]
+    if not raw:
+        return None
+    try:
+        return date.fromisoformat(raw)
+    except ValueError:
+        return None
+
+
+def _recency_pts(posted: str, today: date) -> float:
+    d = _parse_posted(posted)
+    if d is None:
+        return 0.0                                  # unknown age → no bonus (not a penalty)
+    age = max(0, (today - d).days)                  # future date / clock skew → treat as freshest
+    if age <= RECENCY_FRESH_DAYS:
+        return RECENCY_PTS_FRESH
+    if age <= RECENCY_RECENT_DAYS:
+        return RECENCY_PTS_RECENT
+    return 0.0
+
+
+def _location_pts(profile: CVProfile, job: Job, config: MatchConfig) -> float:
+    # Remote intent vs *truthful* per-job remote only. Arbeitnow/JSearch reflect real job
+    # data; Adzuna/Jooble merely echo the request flag and Remotive is hardcoded True, so
+    # gate on the display-cased source name (a rename just under-fires — the safe direction).
+    src = (job.source or "").lower()
+    truthful_remote = src.startswith("arbeitnow") or src.startswith("jsearch")
+    if config.search_remote and job.remote and truthful_remote:
+        return LOCATION_PTS
+    # Place match: prefer the explicit search location, fall back to the CV's location.
+    target = (config.search_location or (getattr(profile, "location", None) or "")).strip().lower()
+    jloc = (job.location or "").lower()
+    if not target or not jloc:
+        return 0.0
+    toks = {t for t in re.split(r"[,\s]+", target) if len(t) > 2}
+    if toks and any(t in jloc for t in toks):       # e.g. "copenhagen" in "copenhagen, denmark"
+        return LOCATION_PTS
+    return 0.0
+
+
+def _seniority_pts(profile: CVProfile, job: Job) -> float:
+    if getattr(profile, "seniority", None) not in ("senior", "lead") or not job.title:
+        return 0.0                                  # only reward a confident, visible agreement
+    title_tokens = set(re.findall(r"[a-z]+", job.title.lower()))
+    return SENIORITY_PTS if (title_tokens & _SENIOR_TITLE_TOKENS) else 0.0
+
+
+def _nudges(profile: CVProfile, job: Job, config: MatchConfig) -> tuple[float, list[str]]:
+    """Total bonus points (capped) plus the plain-English reasons for them."""
+    total = 0.0
+    reasons: list[str] = []
+    if _recency_pts(job.posted, config.today) > 0:
+        total += _recency_pts(job.posted, config.today)
+        reasons.append("Posted recently")
+    if _location_pts(profile, job, config) > 0:
+        total += _location_pts(profile, job, config)
+        reasons.append("Matches your location/remote preference")
+    if _seniority_pts(profile, job) > 0:
+        total += _seniority_pts(profile, job)
+        reasons.append(f"Matches your {profile.seniority} level")
+    return min(NUDGE_CAP, total), reasons
+
+
 def rank_jobs(profile: CVProfile, jobs: list[Job], config: MatchConfig | None = None) -> list[Job]:
     """Score every job in-place against the profile and return them sorted best-first."""
     config = config or MatchConfig()
@@ -176,8 +269,13 @@ def rank_jobs(profile: CVProfile, jobs: list[Job], config: MatchConfig | None = 
 
         wsum = sum(c["weight"] for c in comps) or 1.0
         raw = sum(c["value"] * c["weight"] for c in comps) / wsum
-        job.score = round(max(0.0, min(1.0, raw)) * 100, 1)
-        job.explanation = _build_explanation(job, comps, wsum, profile)
+        base = round(max(0.0, min(1.0, raw)) * 100, 1)
+
+        # Bounded, never-penalizing bonus added on TOP of the base (computed outside the
+        # weight machinery, so no job can score lower than before and calibration holds).
+        bonus, boost_reasons = _nudges(profile, job, config)
+        job.score = round(min(100.0, base + bonus), 1)
+        job.explanation = _build_explanation(job, comps, wsum, profile, base, boost_reasons)
 
     jobs.sort(key=lambda j: j.score, reverse=True)
     return jobs
@@ -187,25 +285,44 @@ def rank_jobs(profile: CVProfile, jobs: list[Job], config: MatchConfig | None = 
 # Explanation object — makes the 0-100 transparent ("why this score?")
 # ---------------------------------------------------------------------------
 
-def _build_explanation(job: Job, comps: list[dict], wsum: float, profile: CVProfile) -> dict:
+def _build_explanation(job: Job, comps: list[dict], wsum: float, profile: CVProfile,
+                       base: float, boost_reasons: list[str]) -> dict:
     """Decompose the score into per-component contributions that sum to it, plus a
-    few plain-English reasons. ``points`` for each component is the share it actually
-    contributes (normalised by the weights used), so the components sum to ``score``;
-    ``max_points`` is the most that component could contribute given those weights."""
+    few plain-English reasons. ``points`` for each base component is the share it
+    contributes (normalised by the weights used); ``max_points`` is its ceiling. The
+    base components sum to ``base``; an optional 'nudges' band carries the bonus, so the
+    full component list still sums exactly to ``job.score``."""
     components = []
     for c in comps:
-        share = c["weight"] / wsum            # this component's slice of the 0-100
+        share = c["weight"] / wsum            # this component's slice of the 0-100 base
         components.append({
             "key": c["key"],
             "label": c["label"],
             "strength": round(c["value"] * 100),          # how strong this signal is (0-100)
-            "points": round(c["value"] * share * 100, 1),  # points it adds to the final score
+            "points": round(c["value"] * share * 100, 1),  # points it adds to the base score
             "max_points": round(share * 100, 1),           # ceiling for this component
         })
+
+    # Bonus band, appended only when earned — points reconcile to the score exactly,
+    # even at the 100 clamp (awarded = job.score - base, which is ≤ the raw bonus there).
+    awarded = round(job.score - base, 1)
+    if awarded > 0:
+        components.append({
+            "key": "nudges",
+            "label": "Freshness & fit",
+            "strength": round(min(1.0, awarded / NUDGE_CAP) * 100),
+            "points": awarded,
+            "max_points": NUDGE_CAP,
+            "bonus": True,
+        })
+
     return {
         "score": job.score,
         "components": components,
         "reasons": _reasons(job, comps, profile),
+        "boost_reasons": boost_reasons,        # plain reasons for the bonus (recency / fit / seniority)
+        "salary": job.salary or None,          # display-only annotation (never scored)
+        "nudge_points": awarded,
         # 'skills' is omitted from scoring when the posting lists no recognisable
         # skills — surface that so a missing component reads as "unknown", not "zero".
         "skills_detected": bool(job.job_skills),

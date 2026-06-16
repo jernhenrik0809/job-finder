@@ -2,6 +2,31 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.11.0] — 2026-06-16
+
+### Added
+- **Ranking nudges + salary on cards.** The score now reflects more than text/skill/title overlap,
+  using fields that were already fetched but ignored — as small, **bounded, never-penalizing**
+  bonuses on top of the base score (a job can only score the *same or higher* than before, so the
+  calibration never regresses):
+  - **Freshly posted** (up to +1.5): recent postings get a lift; degrades safely to zero on an
+    empty or non-ISO date (most sources), never crashing.
+  - **Location / remote fit** (up to +0.5): matches your search location, or a *genuinely* remote
+    role (trusted only from sources that report real per-job remote, not the ones that echo the flag).
+  - **Seniority fit** (up to +0.5): a senior/lead CV matched to a senior/lead-titled role.
+  Total bonus is hard-capped at **2.5 / 100**, so it only ever breaks near-ties — it can't override
+  a decisive relevance gap. Every nudge is **explained**: it shows as a green **"Freshness & fit"**
+  band in the *Why?* breakdown (its points still sum exactly to the score) with plain reasons, and
+  **salary** is surfaced on the match card.
+- `jobfinder/matcher.py` (`MatchConfig.today` / `search_location` / `search_remote`, threaded from
+  the search settings in `engine.py`). Salary is **display-only** — never parsed into a score
+  (cross-source salary strings aren't reliably numeric).
+
+### Tests
+- 105 → 113 (never-penalizing, points-still-sum-to-score with a nudge, recency bands + safe parsing
+  of empty/garbage/full-datetime, future-date clamp, remote-source trust, location/seniority, salary
+  display-only, 100-clamp). Design produced via a multi-agent map→design→synthesize workflow.
+
 ## [1.10.0] — 2026-06-16
 
 ### Added

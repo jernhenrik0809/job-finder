@@ -77,8 +77,12 @@ def find_jobs(profile: CVProfile, settings: SearchSettings) -> SearchResult:
         deduped.setdefault(job.id, job)
     jobs = list(deduped.values())
 
-    # Score & rank.
-    rank_jobs(profile, jobs, MatchConfig(semantic=settings.semantic))
+    # Score & rank (thread the search location/remote so the fit nudge can use them).
+    rank_jobs(profile, jobs, MatchConfig(
+        semantic=settings.semantic,
+        search_location=settings.location,
+        search_remote=settings.remote,
+    ))
 
     if settings.min_score > 0:
         jobs = [j for j in jobs if j.score >= settings.min_score]

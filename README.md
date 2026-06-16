@@ -214,6 +214,12 @@ score = 0.55 · text_similarity     (TF-IDF cosine: your whole CV vs the posting
 - If a posting has no recognisable skills, that component is dropped (not guessed),
   so unrelated jobs aren't inflated.
 
+On top of that base, a few **bounded, never-penalizing nudges** (max **+2.5** total) lift jobs
+that are a better real-world fit: **freshly posted**, a **location / genuine-remote** match, or a
+**seniority** match to your level. They only ever break near-ties — never enough to override a
+decisive relevance gap — and each one is shown as a green band in the **Why?** breakdown. (Salary
+is shown on the card but never scored — cross-board salary text isn't reliably comparable.)
+
 ### Why this score? (transparent breakdown)
 
 Every match card has a **Why?** toggle. It opens a breakdown showing each component's

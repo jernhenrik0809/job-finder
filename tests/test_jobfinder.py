@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from jobfinder.skills import extract_skills, skill_overlap
-from jobfinder.cv_parser import build_profile, extract_text, looks_empty
+from jobfinder.cv_parser import CVProfile, build_profile, extract_text, looks_empty
 from jobfinder.matcher import rank_jobs, MatchConfig
 from jobfinder.sources.base import Job
 
@@ -188,3 +188,98 @@ def test_explanation_survives_json_round_trip():
     d = jobs[0].to_dict()
     again = json.loads(json.dumps(d))         # the API serialises Job via to_dict
     assert again["explanation"]["components"]
+
+
+# --- ranking nudges (bounded, never-penalizing, explainable) ---------------
+
+from datetime import date
+from jobfinder.matcher import MatchConfig, NUDGE_CAP
+
+_TODAY = date(2026, 6, 16)
+
+
+def _senior_profile():
+    return CVProfile(raw_text="Senior Python developer. Django, FastAPI, AWS, Docker, PostgreSQL.",
+                     skills=["python", "django", "fastapi", "aws", "docker", "postgresql"],
+                     titles=["Python Developer"], seniority="senior", location="Copenhagen")
+
+
+def _job(**kw):
+    return Job(title=kw.get("title", "Python Developer"), company="X",
+               description=kw.get("desc", "Python Django AWS backend role."),
+               source=kw.get("source", "test"), posted=kw.get("posted", ""),
+               location=kw.get("loc", ""), remote=kw.get("remote", False), salary=kw.get("salary", ""))
+
+
+def _score(job, **cfg):
+    jobs = [job]
+    rank_jobs(_senior_profile(), jobs, MatchConfig(today=_TODAY, **cfg))
+    return jobs[0]
+
+
+def test_nudges_never_penalize():
+    # a job with NO nudge signal scores its base; with signals it can only go up
+    plain = _score(_job())
+    boosted = _score(_job(title="Senior Python Developer", posted="2026-06-15",
+                          loc="Copenhagen, Denmark", source="Arbeitnow", remote=True),
+                     search_location="Copenhagen", search_remote=True)
+    assert plain.explanation["nudge_points"] == 0.0
+    assert boosted.score >= boosted.explanation["score"] - boosted.explanation["nudge_points"]  # base ≤ score
+    assert boosted.explanation["nudge_points"] > 0
+
+
+def test_nudge_points_keep_components_summing_to_score():
+    j = _score(_job(title="Senior Python Developer", posted="2026-06-14", source="Arbeitnow"))
+    ex = j.explanation
+    assert any(c.get("bonus") for c in ex["components"])
+    assert abs(sum(c["points"] for c in ex["components"]) - j.score) < 0.2
+
+
+def test_no_nudge_means_no_bonus_component():
+    ex = _score(_job()).explanation       # posted='', no location/seniority/remote signal
+    assert ex["nudge_points"] == 0.0
+    assert all(not c.get("bonus") for c in ex["components"])
+    assert "nudges" not in [c["key"] for c in ex["components"]]
+
+
+def test_recency_bands_and_safe_parsing():
+    assert _score(_job(posted="2026-06-15")).explanation["nudge_points"] == 1.5     # fresh (≤7d)
+    assert _score(_job(posted="2026-05-30")).explanation["nudge_points"] == 0.7     # recent (≤30d)
+    assert _score(_job(posted="2026-01-01")).explanation["nudge_points"] == 0.0     # stale
+    assert _score(_job(posted="2026-06-20")).explanation["nudge_points"] == 1.5     # future → freshest
+    for bad in ("", "not-a-date", "2026-13-99"):
+        assert _score(_job(posted=bad)).explanation["nudge_points"] == 0.0          # safe, no crash
+    # a full ISO datetime is sliced to the date and still parses
+    assert _score(_job(posted="2026-06-12T08:00:00.000Z")).explanation["nudge_points"] == 1.5
+
+
+def test_remote_nudge_trusts_only_real_remote_sources():
+    for src in ("Arbeitnow", "JSearch/Google"):
+        assert _score(_job(source=src, remote=True), search_remote=True).explanation["nudge_points"] == 0.5
+    for src in ("Adzuna", "Jooble", "Remotive"):   # these echo/hardcode remote → not trusted
+        assert _score(_job(source=src, remote=True), search_remote=True).explanation["nudge_points"] == 0.0
+
+
+def test_location_and_seniority_nudges():
+    assert _score(_job(loc="Copenhagen, Denmark"), search_location="Copenhagen").explanation["nudge_points"] == 0.5
+    assert _score(_job(title="Senior Python Developer")).explanation["nudge_points"] == 0.5   # senior title
+    assert _score(_job(title="Junior Python Developer")).explanation["nudge_points"] == 0.0   # no senior token
+
+
+def test_salary_is_surfaced_display_only():
+    ex = _score(_job(salary="600,000 DKK")).explanation
+    assert ex["salary"] == "600,000 DKK"
+    # salary contributes ZERO score points (it's not a component)
+    assert "salary" not in [c["key"] for c in ex["components"]]
+    assert _score(_job(salary="")).explanation["salary"] is None
+
+
+def test_bonus_clamps_at_100():
+    # force a near-perfect base so base + full bonus would exceed 100
+    prof = _senior_profile()
+    j = Job(title="Senior Python Developer", company="X", source="Arbeitnow", remote=True,
+            posted="2026-06-15", location="Copenhagen, Denmark",
+            description=prof.raw_text)        # identical text → ~max base
+    rank_jobs(prof, [j], MatchConfig(today=_TODAY, search_location="Copenhagen", search_remote=True))
+    assert j.score <= 100.0
+    assert abs(sum(c["points"] for c in j.explanation["components"]) - j.score) < 0.2  # still sums, even clamped
