@@ -25,6 +25,7 @@ from .cv_parser import CVProfile, build_profile, extract_text_from_bytes, looks_
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
 from .insights import compute_insights
+from .saved_searches import new_saved_search, register_run, mark_seen
 from .sources import available_sources
 from .store import get_store
 
@@ -71,6 +72,19 @@ class SearchRequest(BaseModel):
     keywords: str = ""
     location: str = ""
     sources: list[str] = []          # empty → server uses the configured default sources
+    limit_per_source: int = 25
+    remote: bool = False
+    days: int | None = None
+    semantic: bool = False
+    min_score: float = 0.0
+
+
+class SaveSearchRequest(BaseModel):
+    name: str = "Saved search"
+    cv_id: str = ""
+    keywords: str = ""
+    location: str = ""
+    sources: list[str] = []
     limit_per_source: int = 25
     remote: bool = False
     days: int | None = None
@@ -160,27 +174,26 @@ async def upload_text(text: str = Form(...)) -> JSONResponse:
     return JSONResponse({"cv_id": cv_id, "profile": _profile_summary(profile), "warning": None})
 
 
+def _build_settings(keywords, location, sources, limit_per_source, remote, days, semantic, min_score) -> SearchSettings:
+    # Keep only known sources, de-duplicated and order-preserving — guards against a
+    # client sending unknown or repeated names (which would amplify outbound requests).
+    known = set(available_sources())
+    chosen = list(dict.fromkeys(s for s in (sources or []) if s in known)) or list(settings.default_sources)
+    return SearchSettings(
+        keywords=keywords, location=location, sources=chosen,
+        limit_per_source=max(1, min(limit_per_source, 50)),
+        remote=remote, days=days, semantic=semantic, min_score=min_score,
+    )
+
+
 @app.post("/api/search")
 def search(req: SearchRequest) -> JSONResponse:
     profile = store.get_profile(req.cv_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="CV not found — please upload your CV again.")
 
-    # Keep only known sources, de-duplicated and order-preserving — guards against a
-    # client sending unknown or repeated names (which would amplify outbound requests).
-    known = set(available_sources())
-    chosen = list(dict.fromkeys(s for s in req.sources if s in known)) or list(settings.default_sources)
-
-    search_settings = SearchSettings(
-        keywords=req.keywords,
-        location=req.location,
-        sources=chosen,
-        limit_per_source=max(1, min(req.limit_per_source, 50)),
-        remote=req.remote,
-        days=req.days,
-        semantic=req.semantic,
-        min_score=req.min_score,
-    )
+    search_settings = _build_settings(req.keywords, req.location, req.sources, req.limit_per_source,
+                                      req.remote, req.days, req.semantic, req.min_score)
     result = find_jobs(profile, search_settings)
     return JSONResponse({
         "jobs": [j.to_dict() for j in result.jobs],
@@ -360,6 +373,82 @@ def export_application(aid: str) -> PlainTextResponse:
 @app.get("/api/insights")
 def insights() -> dict:
     return compute_insights(store.list_applications())
+
+
+# ---------------------------------------------------------------------------
+# Saved searches (resurface what's new since last check)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/saved-searches")
+def create_saved_search(req: SaveSearchRequest) -> JSONResponse:
+    s = new_saved_search(req.name, req.model_dump())
+    store.save_saved_search(s)
+    return JSONResponse(s.summary())
+
+
+@app.get("/api/saved-searches")
+def list_saved_searches() -> dict:
+    return {"searches": [s.summary() for s in store.list_saved_searches()]}
+
+
+@app.delete("/api/saved-searches/{sid}")
+def delete_saved_search(sid: str) -> dict:
+    store.delete_saved_search(sid)
+    return {"ok": True}
+
+
+@app.post("/api/saved-searches/{sid}/seen")
+def mark_saved_search_seen(sid: str) -> dict:
+    s = store.get_saved_search(sid)
+    if s is None:
+        raise HTTPException(status_code=404, detail="Saved search not found.")
+    mark_seen(s)
+    store.save_saved_search(s)
+    return {"ok": True, "new_count": 0}
+
+
+def _run_one(s) -> dict:
+    """Run a saved search; update its seen-set/new_count; return the ranked jobs + new ids."""
+    profile = store.get_profile(s.cv_id) if s.cv_id else None
+    if profile is None:
+        raise HTTPException(status_code=400,
+                            detail="The CV for this saved search isn't available — re-upload your CV.")
+    settings_ = _build_settings(s.keywords, s.location, s.sources, s.limit_per_source,
+                                s.remote, s.days, s.semantic, s.min_score)
+    result = find_jobs(profile, settings_)
+    new_ids = register_run(s, [j.id for j in result.jobs])
+    store.save_saved_search(s)
+    return {
+        "jobs": [j.to_dict() for j in result.jobs],
+        "new_ids": new_ids,
+        "new_count": s.new_count,
+        "warnings": result.warnings,
+        "counts": result.counts,
+        "query": settings_.keywords or "",
+        "name": s.name,
+    }
+
+
+@app.post("/api/saved-searches/{sid}/run")
+def run_saved_search(sid: str) -> JSONResponse:
+    s = store.get_saved_search(sid)
+    if s is None:
+        raise HTTPException(status_code=404, detail="Saved search not found.")
+    return JSONResponse(_run_one(s))
+
+
+@app.post("/api/saved-searches/run-all")
+def run_all_saved_searches() -> dict:
+    out = []
+    for s in store.list_saved_searches():
+        try:
+            r = _run_one(s)
+            out.append({"id": s.id, "name": s.name, "new_count": r["new_count"]})
+        except HTTPException as e:
+            out.append({"id": s.id, "name": s.name, "new_count": s.new_count, "error": e.detail})
+        except Exception as e:
+            out.append({"id": s.id, "name": s.name, "new_count": s.new_count, "error": str(e)})
+    return {"searches": out}
 
 
 # Static assets (css/js)

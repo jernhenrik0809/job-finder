@@ -202,10 +202,15 @@ def _detect_seniority(text: str, years: int | None) -> str | None:
 
 
 def _detect_location(text: str) -> str | None:
-    # Heuristic: a "City, ST" or "City, Country" pattern in the first lines.
+    # Heuristic: a "City, ST" or "City, Country" pattern in the first lines. Skip skill
+    # lists and section headers (e.g. "Skills: Python, Django") which look like "X, Y" but
+    # are not locations.
     for line in text.splitlines()[:15]:
+        low = line.lower()
+        if "experience" in low or "skill" in low or ":" in line:
+            continue
         m = re.search(r"\b([A-Z][a-zA-Z.\- ]{2,30}),\s*([A-Z]{2}|[A-Z][a-zA-Z ]{2,30})\b", line)
-        if m and "experience" not in line.lower():
+        if m:
             return f"{m.group(1).strip()}, {m.group(2).strip()}"
     return None
 

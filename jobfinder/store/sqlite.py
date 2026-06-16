@@ -17,17 +17,19 @@ import threading
 import time
 from pathlib import Path
 
-from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS
+from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES
 from ..applications import Application
 from ..cv_parser import CVProfile
+from ..saved_searches import SavedSearch
 
 _SCHEMA = """
-CREATE TABLE IF NOT EXISTS profiles     (cv_id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS examples     (id TEXT PRIMARY KEY, created REAL NOT NULL, name TEXT, text TEXT, chars INTEGER);
-CREATE TABLE IF NOT EXISTS applications (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS profiles      (cv_id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS examples      (id TEXT PRIMARY KEY, created REAL NOT NULL, name TEXT, text TEXT, chars INTEGER);
+CREATE TABLE IF NOT EXISTS applications  (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS saved_searches(id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 2
+_SCHEMA_VERSION = 3
 
 
 class SqliteStore(Store):
@@ -53,7 +55,9 @@ class SqliteStore(Store):
             version = row["version"]
             if version < 2:                      # v1.x → v2: carry old drafts into applications
                 self._migrate_v1_drafts(self._conn)
-                self._conn.execute("UPDATE schema_version SET version=?", (2,))
+            # v2 → v3 adds the saved_searches table (already created above; no data to move).
+            if version < _SCHEMA_VERSION:
+                self._conn.execute("UPDATE schema_version SET version=?", (_SCHEMA_VERSION,))
 
     @staticmethod
     def _migrate_v1_drafts(conn: sqlite3.Connection) -> None:
@@ -160,6 +164,30 @@ class SqliteStore(Store):
     def delete_application(self, app_id: str) -> None:
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM applications WHERE id=?", (app_id,))
+
+    # --- saved searches ---
+    def save_saved_search(self, search: SavedSearch) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO saved_searches(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (search.id, time.time(), json.dumps(search.to_dict())),
+            )
+            self._evict("saved_searches", "id", MAX_SAVED_SEARCHES)
+
+    def get_saved_search(self, search_id: str) -> SavedSearch | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM saved_searches WHERE id=?", (search_id,)).fetchone()
+        return SavedSearch.from_dict(json.loads(row["data"])) if row else None
+
+    def list_saved_searches(self) -> list[SavedSearch]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM saved_searches ORDER BY created ASC").fetchall()
+        return [SavedSearch.from_dict(json.loads(r["data"])) for r in rows]
+
+    def delete_saved_search(self, search_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM saved_searches WHERE id=?", (search_id,))
 
     def close(self) -> None:
         self._conn.close()

@@ -376,6 +376,25 @@ input[type=range] { accent-color: var(--accent); }
 .spark-labels { display: flex; gap: 6px; margin-top: 4px; }
 .spark-labels span { flex: 1; text-align: center; font-size: 10px; color: var(--muted); }
 
+/* ---------- saved searches ---------- */
+#saveSearchBtn { display: block; margin: 8px auto 0; }
+.saved-box { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.saved-head { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.saved-list { display: flex; flex-direction: column; gap: 6px; }
+.saved-row {
+  display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 9px; padding: 8px 10px; cursor: pointer; transition: border-color .12s;
+}
+.saved-row:hover { border-color: var(--accent); }
+.saved-row .s-name { flex: 1; font-size: 13px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-row .s-sub { font-size: 11px; color: var(--muted); }
+.saved-row .new-badge { background: var(--green); color: #04240f; border-radius: 999px; font-size: 11px; font-weight: 700; padding: 1px 8px; }
+.saved-row .s-del { color: var(--muted); border: none; background: none; cursor: pointer; font-size: 15px; padding: 0 2px; }
+.saved-row .s-del:hover { color: var(--red); }
+
+/* NEW flag on match cards surfaced from a saved-search run */
+.job .new-flag { background: var(--green-dim); color: #b8f3d8; border: 1px solid #1f7a52; border-radius: 999px; font-size: 10px; font-weight: 700; padding: 1px 7px; margin-left: 6px; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 920px) {
   .layout { grid-template-columns: 1fr; }

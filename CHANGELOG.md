@@ -2,6 +2,25 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.4.0] — 2026-06-16
+
+### Added
+- **Saved searches + new-match alerts.** Save any query (**★ Save this search**); the sidebar
+  lists your saved searches with a **"N new"** badge. Clicking one runs it and loads the
+  results into *Matches* with **NEW** flags on postings you haven't seen before, then marks
+  them seen. **"check for new"** runs them all and refreshes the badges. New-match detection
+  diffs each run's results against the ids already surfaced — no background scheduler, so the
+  app stays a single off-friendly local process.
+- `jobfinder/saved_searches.py`; SQLite **schema v3** (`saved_searches`); API
+  `POST/GET /api/saved-searches`, `…/{id}/run`, `…/run-all`, `…/{id}/seen`, `DELETE …/{id}`.
+
+### Fixed
+- CV location detection no longer false-matches a skills line (e.g. "Skills: Python, Django")
+  as a "City, Region" location.
+
+### Tests
+- 54 → 62 (saved-search model + diffing, store round-trip, run/seen/delete API, location guard).
+
 ## [1.3.0] — 2026-06-16
 
 ### Added

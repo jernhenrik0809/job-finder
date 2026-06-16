@@ -138,6 +138,15 @@ drafted but not sent).
 
 ---
 
+## Saved searches
+
+Click **★ Save this search** to store a query. Your saved searches live in the sidebar
+with a **"N new"** badge; click one to re-run it — postings you haven't seen are flagged
+**NEW** — or hit **check for new** to refresh every badge at once. It's how you catch new
+roles without re-typing the same search. (No background polling — searches run when you ask.)
+
+---
+
 ## How matching works
 
 Each job gets a 0–100 score:

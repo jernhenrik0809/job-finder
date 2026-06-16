@@ -116,8 +116,9 @@ def test_sqlite_v1_drafts_migrate_to_applications(tmp_path):
     assert a.id == "old1" and a.job_title == "Old Role" and a.company == "OldCo"
     assert a.status == "ready" and a.body == "Dear team..." and a.generator == "template"
     assert any(e["type"] == "migrated" for e in a.events)
+    from jobfinder.store.sqlite import _SCHEMA_VERSION
     ver = s._conn.execute("SELECT version FROM schema_version").fetchone()["version"]
-    assert ver == 2
+    assert ver == _SCHEMA_VERSION                # bumped to the current schema (drafts carried over)
     assert s._conn.execute("SELECT name FROM sqlite_master WHERE name='drafts'").fetchone() is None
     s.close()
 
@@ -133,6 +134,23 @@ def test_application_from_dict_ignores_unknown_fields(tmp_path):
     assert len(apps) == 1 and apps[0].id == "x1"
     assert s.get_application("x1") is not None
     s.close()
+
+
+def test_sqlite_saved_search_round_trip(tmp_path):
+    from jobfinder.saved_searches import new_saved_search, register_run
+    s = SqliteStore(tmp_path / "jf.db")
+    ss = new_saved_search("My search", {"cv_id": "cv1", "keywords": "python", "sources": ["remotive"]})
+    register_run(ss, ["a", "b"])
+    s.save_saved_search(ss)
+    s.close()
+
+    s2 = SqliteStore(tmp_path / "jf.db")
+    got = s2.get_saved_search(ss.id)
+    assert got and got.name == "My search" and got.new_count == 2 and set(got.seen_ids) == {"a", "b"}
+    assert [x.id for x in s2.list_saved_searches()] == [ss.id]
+    s2.delete_saved_search(ss.id)
+    assert s2.get_saved_search(ss.id) is None
+    s2.close()
 
 
 def test_memory_store_basics():

@@ -100,7 +100,16 @@
       </label>
 
       <button id="searchBtn" class="btn primary" type="button" disabled>Find matching jobs</button>
+      <button id="saveSearchBtn" class="link-btn small hidden" type="button">★ Save this search</button>
       <p id="hint" class="muted small center">Upload your CV to begin.</p>
+
+      <div id="savedBox" class="saved-box hidden">
+        <div class="saved-head">
+          <span>Saved searches</span>
+          <button id="checkNew" class="link-btn small" type="button">check for new</button>
+        </div>
+        <div id="savedList" class="saved-list"></div>
+      </div>
     </section>
 
     <!-- ============ RIGHT: results ============ -->

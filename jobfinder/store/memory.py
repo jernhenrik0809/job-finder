@@ -6,9 +6,10 @@ application update) preserves its position.
 """
 from __future__ import annotations
 
-from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS
+from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES
 from ..applications import Application
 from ..cv_parser import CVProfile
+from ..saved_searches import SavedSearch
 
 
 def _evict(d: dict, cap: int) -> None:
@@ -21,6 +22,7 @@ class MemoryStore(Store):
         self._profiles: dict[str, CVProfile] = {}
         self._examples: dict[str, dict] = {}
         self._apps: dict[str, Application] = {}
+        self._searches: dict[str, SavedSearch] = {}
 
     def save_profile(self, cv_id: str, profile: CVProfile) -> None:
         self._profiles[cv_id] = profile
@@ -51,3 +53,16 @@ class MemoryStore(Store):
 
     def delete_application(self, app_id: str) -> None:
         self._apps.pop(app_id, None)
+
+    def save_saved_search(self, search: SavedSearch) -> None:
+        self._searches[search.id] = search
+        _evict(self._searches, MAX_SAVED_SEARCHES)
+
+    def get_saved_search(self, search_id: str) -> SavedSearch | None:
+        return self._searches.get(search_id)
+
+    def list_saved_searches(self) -> list[SavedSearch]:
+        return list(self._searches.values())
+
+    def delete_saved_search(self, search_id: str) -> None:
+        self._searches.pop(search_id, None)

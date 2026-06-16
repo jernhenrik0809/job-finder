@@ -94,6 +94,34 @@ def test_insights_endpoint():
     client.delete(f"/api/applications/{aid}")
 
 
+def test_saved_search_create_run_seen_delete(monkeypatch):
+    cv_id = _upload_cv()
+    r = client.post("/api/saved-searches", json={"name": "Py", "cv_id": cv_id, "keywords": "python", "sources": ["remotive"]})
+    assert r.status_code == 200
+    sid = r.json()["id"]
+    assert any(x["id"] == sid for x in client.get("/api/saved-searches").json()["searches"])
+
+    # mock the live search so the test is hermetic
+    import jobfinder.web as web
+    from jobfinder.engine import SearchResult
+    from jobfinder.sources.base import Job
+    jobs = [Job(title="Python Dev", company="Acme", source="Remotive"),
+            Job(title="Backend Engineer", company="Globex", source="Remotive")]
+    for j in jobs:
+        j.score = 50
+    monkeypatch.setattr(web, "find_jobs", lambda profile, settings: SearchResult(jobs=jobs, profile=profile))
+
+    run = client.post(f"/api/saved-searches/{sid}/run").json()
+    assert len(run["jobs"]) == 2 and len(run["new_ids"]) == 2 and run["new_count"] == 2
+
+    run2 = client.post(f"/api/saved-searches/{sid}/run").json()    # same jobs → nothing new
+    assert run2["new_ids"] == [] and run2["new_count"] == 2
+
+    assert client.post(f"/api/saved-searches/{sid}/seen").json()["new_count"] == 0
+    assert client.delete(f"/api/saved-searches/{sid}").status_code == 200
+    assert all(x["id"] != sid for x in client.get("/api/saved-searches").json()["searches"])
+
+
 def test_examples_add_list_delete():
     r = client.post("/api/examples-text", data={"text": "My example letter.", "name": "ex1"})
     assert r.status_code == 200

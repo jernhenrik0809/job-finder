@@ -7,6 +7,7 @@ const jobsById = new Map();      // jobId -> job (all rendered matches)
 const savedJobIds = new Set();   // job ids already saved to the pipeline this session
 const appsById = new Map();      // application id -> application
 let dragId = null;
+let currentNewIds = new Set();   // job ids flagged NEW from the last saved-search run
 
 const $ = (sel) => document.querySelector(sel);
 const el = {
@@ -17,6 +18,7 @@ const el = {
   keywords: $('#keywords'), location: $('#location'), days: $('#days'), limit: $('#limit'),
   remote: $('#remote'), semantic: $('#semantic'), minScore: $('#minScore'), minScoreVal: $('#minScoreVal'),
   searchBtn: $('#searchBtn'), hint: $('#hint'),
+  saveSearchBtn: $('#saveSearchBtn'), savedBox: $('#savedBox'), savedList: $('#savedList'), checkNew: $('#checkNew'),
   resultMeta: $('#resultMeta'), warnings: $('#warnings'),
   loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'), jsearchChk: $('#jsearchChk'),
   tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), tabInsights: $('#tabInsights'), pipelineCount: $('#pipelineCount'),
@@ -83,6 +85,8 @@ async function postProfile(url, fd) {
     renderProfile(data.profile);
     if (data.warning) showWarnings([data.warning]);
     el.searchBtn.disabled = false;
+    el.saveSearchBtn.classList.remove('hidden');
+    loadSavedSearches();
     el.hint.textContent = 'CV loaded. Adjust the search and hit “Find matching jobs”.';
   } catch (err) {
     el.hint.textContent = '⚠ ' + err.message;
@@ -130,6 +134,7 @@ async function runSearch() {
   if (!cvId) return;
   const sources = selectedSources();
   if (sources.length === 0) { showWarnings(['Pick at least one job source.']); return; }
+  currentNewIds = new Set();          // a manual search has no "new since last check" context
   switchTab('matches');
   el.warnings.classList.add('hidden');
   el.empty.classList.add('hidden');
@@ -191,7 +196,7 @@ function jobCard(j) {
     <div class="job-pick"><input type="checkbox" aria-label="Select for drafting" /></div>
     <div class="score ${cls}">${Math.round(j.score)}<small>match</small></div>
     <div class="job-main">
-      <h3>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(j.title)}</a>` : esc(j.title)}</h3>
+      <h3>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(j.title)}</a>` : esc(j.title)}${currentNewIds.has(j.id) ? '<span class="new-flag">NEW</span>' : ''}</h3>
       <div class="job-sub">${sub}</div>
       ${desc}
       ${matched ? `<div class="skill-row"><span class="lbl">✓ you have</span>${matched}</div>` : ''}
@@ -220,6 +225,89 @@ async function saveToPipeline(job, btn) {
     bumpPipelineCount(1);
   } catch (err) { showWarnings(['Save: ' + err.message]); }
   finally { btn.disabled = false; }
+}
+
+// ---------- saved searches ----------
+function currentSearchPayload() {
+  const kw = el.keywords.value.trim();
+  const loc = el.location.value.trim();
+  return {
+    name: (kw || 'Saved search') + (loc ? ' · ' + loc : ''),
+    cv_id: cvId || '', keywords: kw, location: loc, sources: selectedSources(),
+    limit_per_source: parseInt(el.limit.value, 10), remote: el.remote.checked,
+    days: el.days.value ? parseInt(el.days.value, 10) : null,
+    semantic: el.semantic.checked, min_score: parseFloat(el.minScore.value),
+  };
+}
+
+el.saveSearchBtn.addEventListener('click', async () => {
+  if (!cvId) return;
+  try {
+    const resp = await fetch('/api/saved-searches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(currentSearchPayload()) });
+    if (!resp.ok) throw new Error('save failed');
+    el.saveSearchBtn.textContent = '★ Saved!';
+    setTimeout(() => { el.saveSearchBtn.textContent = '★ Save this search'; }, 1400);
+    loadSavedSearches();
+  } catch (e) { showWarnings(['Save search: ' + e.message]); }
+});
+
+el.checkNew.addEventListener('click', async () => {
+  el.checkNew.textContent = 'checking…'; el.checkNew.disabled = true;
+  try {
+    const data = await (await fetch('/api/saved-searches/run-all', { method: 'POST' })).json();
+    renderSavedList(data.searches || []);
+    const total = (data.searches || []).reduce((n, s) => n + (s.new_count || 0), 0);
+    el.checkNew.textContent = total ? `${total} new ✓` : 'no new';
+  } catch { el.checkNew.textContent = 'check for new'; }
+  finally { setTimeout(() => { el.checkNew.textContent = 'check for new'; el.checkNew.disabled = false; }, 2500); }
+});
+
+async function loadSavedSearches() {
+  try { renderSavedList((await (await fetch('/api/saved-searches')).json()).searches || []); }
+  catch { /* ignore */ }
+}
+
+function renderSavedList(searches) {
+  el.savedBox.classList.toggle('hidden', searches.length === 0);
+  el.savedList.innerHTML = '';
+  searches.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'saved-row';
+    const sub = [s.location, (s.sources || []).join(', ')].filter(Boolean).join(' · ');
+    row.innerHTML = `<span class="s-name">${esc(s.name)}${sub ? `<div class="s-sub">${esc(sub)}</div>` : ''}</span>
+      ${s.new_count ? `<span class="new-badge">${s.new_count} new</span>` : ''}
+      <button class="s-del" title="Delete">✕</button>`;
+    row.addEventListener('click', (e) => { if (!e.target.closest('.s-del')) runSavedSearch(s.id); });
+    row.querySelector('.s-del').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await fetch(`/api/saved-searches/${s.id}`, { method: 'DELETE' });
+      loadSavedSearches();
+    });
+    el.savedList.appendChild(row);
+  });
+}
+
+async function runSavedSearch(id) {
+  switchTab('matches');
+  el.warnings.classList.add('hidden');
+  el.empty.classList.add('hidden');
+  el.jobs.innerHTML = '';
+  selected.clear(); jobsById.clear(); updateSelbar();
+  el.loading.classList.remove('hidden');
+  el.resultMeta.textContent = '';
+  try {
+    const resp = await fetch(`/api/saved-searches/${id}/run`, { method: 'POST' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Run failed');
+    currentNewIds = new Set(data.new_ids || []);
+    renderJobs(data);
+    await fetch(`/api/saved-searches/${id}/seen`, { method: 'POST' });   // mark viewed → clears badge
+    loadSavedSearches();
+  } catch (err) {
+    showWarnings(['Saved search: ' + err.message]);
+  } finally {
+    el.loading.classList.add('hidden');
+  }
 }
 
 // ---------- selection → generate ----------

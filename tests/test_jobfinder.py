@@ -70,6 +70,17 @@ def test_build_profile_from_sample():
     assert profile.suggested_keywords
 
 
+def test_location_not_detected_from_skill_line():
+    # "Skills: Python, Django" must not be read as a "City, Region" location
+    p = build_profile("Jordan Smith\nBackend Developer\nSkills: Python, Django, FastAPI, AWS")
+    assert p.location is None
+
+
+def test_location_detected_from_contact_line():
+    p = build_profile("Jane Doe\nSan Francisco, CA\nSoftware Engineer")
+    assert p.location == "San Francisco, CA"
+
+
 def test_looks_empty():
     assert looks_empty("") is True
     assert looks_empty("   \n  ") is True
