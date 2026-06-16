@@ -2,6 +2,21 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.6.1] — 2026-06-16
+
+### Fixed (from review)
+- **Wrong-type salary crash (Denmark sources).** A Jooble posting with a *numeric* salary
+  (e.g. `45000` instead of `"45000 DKK"`) raised `AttributeError` on `.strip()` mid-loop,
+  which took out the **entire** Jooble source (0 jobs + a warning) for that search — the same
+  bug-class as the earlier null guards, but for wrong *types* rather than nulls. Adzuna had the
+  analogous latent fragility: `int()` on a decimal-string salary (`"500000.0"`) raises
+  `ValueError`. Both sources now coerce external fields defensively (`_s()` for strings,
+  `int(float())` for salary figures), so a single odd field degrades to empty rather than
+  wiping the source. `jobfinder/sources/jooble.py`, `jobfinder/sources/adzuna.py`.
+
+### Tests
+- 71 → 73 (Jooble numeric salary, Adzuna decimal-string salary — both assert the source survives).
+
 ## [1.6.0] — 2026-06-16
 
 ### Added

@@ -99,3 +99,30 @@ def test_jooble_defaults_to_denmark_location():
     with patch("jobfinder.sources.jooble.requests.post", side_effect=_fake_post):
         JoobleSource(api_key="k").search("python")               # no location given
     assert captured["body"]["location"] == "Denmark"             # stays Denmark-relevant
+
+
+def test_jooble_handles_numeric_salary():
+    # Jooble's salary is usually a string but can come back numeric; must not crash the source.
+    payload = {"jobs": [{
+        "title": "Data Engineer", "company": "NumCo", "location": "Odense",
+        "link": "https://jooble/2", "snippet": "Python", "updated": "2026-06-09",
+        "salary": 45000,                                          # int, not str
+    }]}
+    with patch("jobfinder.sources.jooble.requests.post", return_value=_FakeResp(payload)):
+        jobs = JoobleSource(api_key="k").search("python", limit=5)
+    assert len(jobs) == 1                                         # whole source not wiped out
+    assert jobs[0].salary == "45000"                             # coerced, no AttributeError
+
+
+def test_adzuna_handles_decimal_string_salary():
+    # A proxy/cache could serialize salary as a decimal string; int(float()) must absorb it.
+    payload = {"results": [{
+        "title": "ML Engineer", "company": {"display_name": "Acme DK"},
+        "location": {"display_name": "København"}, "redirect_url": "https://adzuna/2",
+        "description": "Python", "created": "2026-06-10",
+        "salary_min": "500000.0", "salary_max": "700000.0",      # decimal strings
+    }]}
+    with patch("jobfinder.sources.adzuna.requests.get", return_value=_FakeResp(payload)):
+        jobs = AdzunaSource(app_id="id", app_key="key").search("python", limit=5)
+    assert len(jobs) == 1                                         # no ValueError → source survives
+    assert jobs[0].salary == "500,000–700,000"

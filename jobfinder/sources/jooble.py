@@ -25,6 +25,12 @@ def _strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
+def _s(v) -> str:
+    """Coerce any API value to a stripped string — guards null AND wrong types
+    (e.g. a numeric salary, which would crash .strip())."""
+    return "" if v is None else str(v).strip()
+
+
 class JoobleSource(JobSource):
     name = "jooble"
 
@@ -54,14 +60,14 @@ class JoobleSource(JobSource):
         jobs: list[Job] = []
         for item in (data.get("jobs") or [])[:limit]:
             jobs.append(Job(
-                title=(item.get("title") or "").strip(),
-                company=(item.get("company") or "").strip(),
-                location=(item.get("location") or "").strip(),
-                url=item.get("link") or "",
+                title=_s(item.get("title")),
+                company=_s(item.get("company")),
+                location=_s(item.get("location")),
+                url=_s(item.get("link")),
                 description=_strip_html(item.get("snippet")),
                 source="Jooble",
-                posted=(item.get("updated") or "")[:10],
-                salary=(item.get("salary") or "").strip(),
+                posted=_s(item.get("updated"))[:10],
+                salary=_s(item.get("salary")),
                 remote=remote,
             ))
         return jobs

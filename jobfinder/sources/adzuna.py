@@ -25,6 +25,24 @@ def _strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
+def _s(v) -> str:
+    """Coerce any API value to a stripped string — guards null AND wrong types."""
+    return "" if v is None else str(v).strip()
+
+
+def _money(v) -> str:
+    """Format a salary figure with thousands separators.
+
+    Adzuna returns these as JSON numbers, but a proxy/cache could serialize them as
+    a decimal string ("500000.0"); ``int(float(v))`` handles both, and a bad value
+    yields "" rather than crashing the whole source.
+    """
+    try:
+        return f"{int(float(v)):,}"
+    except (TypeError, ValueError):
+        return ""
+
+
 class AdzunaSource(JobSource):
     name = "adzuna"
 
@@ -63,22 +81,22 @@ class AdzunaSource(JobSource):
 
         jobs: list[Job] = []
         for item in (data.get("results") or [])[:limit]:
-            company = ((item.get("company") or {}).get("display_name") or "").strip()
-            loc = ((item.get("location") or {}).get("display_name") or "").strip()
+            company = _s((item.get("company") or {}).get("display_name"))
+            loc = _s((item.get("location") or {}).get("display_name"))
             salary = ""
-            lo, hi = item.get("salary_min"), item.get("salary_max")
+            lo, hi = _money(item.get("salary_min")), _money(item.get("salary_max"))
             if lo and hi:
-                salary = f"{int(lo):,}–{int(hi):,}"
+                salary = f"{lo}–{hi}"
             elif lo:
-                salary = f"from {int(lo):,}"
+                salary = f"from {lo}"
             jobs.append(Job(
-                title=(item.get("title") or "").strip(),
+                title=_s(item.get("title")),
                 company=company,
                 location=loc,
-                url=item.get("redirect_url") or "",
+                url=_s(item.get("redirect_url")),
                 description=_strip_html(item.get("description")),
                 source="Adzuna",
-                posted=(item.get("created") or "")[:10],
+                posted=_s(item.get("created"))[:10],
                 salary=salary,
                 remote=remote,
             ))
