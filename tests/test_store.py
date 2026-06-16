@@ -90,6 +90,51 @@ def test_sqlite_concurrent_read_write(tmp_path):
     assert not errors, f"concurrency errors: {errors[:3]}"
 
 
+def test_sqlite_v1_drafts_migrate_to_applications(tmp_path):
+    # A v1.1.0 DB stored cover letters in a 'drafts' table at schema_version=1.
+    # Opening it with the current store must carry them into 'applications', not orphan them.
+    import sqlite3, json
+    db = tmp_path / "jf.db"
+    conn = sqlite3.connect(str(db))
+    conn.executescript("""
+        CREATE TABLE profiles (cv_id TEXT PRIMARY KEY, created REAL, data TEXT);
+        CREATE TABLE examples (id TEXT PRIMARY KEY, created REAL, name TEXT, text TEXT, chars INTEGER);
+        CREATE TABLE drafts (id TEXT PRIMARY KEY, created REAL, data TEXT);
+        CREATE TABLE schema_version (version INTEGER);
+    """)
+    conn.execute("INSERT INTO schema_version(version) VALUES(1)")
+    draft = {"job_title": "Old Role", "company": "OldCo", "job_url": "https://x/1", "job_source": "LinkedIn",
+             "score": 80.0, "subject": "Application for Old Role", "body": "Dear team...",
+             "generator": "template", "status": "ready", "note": "", "id": "old1"}
+    conn.execute("INSERT INTO drafts(id, created, data) VALUES(?,?,?)", ("old1", 1000.0, json.dumps(draft)))
+    conn.commit(); conn.close()
+
+    s = SqliteStore(db)
+    apps = s.list_applications()
+    assert len(apps) == 1
+    a = apps[0]
+    assert a.id == "old1" and a.job_title == "Old Role" and a.company == "OldCo"
+    assert a.status == "ready" and a.body == "Dear team..." and a.generator == "template"
+    assert any(e["type"] == "migrated" for e in a.events)
+    ver = s._conn.execute("SELECT version FROM schema_version").fetchone()["version"]
+    assert ver == 2
+    assert s._conn.execute("SELECT name FROM sqlite_master WHERE name='drafts'").fetchone() is None
+    s.close()
+
+
+def test_application_from_dict_ignores_unknown_fields(tmp_path):
+    # One row carrying a field the current dataclass doesn't know must not 500 the list endpoint.
+    import json
+    s = SqliteStore(tmp_path / "jf.db")
+    blob = _app("x1").to_dict(); blob["some_future_field"] = 123
+    s._conn.execute("INSERT INTO applications(id, created, data) VALUES(?,?,?)", ("x1", 1.0, json.dumps(blob)))
+    s._conn.commit()
+    apps = s.list_applications()        # must not raise
+    assert len(apps) == 1 and apps[0].id == "x1"
+    assert s.get_application("x1") is not None
+    s.close()
+
+
 def test_memory_store_basics():
     s = MemoryStore()
     s.save_profile("cv1", build_profile(CV))

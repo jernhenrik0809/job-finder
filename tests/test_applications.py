@@ -75,3 +75,17 @@ def test_job_snapshot_reconstructs_for_regeneration():
 
 def test_all_statuses_are_distinct():
     assert len(STATUSES) == len(set(STATUSES))
+
+
+def test_new_application_tolerates_bad_score():
+    # an untrusted client could POST a non-numeric score; must not crash
+    a = new_application({"title": "X", "score": "not-a-number"})
+    assert a.score == 0.0
+    b = new_application({"title": "Y"})   # missing score
+    assert b.score == 0.0
+
+
+def test_application_from_dict_drops_unknown_keys():
+    from jobfinder.applications import Application
+    a = Application.from_dict({"job_title": "Z", "company": "C", "mystery": 1, "id": "k"})
+    assert a.job_title == "Z" and a.company == "C" and a.id == "k"

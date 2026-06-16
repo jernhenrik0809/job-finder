@@ -26,8 +26,18 @@ tracked application pipeline.
 - The draft Outbox is superseded by the Application pipeline; generation now creates
   tracked applications instead of standalone drafts. `/api/drafts/*` → `/api/applications/*`.
 
+### Fixed (from review)
+- **Upgrade data-loss:** the SQLite v1→v2 migration is now real — it carries v1.x drafts
+  forward into applications and bumps `schema_version` (previously a no-op that orphaned them).
+- **Forward-compat:** stored rows are reconstructed via `from_dict` (unknown keys ignored), so
+  one odd row can't 500 the whole pipeline.
+- Defensive numeric coercion of an untrusted `job["score"]`; drag highlight no longer sticks;
+  drawer no longer reopens if closed mid-request; deleting an application resets the match card's
+  Save button.
+
 ### Tests
-- 32 → 40 (Application state machine, application store round-trip, pipeline API endpoints).
+- 32 → 44 (Application state machine, store round-trip, pipeline API, v1→v2 migration,
+  `from_dict` robustness).
 
 ## [1.1.0] — 2026-06-10
 

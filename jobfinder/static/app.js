@@ -169,6 +169,7 @@ function renderJobs(data) {
 function jobCard(j) {
   const card = document.createElement('div');
   card.className = 'job';
+  card.dataset.jobId = j.id;
   const cls = j.score >= 70 ? 'high' : j.score >= 45 ? 'mid' : 'low';
   const url = safeUrl(j.url);
   const matched = (j.matched_skills || []).slice(0, 8).map(s => `<span class="chip matched">${esc(s)}</span>`).join('');
@@ -283,10 +284,10 @@ function renderBoard() {
     col.innerHTML = `<div class="col-head st-${status}"><span>${esc(status)}</span><span class="cnt">${inCol.length}</span></div><div class="col-body"></div>`;
     const body = col.querySelector('.col-body');
     inCol.forEach(a => body.appendChild(pcard(a)));
-    // drop target wiring
-    body.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drop-target'); });
-    body.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) col.classList.remove('drop-target'); });
-    body.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('drop-target'); onDrop(status); });
+    // drop target wiring — on the whole column so header + body are one consistent zone
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drop-target'); });
+    col.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) col.classList.remove('drop-target'); });
+    col.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('drop-target'); onDrop(status); });
     el.board.appendChild(col);
   });
 }
@@ -403,10 +404,9 @@ function wireDrawer(id) {
     const updated = await patchApp(id, { status: btn.dataset.status });
     if (updated) {
       appsById.set(id, updated);
-      panel.querySelectorAll('.st-btn').forEach(b => b.classList.toggle('active', b.dataset.status === updated.status));
       renderBoard();
-      // refresh timeline
-      openDrawer(id);
+      // refresh the drawer (timeline + active pill) only if it's still open on this app
+      if (!el.drawer.classList.contains('hidden')) openDrawer(id);
     }
   }));
 
@@ -431,7 +431,7 @@ function wireDrawer(id) {
       if (!resp.ok) throw new Error(data.detail || 'Generation failed');
       appsById.set(id, data);
       renderBoard();
-      openDrawer(id);
+      if (!el.drawer.classList.contains('hidden')) openDrawer(id);
     } catch (err) { showWarnings(['Generate: ' + err.message]); btn.disabled = false; btn.textContent = 'Retry'; }
   });
 
@@ -440,9 +440,15 @@ function wireDrawer(id) {
   });
   panel.querySelector('.download').addEventListener('click', () => { window.location.href = `/api/applications/${id}/export`; });
   panel.querySelector('.del').addEventListener('click', async () => {
+    const a = appsById.get(id);
+    const jobId = a && a.job && a.job.id;
     await fetch(`/api/applications/${id}`, { method: 'DELETE' });
     appsById.delete(id);
-    // un-mark the matching job's Save button if visible
+    if (jobId) {                       // un-mark the originating match card's Save button
+      savedJobIds.delete(jobId);
+      const btn = document.querySelector(`.job[data-job-id="${jobId}"] .save-pipeline`);
+      if (btn) { btn.classList.remove('saved'); btn.textContent = '＋ Save to pipeline'; }
+    }
     renderBoard();
     closeDrawer();
   });

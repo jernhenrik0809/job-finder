@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
 from io import BytesIO
 from pathlib import Path
 from typing import BinaryIO
@@ -23,6 +23,12 @@ class CVProfile:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "CVProfile":
+        """Reconstruct from a stored dict, ignoring unknown keys (forward-compat)."""
+        allowed = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in d.items() if k in allowed})
 
 
 # ---------------------------------------------------------------------------

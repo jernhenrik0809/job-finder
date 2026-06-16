@@ -47,9 +47,50 @@ class SqliteStore(Store):
         with self._lock, self._conn:
             self._conn.executescript(_SCHEMA)
             row = self._conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
-            if row is None:
+            if row is None:                      # fresh DB — record the current version
                 self._conn.execute("INSERT INTO schema_version(version) VALUES(?)", (_SCHEMA_VERSION,))
-            # future forward-only migrations key off row["version"] here.
+                return
+            version = row["version"]
+            if version < 2:                      # v1.x → v2: carry old drafts into applications
+                self._migrate_v1_drafts(self._conn)
+                self._conn.execute("UPDATE schema_version SET version=?", (2,))
+
+    @staticmethod
+    def _migrate_v1_drafts(conn: sqlite3.Connection) -> None:
+        """v1.x stored cover letters in a 'drafts' table. Promote each to an Application
+        so the user's outbox isn't silently lost on upgrade, then drop the old table."""
+        if conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='drafts'"
+        ).fetchone() is None:
+            return
+        for r in conn.execute("SELECT created, data FROM drafts ORDER BY created ASC").fetchall():
+            try:
+                d = json.loads(r["data"])
+            except Exception:
+                continue
+            created = r["created"]
+            kwargs = dict(
+                job_title=d.get("job_title") or "this role",
+                company=d.get("company") or "",
+                job_url=d.get("job_url") or "",
+                job_source=d.get("job_source") or "",
+                score=float(d.get("score") or 0),
+                status="ready" if d.get("status") == "ready" else "drafting",
+                subject=d.get("subject") or "",
+                body=d.get("body") or "",
+                generator=d.get("generator") or "",
+                gen_note=d.get("note") or "",
+                created=created, updated=created,
+            )
+            if d.get("id"):
+                kwargs["id"] = d["id"]           # preserve the id (else the factory mints one)
+            appn = Application(**kwargs)
+            appn.events.append({"ts": created, "type": "migrated", "detail": "Imported from a v1.x draft"})
+            conn.execute(
+                "INSERT OR IGNORE INTO applications(id, created, data) VALUES(?,?,?)",
+                (appn.id, created, json.dumps(appn.to_dict())),
+            )
+        conn.execute("DROP TABLE drafts")
 
     def _evict(self, table: str, key: str, cap: int) -> None:
         n = self._conn.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()["n"]
@@ -73,7 +114,7 @@ class SqliteStore(Store):
     def get_profile(self, cv_id: str) -> CVProfile | None:
         with self._lock:
             row = self._conn.execute("SELECT data FROM profiles WHERE cv_id=?", (cv_id,)).fetchone()
-        return CVProfile(**json.loads(row["data"])) if row else None
+        return CVProfile.from_dict(json.loads(row["data"])) if row else None
 
     # --- examples ---
     def save_example(self, example: dict) -> None:
@@ -109,12 +150,12 @@ class SqliteStore(Store):
     def get_application(self, app_id: str) -> Application | None:
         with self._lock:
             row = self._conn.execute("SELECT data FROM applications WHERE id=?", (app_id,)).fetchone()
-        return Application(**json.loads(row["data"])) if row else None
+        return Application.from_dict(json.loads(row["data"])) if row else None
 
     def list_applications(self) -> list[Application]:
         with self._lock:
             rows = self._conn.execute("SELECT data FROM applications ORDER BY created ASC").fetchall()
-        return [Application(**json.loads(r["data"])) for r in rows]
+        return [Application.from_dict(json.loads(r["data"])) for r in rows]
 
     def delete_application(self, app_id: str) -> None:
         with self._lock, self._conn:

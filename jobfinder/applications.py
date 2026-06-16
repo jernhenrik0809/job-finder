@@ -10,7 +10,14 @@ from __future__ import annotations
 
 import secrets
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field, asdict, fields
+
+
+def _to_float(x) -> float:
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return 0.0
 
 # Canonical lifecycle, in pipeline order. The board renders one column per status.
 STATUSES = [
@@ -59,6 +66,13 @@ class Application:
     def to_dict(self) -> dict:
         return asdict(self)
 
+    @classmethod
+    def from_dict(cls, d: dict) -> "Application":
+        """Reconstruct from a stored dict, ignoring unknown keys so a schema change
+        (a renamed/added field in another build) never crashes the read path."""
+        allowed = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in d.items() if k in allowed})
+
 
 def record_event(app: Application, etype: str, detail: str = "") -> None:
     app.events.append({"ts": time.time(), "type": etype, "detail": detail})
@@ -73,10 +87,11 @@ def new_application(job: dict, cv_id: str = "", status: str = "saved") -> Applic
         job_url=(job.get("url") or ""),
         job_source=(job.get("source") or ""),
         location=(job.get("location") or ""),
-        score=float(job.get("score") or 0),
+        score=_to_float(job.get("score")),
         status=status if status in STATUSES else "saved",
         cv_id=cv_id,
         job={
+            "id": job.get("id"),     # the originating match-card id (for UI sync / dedup)
             "description": (job.get("description") or "")[:6000],
             "matched_skills": job.get("matched_skills") or [],
             "missing_skills": job.get("missing_skills") or [],
