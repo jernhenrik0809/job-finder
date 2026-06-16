@@ -13,7 +13,8 @@ from .sources.base import Job
 class SearchSettings:
     keywords: str = ""
     location: str = ""
-    sources: list[str] = field(default_factory=lambda: ["linkedin"])
+    # Ethics principle: free/official sources on by default; LinkedIn is opt-in.
+    sources: list[str] = field(default_factory=lambda: ["remotive", "arbeitnow"])
     limit_per_source: int = 25
     remote: bool = False
     days: int | None = None          # only jobs posted within N days

@@ -11,6 +11,10 @@ venv/
 # Runtime artifacts
 server.log
 *.log
+*.db
+*.sqlite*
+data/
+.tmp_*/
 
 # OS / editor
 .DS_Store

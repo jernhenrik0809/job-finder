@@ -48,7 +48,36 @@ Then open <http://127.0.0.1:8000>. Drop in your CV, tweak the search, and hit
 
 > **Tip:** LinkedIn is the slowest source (it politely throttles requests and
 > fetches each job's full description), taking ~20–60s. Remotive/Arbeitnow are
-> near-instant. Start with Remotive to try it, then enable LinkedIn.
+> the **default** (near-instant); LinkedIn is **opt-in** — tick it when you want it.
+
+### Run with Docker
+
+```bash
+docker compose up --build      # → http://localhost:8000
+```
+
+Your data (the SQLite store) persists in `./data` on the host. To enable the AI
+draft writer / JSearch source, uncomment `ANTHROPIC_API_KEY` / `RAPIDAPI_KEY` in
+`docker-compose.yml`.
+
+### Your work is saved
+
+Parsed CVs, style examples and the whole Outbox are stored in a local **SQLite**
+database, so they **survive a restart**. By default it lives at
+`%LOCALAPPDATA%\JobFinder\jobfinder.db` (Windows) / `~/.local/share/jobfinder/`
+(Linux/macOS). Nothing is uploaded anywhere.
+
+### Configuration (all optional, via environment variables)
+
+| Variable | Default | What it does |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | — | Enables the **Claude** draft writer |
+| `RAPIDAPI_KEY` | — | Enables the **JSearch** source |
+| `JOBFINDER_MODEL` | `claude-opus-4-8` | Claude model tier (e.g. `claude-haiku-4-5` to cut cost) |
+| `JOBFINDER_STORAGE` | `sqlite` | `sqlite` (persistent) or `memory` (ephemeral) |
+| `JOBFINDER_DATA_DIR` / `JOBFINDER_DB` | OS app-data dir | Where the SQLite DB lives |
+| `JOBFINDER_DEFAULT_SOURCES` | `remotive,arbeitnow` | Sources used when none are picked |
+| `JOBFINDER_HOST` / `JOBFINDER_PORT` | `127.0.0.1` / `8000` | Bind address/port |
 
 ---
 

@@ -1,0 +1,18 @@
+# Keep the image lean — only ship the app
+.git/
+.github/
+.claude/
+docs/
+tests/
+demos/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.db
+*.log
+.tmp_*/
+data/
+.DS_Store
+Thumbs.db

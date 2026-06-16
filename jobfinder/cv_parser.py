@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, asdict
+from io import BytesIO
 from pathlib import Path
+from typing import BinaryIO
 
 from .skills import extract_skills
 
@@ -44,47 +46,59 @@ def extract_text(path: str | Path) -> str:
 
 
 def extract_text_from_bytes(data: bytes, filename: str) -> str:
-    """Extract text from uploaded bytes by writing to a temp file."""
-    import tempfile
-    suffix = Path(filename).suffix or ".txt"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(data)
-        tmp_path = tmp.name
-    try:
-        return extract_text(tmp_path)
-    finally:
-        try:
-            Path(tmp_path).unlink()
-        except OSError:
-            pass
+    """Extract text from uploaded bytes — fully in memory, never touching disk.
+
+    (Earlier this spooled to a NamedTemporaryFile(delete=False); a crash mid-parse
+    could leave a plaintext CV in the OS temp dir — a privacy leak. Parsing from a
+    BytesIO keeps the CV in process memory only.)
+    """
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".pdf":
+        return _extract_pdf_stream(BytesIO(data), name=filename)
+    if suffix == ".docx":
+        return _extract_docx_stream(BytesIO(data))
+    if suffix == ".doc":
+        raise ValueError("Legacy .doc files are not supported — please save as .docx or PDF.")
+    return data.decode("utf-8", errors="ignore")
 
 
 def _extract_pdf(path: Path) -> str:
+    with open(path, "rb") as f:
+        return _extract_pdf_stream(f, name=path.name)
+
+
+def _extract_pdf_stream(stream: BinaryIO, name: str = "document.pdf") -> str:
     # Prefer pypdf (pure-python, light); fall back to pdfplumber if available.
     first_error: Exception | None = None
     try:
         from pypdf import PdfReader
-        reader = PdfReader(str(path))
+        reader = PdfReader(stream)
         return "\n".join((page.extract_text() or "") for page in reader.pages)
     except Exception as e:
         first_error = e  # remember the real cause so we don't misattribute it below
     try:
         import pdfplumber
-        with pdfplumber.open(str(path)) as pdf:
+        stream.seek(0)
+        with pdfplumber.open(stream) as pdf:
             return "\n".join((page.extract_text() or "") for page in pdf.pages)
     except Exception as e2:
         raise RuntimeError(
-            f"Could not read PDF '{path.name}'. pypdf failed ({first_error}); "
+            f"Could not read PDF '{name}'. pypdf failed ({first_error}); "
             f"pdfplumber failed ({e2}). If the file is a scanned image, paste your CV text instead."
         )
 
 
 def _extract_docx(path: Path) -> str:
+    with open(path, "rb") as f:
+        return _extract_docx_stream(f)
+
+
+def _extract_docx_stream(stream: BinaryIO) -> str:
     try:
         import docx  # python-docx
     except ImportError as e:
         raise RuntimeError("Reading .docx requires python-docx (pip install python-docx).") from e
-    document = docx.Document(str(path))
+    document = docx.Document(stream)
     parts = [p.text for p in document.paragraphs]
     # Also pull text out of tables (common in resumes).
     for table in document.tables:

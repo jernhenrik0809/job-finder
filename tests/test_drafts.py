@@ -108,3 +108,25 @@ def test_generate_draft_without_key_falls_back_to_template(monkeypatch):
     assert llm_available() is False
     d = generate_draft(_profile(), JOB, DraftOptions(use_llm=True))
     assert d.generator == "template"   # no key → template, no crash
+
+
+def test_system_prompt_forbids_placeholders_and_injection():
+    from jobfinder.drafts import _SYSTEM_BASE
+    low = _SYSTEM_BASE.lower()
+    assert "placeholder" in low                       # no [Company]/[Your Name]
+    assert "not instructions" in low or "ignore any directives" in low  # prompt-injection guard
+
+
+def test_generate_llm_flags_leftover_placeholder():
+    import anthropic
+
+    class _M:
+        def create(self, **k):
+            return _Resp("Dear [Company] team,\n\nI'd love to join.\n\nRegards,\nJane Doe")
+
+    class _C:
+        messages = _M()
+
+    with patch.object(anthropic, "Anthropic", lambda *a, **k: _C()):
+        d = generate_llm(_profile(), JOB, DraftOptions())
+    assert d.note and "placeholder" in d.note.lower()

@@ -1,0 +1,17 @@
+services:
+  jobfinder:
+    build: .
+    image: jobfinder:latest
+    container_name: jobfinder
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLite store persists here on the host — survives `docker compose down`.
+      - ./data:/data
+    environment:
+      - JOBFINDER_HOST=0.0.0.0
+      # Optional: uncomment + set to enable the AI draft writer and the JSearch source.
+      # - ANTHROPIC_API_KEY=sk-ant-...
+      # - RAPIDAPI_KEY=...
+      # - JOBFINDER_MODEL=claude-opus-4-8
+    restart: unless-stopped

@@ -1,4 +1,9 @@
-"""FastAPI backend serving the Job Finder UI and JSON API."""
+"""FastAPI backend serving the Job Finder UI and JSON API.
+
+State lives in a Store (memory or SQLite) behind the repository interface — not in
+module-global dicts — so the Outbox and parsed CVs survive a restart when the SQLite
+backend is active (the default).
+"""
 from __future__ import annotations
 
 import secrets
@@ -9,28 +14,27 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import __version__
+from .config import settings
 from .cv_parser import CVProfile, build_profile, extract_text_from_bytes, looks_empty
-from .drafts import ApplicationDraft, DraftOptions, generate_draft, llm_available, DEFAULT_MODEL
+from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
 from .sources import available_sources
+from .store import get_store
 
-app = FastAPI(title="Job Finder", version="1.0.0")
+app = FastAPI(title="Job Finder", version=__version__)
 
 _STATIC = Path(__file__).parent / "static"
-
-# Simple in-memory store of parsed CVs for the lifetime of the process.
-# Keyed by a random id handed back to the browser. Fine for a local single-user app.
-_PROFILES: dict[str, CVProfile] = {}
-_MAX_PROFILES = 50
 _MAX_UPLOAD_BYTES = 25 * 1024 * 1024  # 25 MB — a CV is tiny; reject anything larger
+_MAX_JOBS_PER_BATCH = 20
+
+# The single persistence seam. Backend chosen by settings (sqlite default, memory in tests).
+store = get_store(settings)
 
 
 def _store_profile(profile: CVProfile) -> str:
-    if len(_PROFILES) > _MAX_PROFILES:
-        # drop an arbitrary old entry to bound memory
-        _PROFILES.pop(next(iter(_PROFILES)))
     cv_id = secrets.token_urlsafe(9)
-    _PROFILES[cv_id] = profile
+    store.save_profile(cv_id, profile)
     return cv_id
 
 
@@ -47,17 +51,9 @@ def _profile_summary(profile: CVProfile) -> dict:
     }
 
 
-# Application-draft outbox + uploaded style examples (single-user, in-memory).
-_EXAMPLES: dict[str, dict] = {}     # id -> {id, name, text, chars}
-_DRAFTS: dict[str, ApplicationDraft] = {}
-_MAX_EXAMPLES = 10
-_MAX_DRAFTS = 100
-_MAX_JOBS_PER_BATCH = 20
-
-
 def _example_summary(ex: dict) -> dict:
     return {"id": ex["id"], "name": ex["name"], "chars": ex["chars"],
-            "preview": ex["text"][:160].replace("\n", " ").strip()}
+            "preview": (ex.get("text") or "")[:160].replace("\n", " ").strip()}
 
 
 # ---------------------------------------------------------------------------
@@ -68,7 +64,7 @@ class SearchRequest(BaseModel):
     cv_id: str
     keywords: str = ""
     location: str = ""
-    sources: list[str] = ["remotive"]
+    sources: list[str] = []          # empty → server uses the configured default sources
     limit_per_source: int = 25
     remote: bool = False
     days: int | None = None
@@ -99,12 +95,17 @@ def index() -> str:
     return (_STATIC / "index.html").read_text(encoding="utf-8")
 
 
+@app.get("/api/health")
+def health() -> dict:
+    return {"status": "ok", "version": __version__, "storage": settings.storage}
+
+
 @app.get("/api/sources")
 def sources() -> dict:
-    import os
     return {
         "sources": available_sources(),
-        "jsearch_key_present": bool(os.environ.get("RAPIDAPI_KEY") or os.environ.get("JSEARCH_API_KEY")),
+        "default_sources": settings.default_sources,
+        "jsearch_key_present": settings.jsearch_key_present,
     }
 
 
@@ -142,16 +143,16 @@ async def upload_text(text: str = Form(...)) -> JSONResponse:
 
 @app.post("/api/search")
 def search(req: SearchRequest) -> JSONResponse:
-    profile = _PROFILES.get(req.cv_id)
+    profile = store.get_profile(req.cv_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="CV not found — please upload your CV again.")
 
     # Keep only known sources, de-duplicated and order-preserving — guards against a
     # client sending unknown or repeated names (which would amplify outbound requests).
     known = set(available_sources())
-    chosen = list(dict.fromkeys(s for s in req.sources if s in known)) or ["remotive"]
+    chosen = list(dict.fromkeys(s for s in req.sources if s in known)) or list(settings.default_sources)
 
-    settings = SearchSettings(
+    search_settings = SearchSettings(
         keywords=req.keywords,
         location=req.location,
         sources=chosen,
@@ -161,12 +162,12 @@ def search(req: SearchRequest) -> JSONResponse:
         semantic=req.semantic,
         min_score=req.min_score,
     )
-    result = find_jobs(profile, settings)
+    result = find_jobs(profile, search_settings)
     return JSONResponse({
         "jobs": [j.to_dict() for j in result.jobs],
         "warnings": result.warnings,
         "counts": result.counts,
-        "query": settings.keywords or profile.suggested_keywords,
+        "query": search_settings.keywords or profile.suggested_keywords,
     })
 
 
@@ -176,7 +177,7 @@ def search(req: SearchRequest) -> JSONResponse:
 
 @app.get("/api/draft-config")
 def draft_config() -> dict:
-    return {"llm_available": llm_available(), "model": DEFAULT_MODEL}
+    return {"llm_available": llm_available(), "model": settings.model}
 
 
 @app.post("/api/examples")
@@ -203,53 +204,48 @@ async def add_example_text(text: str = Form(...), name: str = Form("Pasted examp
 
 
 def _store_example(name: str, text: str) -> JSONResponse:
-    if len(_EXAMPLES) >= _MAX_EXAMPLES:
-        _EXAMPLES.pop(next(iter(_EXAMPLES)))
-    eid = secrets.token_urlsafe(6)
-    ex = {"id": eid, "name": name, "text": text, "chars": len(text)}
-    _EXAMPLES[eid] = ex
+    ex = {"id": secrets.token_urlsafe(6), "name": name, "text": text, "chars": len(text)}
+    store.save_example(ex)
     return JSONResponse(_example_summary(ex))
 
 
 @app.get("/api/examples")
 def list_examples() -> dict:
-    return {"examples": [_example_summary(e) for e in _EXAMPLES.values()]}
+    return {"examples": [_example_summary(e) for e in store.list_examples()]}
 
 
 @app.delete("/api/examples/{eid}")
 def delete_example(eid: str) -> dict:
-    _EXAMPLES.pop(eid, None)
+    store.delete_example(eid)
     return {"ok": True}
 
 
 @app.post("/api/drafts/generate")
 def generate_drafts(req: GenerateRequest) -> JSONResponse:
-    profile = _PROFILES.get(req.cv_id)
+    profile = store.get_profile(req.cv_id)
     if profile is None:
         raise HTTPException(status_code=404, detail="CV not found — please upload your CV again.")
     if not req.jobs:
         raise HTTPException(status_code=400, detail="No roles selected.")
 
     options = DraftOptions(tone=req.tone, length=req.length, use_llm=req.use_llm)
-    examples = [e["text"] for e in _EXAMPLES.values()]
+    examples = [e["text"] for e in store.list_examples()]
     created = []
     for job in req.jobs[:_MAX_JOBS_PER_BATCH]:
         draft = generate_draft(profile, job, options, examples=examples)
-        if len(_DRAFTS) >= _MAX_DRAFTS:
-            _DRAFTS.pop(next(iter(_DRAFTS)))
-        _DRAFTS[draft.id] = draft
+        store.save_draft(draft)
         created.append(draft.to_dict())
     return JSONResponse({"drafts": created, "used_llm": options.use_llm and llm_available()})
 
 
 @app.get("/api/drafts")
 def list_drafts() -> dict:
-    return {"drafts": [d.to_dict() for d in _DRAFTS.values()]}
+    return {"drafts": [d.to_dict() for d in store.list_drafts()]}
 
 
 @app.put("/api/drafts/{did}")
 def update_draft(did: str, upd: DraftUpdate) -> JSONResponse:
-    draft = _DRAFTS.get(did)
+    draft = store.get_draft(did)
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found.")
     if upd.subject is not None:
@@ -258,18 +254,19 @@ def update_draft(did: str, upd: DraftUpdate) -> JSONResponse:
         draft.body = upd.body
     if upd.status is not None and upd.status in ("draft", "ready"):
         draft.status = upd.status
+    store.save_draft(draft)            # persist the edit (backend-agnostic)
     return JSONResponse(draft.to_dict())
 
 
 @app.delete("/api/drafts/{did}")
 def delete_draft(did: str) -> dict:
-    _DRAFTS.pop(did, None)
+    store.delete_draft(did)
     return {"ok": True}
 
 
 @app.get("/api/drafts/{did}/export")
 def export_draft(did: str) -> PlainTextResponse:
-    draft = _DRAFTS.get(did)
+    draft = store.get_draft(did)
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found.")
     safe = "".join(c if c.isalnum() or c in " -_" else "" for c in f"{draft.company}_{draft.job_title}").strip()
