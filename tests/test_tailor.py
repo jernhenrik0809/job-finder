@@ -35,6 +35,11 @@ def test_segment_bullets_skips_headers_contact_and_skill_lists():
     # ...but a sentence that happens to contain commas is kept
     kept = _segment_bullets("- Led teams across Python, Go, and Rust to ship three production services")
     assert kept and "Led teams" in kept[0]
+    # a terse verb-led achievement with short comma clauses is kept (not mistaken for a skills list)
+    terse = _segment_bullets("- Built APIs, shipped features, led code reviews")
+    assert terse, "verb-led terse achievement should survive the skills-list filter"
+    # while a true skills line (no leading verb, short entries) is still dropped
+    assert _segment_bullets("Python, Django, Flask, FastAPI, AWS, Docker, Redis") == []
     assert all(len(x) >= 25 and not x.startswith("-") for x in b)
 
 

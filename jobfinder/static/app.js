@@ -8,6 +8,7 @@ const savedJobIds = new Set();   // job ids already saved to the pipeline this s
 const appsById = new Map();      // application id -> application
 let dragId = null;
 let currentNewIds = new Set();   // job ids flagged NEW from the last saved-search run
+const tailoringById = new Map(); // app id -> last tailor result (survives drawer re-render)
 
 const $ = (sel) => document.querySelector(sel);
 const el = {
@@ -489,6 +490,14 @@ function openDrawer(id) {
 
   el.drawer.classList.remove('hidden');
   wireDrawer(a.id);
+
+  // restore a previously-computed tailor result (survives status changes / regenerate)
+  if (tailoringById.has(id)) {
+    const out = el.drawerPanel.querySelector('#tailorOut');
+    if (out) renderTailoring(out, tailoringById.get(id));
+    const tb = el.drawerPanel.querySelector('.tailor');
+    if (tb) tb.textContent = 'Re-tailor';
+  }
 }
 
 function wireDrawer(id) {
@@ -549,6 +558,7 @@ function wireDrawer(id) {
       });
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) throw new Error(data.detail || 'Tailoring failed');
+      tailoringById.set(id, data);     // cache so a status change / regenerate doesn't wipe it
       const out = panel.querySelector('#tailorOut');
       if (out) renderTailoring(out, data);
       btn.textContent = 'Re-tailor';
@@ -561,6 +571,7 @@ function wireDrawer(id) {
     const jobId = a && a.job && a.job.id;
     await fetch(`/api/applications/${id}`, { method: 'DELETE' });
     appsById.delete(id);
+    tailoringById.delete(id);
     if (jobId) {                       // un-mark the originating match card's Save button
       savedJobIds.delete(jobId);
       const btn = document.querySelector(`.job[data-job-id="${jobId}"] .save-pipeline`);

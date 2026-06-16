@@ -14,9 +14,15 @@ All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 - `jobfinder/tailor.py`; API `POST /api/applications/{id}/tailor`. Skill-list lines are
   excluded from accomplishment bullets.
 
+### Fixed (from review)
+- The tailor result (including a paid Claude rewrite) now survives a drawer re-render — a
+  status change or letter-regenerate no longer wipes it (cached client-side per application).
+- The skills-list bullet filter no longer drops terse **verb-led** achievement bullets
+  (e.g. "Built APIs, shipped features, led reviews").
+
 ### Tests
-- 62 → 68 (bullet segmentation incl. skill-list filter, relevance ranking + provenance,
-  emphasize/gaps, mocked Claude rewrite, endpoint).
+- 62 → 68 (bullet segmentation incl. skill-list + verb-led cases, relevance ranking +
+  provenance, emphasize/gaps, mocked Claude rewrite, endpoint).
 
 ## [1.4.0] — 2026-06-16
 

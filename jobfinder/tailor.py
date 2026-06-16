@@ -16,8 +16,16 @@ from .drafts import llm_available
 from .matcher import _tfidf_similarities
 from .skills import extract_skills, skill_overlap
 
-_BULLET_PREFIX = re.compile(r"^\s*[-•*•–—>·∙·]+\s*")
+_BULLET_PREFIX = re.compile(r"^\s*[-•*–—>·∙]+\s*")
 _CONTACT_HINT = ("phone", "email", "e-mail", "tel:", "mobile", "linkedin", "github", "address")
+# Achievement bullets usually open with an action verb; skill lists ("Python, Django, …") don't.
+_ACTION_VERBS = {
+    "built", "led", "designed", "developed", "created", "managed", "implemented", "delivered",
+    "drove", "launched", "shipped", "improved", "reduced", "increased", "mentored", "owned",
+    "architected", "scaled", "automated", "migrated", "optimized", "optimised", "deployed",
+    "founded", "spearheaded", "established", "coordinated", "directed", "engineered",
+    "analyzed", "analysed", "researched", "wrote", "maintained", "supported", "collaborated",
+}
 
 
 def _segment_bullets(text: str) -> list[str]:
@@ -34,9 +42,12 @@ def _segment_bullets(text: str) -> list[str]:
         if "@" in line or low.startswith(_CONTACT_HINT):
             continue
         # Skip comma-separated keyword lists (a skills line, not an accomplishment bullet):
-        # 3+ comma parts that are each only a word or two.
+        # 3+ short comma parts AND the line doesn't open with an action verb (which would
+        # mark it as a real achievement like "Built APIs, shipped features, led reviews").
         parts = [p.strip() for p in line.split(",") if p.strip()]
-        if len(parts) >= 3 and (sum(len(p.split()) for p in parts) / len(parts)) <= 2:
+        first_word = line.split()[0].lower().strip(":.,")
+        if (len(parts) >= 3 and (sum(len(p.split()) for p in parts) / len(parts)) <= 2
+                and first_word not in _ACTION_VERBS):
             continue
         if line not in seen:
             seen.add(line)
