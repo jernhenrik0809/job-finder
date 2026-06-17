@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import secrets
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -17,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__
+from . import alerts
 from .applications import (
     STATUSES, SUGGESTED_NEXT, attach_letter, job_snapshot, new_application, set_status,
 )
@@ -33,7 +35,17 @@ from . import secrets_store
 from .store import get_store
 from .tailor import generate_tailoring
 
-app = FastAPI(title="Job Finder", version=__version__)
+@asynccontextmanager
+async def _lifespan(_app):
+    # Start the opt-in alerts loop on boot (it idles while disabled); stop it on shutdown.
+    alert_scheduler.start()
+    try:
+        yield
+    finally:
+        alert_scheduler.stop()
+
+
+app = FastAPI(title="Job Finder", version=__version__, lifespan=_lifespan)
 
 # Network-boundary hardening: reject cross-site (CSRF) requests and any Host not on
 # the allow-list (DNS-rebinding defense), so a stray browser tab can't read the
@@ -52,6 +64,10 @@ _MAX_JOBS_PER_BATCH = 20
 
 # The single persistence seam. Backend chosen by settings (sqlite default, memory in tests).
 store = get_store(settings)
+
+# Opt-in background alerts (off by default). The daemon thread idles while disabled and
+# only re-runs saved searches / raises reminders once the user turns it on (Settings).
+alert_scheduler = alerts.AlertScheduler(store, find_jobs)
 
 
 def _store_profile(profile: CVProfile) -> str:
@@ -575,11 +591,8 @@ def delete_saved_search(sid: str) -> dict:
 
 @app.post("/api/saved-searches/{sid}/seen")
 def mark_saved_search_seen(sid: str) -> dict:
-    s = store.get_saved_search(sid)
-    if s is None:
+    if store.update_saved_search(sid, mark_seen) is None:    # atomic vs a concurrent sweep/run
         raise HTTPException(status_code=404, detail="Saved search not found.")
-    mark_seen(s)
-    store.save_saved_search(s)
     return {"ok": True, "new_count": 0}
 
 
@@ -592,12 +605,15 @@ def _run_one(s) -> dict:
     settings_ = _build_settings(s.keywords, s.location, s.sources, s.limit_per_source,
                                 s.remote, s.days, s.semantic, s.min_score)
     result = find_jobs(profile, settings_)
-    new_ids = register_run(s, [j.id for j in result.jobs])
-    store.save_saved_search(s)
+    # atomic diff + seen-set update so a concurrent background sweep can't clobber it
+    box = {"new": []}
+    def _diff(sv):
+        box["new"] = register_run(sv, [j.id for j in result.jobs])
+    updated = store.update_saved_search(s.id, _diff) or s
     return {
         "jobs": [j.to_dict() for j in result.jobs],
-        "new_ids": new_ids,
-        "new_count": s.new_count,
+        "new_ids": box["new"],
+        "new_count": updated.new_count,
         "warnings": result.warnings,
         "counts": result.counts,
         "query": settings_.keywords or "",
@@ -625,6 +641,65 @@ def run_all_saved_searches() -> dict:
         except Exception as e:
             out.append({"id": s.id, "name": s.name, "new_count": s.new_count, "error": str(e)})
     return {"searches": out}
+
+
+# ---------------------------------------------------------------------------
+# Notifications inbox + opt-in background alerts
+# ---------------------------------------------------------------------------
+
+class AlertsConfig(BaseModel):
+    enabled: bool | None = None
+    interval_hours: int | None = None
+
+
+@app.get("/api/notifications")
+def list_notifications() -> dict:
+    notes = store.list_notifications()
+    return {"notifications": [n.to_dict() for n in notes],
+            "unread": sum(1 for n in notes if not n.read)}
+
+
+@app.post("/api/notifications/read")
+def mark_all_notifications_read() -> dict:
+    for n in store.list_notifications():
+        if not n.read:
+            n.read = True
+            store.save_notification(n)
+    return {"ok": True, "unread": 0}
+
+
+@app.post("/api/notifications/{nid}/read")
+def mark_notification_read(nid: str) -> dict:
+    n = store.get_notification(nid)
+    if n is None:
+        raise HTTPException(status_code=404, detail="Notification not found.")
+    n.read = True
+    store.save_notification(n)
+    return {"ok": True}
+
+
+@app.delete("/api/notifications/{nid}")
+def dismiss_notification(nid: str) -> dict:
+    store.delete_notification(nid)
+    return {"ok": True}
+
+
+@app.get("/api/alerts/config")
+def get_alerts_config() -> dict:
+    return alert_scheduler.status()
+
+
+@app.post("/api/alerts/config")
+def set_alerts_config(req: AlertsConfig) -> dict:
+    alerts.set_prefs(enabled=req.enabled, interval_hours=req.interval_hours)
+    alert_scheduler.start()          # ensure the loop is live so it can act on the new pref
+    return alert_scheduler.status()
+
+
+@app.post("/api/alerts/run-now")
+def run_alerts_now() -> dict:
+    """User-triggered immediate sweep (re-runs saved searches + refreshes reminders)."""
+    return alert_scheduler.run_now()
 
 
 # Static assets (css/js)

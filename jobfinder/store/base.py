@@ -10,12 +10,14 @@ from abc import ABC, abstractmethod
 
 from ..applications import Application
 from ..cv_parser import CVProfile
+from ..notifications import Notification
 from ..saved_searches import SavedSearch
 
 MAX_PROFILES = 50
 MAX_EXAMPLES = 10
 MAX_APPLICATIONS = 200
 MAX_SAVED_SEARCHES = 40
+MAX_NOTIFICATIONS = 100
 
 
 class Store(ABC):
@@ -52,6 +54,28 @@ class Store(ABC):
     def list_saved_searches(self) -> list[SavedSearch]: ...
     @abstractmethod
     def delete_saved_search(self, search_id: str) -> None: ...
+    @abstractmethod
+    def update_saved_search(self, search_id: str, mutator) -> SavedSearch | None:
+        """Atomically load → ``mutator(search)`` → save under one lock. Returns the updated
+        search (or None if it doesn't exist). Prevents lost updates when the background alert
+        sweep and a foreground /run·/seen request touch the same row."""
+        ...
+    @abstractmethod
+    def update_saved_search(self, search_id: str, mutator) -> SavedSearch | None:
+        """Atomically load → ``mutator(search)`` → save under a single lock, so a
+        background sweep and a foreground run/seen can't clobber each other's
+        seen_ids/new_count (lost update). Returns the updated search, or None if it's gone."""
+        ...
+
+    # --- notifications (the in-app alert inbox) ---
+    @abstractmethod
+    def save_notification(self, note: Notification) -> None: ...
+    @abstractmethod
+    def get_notification(self, note_id: str) -> Notification | None: ...
+    @abstractmethod
+    def list_notifications(self) -> list[Notification]: ...
+    @abstractmethod
+    def delete_notification(self, note_id: str) -> None: ...
 
     def close(self) -> None:  # optional; SqliteStore overrides
         pass

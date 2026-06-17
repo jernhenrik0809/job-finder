@@ -17,9 +17,11 @@ import threading
 import time
 from pathlib import Path
 
-from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES
+from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
+                   MAX_NOTIFICATIONS)
 from ..applications import Application
 from ..cv_parser import CVProfile
+from ..notifications import Notification
 from ..saved_searches import SavedSearch
 
 _SCHEMA = """
@@ -27,9 +29,10 @@ CREATE TABLE IF NOT EXISTS profiles      (cv_id TEXT PRIMARY KEY, created REAL N
 CREATE TABLE IF NOT EXISTS examples      (id TEXT PRIMARY KEY, created REAL NOT NULL, name TEXT, text TEXT, chars INTEGER);
 CREATE TABLE IF NOT EXISTS applications  (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS saved_searches(id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 3
+_SCHEMA_VERSION = 4
 
 
 class SqliteStore(Store):
@@ -55,7 +58,8 @@ class SqliteStore(Store):
             version = row["version"]
             if version < 2:                      # v1.x → v2: carry old drafts into applications
                 self._migrate_v1_drafts(self._conn)
-            # v2 → v3 adds the saved_searches table (already created above; no data to move).
+            # v2 → v3 adds saved_searches; v3 → v4 adds notifications. Both are new tables
+            # (already created above via IF NOT EXISTS); there is no data to migrate.
             if version < _SCHEMA_VERSION:
                 self._conn.execute("UPDATE schema_version SET version=?", (_SCHEMA_VERSION,))
 
@@ -185,9 +189,52 @@ class SqliteStore(Store):
             rows = self._conn.execute("SELECT data FROM saved_searches ORDER BY created ASC").fetchall()
         return [SavedSearch.from_dict(json.loads(r["data"])) for r in rows]
 
+    def update_saved_search(self, search_id, mutator):
+        """Atomic read-modify-write under a single lock acquisition, so a background
+        alert sweep and a concurrent /run or /seen request can't clobber each other's
+        seen_ids / new_count (lost-update race). Returns the updated row, or None."""
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT data FROM saved_searches WHERE id=?", (search_id,)).fetchone()
+            if row is None:
+                return None
+            s = SavedSearch.from_dict(json.loads(row["data"]))
+            mutator(s)
+            self._conn.execute(
+                "INSERT INTO saved_searches(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (s.id, time.time(), json.dumps(s.to_dict())),
+            )
+        return s
+
     def delete_saved_search(self, search_id: str) -> None:
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM saved_searches WHERE id=?", (search_id,))
+
+    # --- notifications ---
+    def save_notification(self, note: Notification) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                # refresh created too (unlike other tables) — a refreshed reminder bumps its
+                # timestamp, and list/evict order by created, so the column must follow the data
+                "INSERT INTO notifications(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data, created=excluded.created",
+                (note.id, note.created or time.time(), json.dumps(note.to_dict())),
+            )
+            self._evict("notifications", "id", MAX_NOTIFICATIONS)
+
+    def get_notification(self, note_id: str) -> Notification | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM notifications WHERE id=?", (note_id,)).fetchone()
+        return Notification.from_dict(json.loads(row["data"])) if row else None
+
+    def list_notifications(self) -> list[Notification]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM notifications ORDER BY created DESC").fetchall()
+        return [Notification.from_dict(json.loads(r["data"])) for r in rows]
+
+    def delete_notification(self, note_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM notifications WHERE id=?", (note_id,))
 
     def close(self) -> None:
         self._conn.close()

@@ -104,6 +104,8 @@ immediately. Everything below also works as **environment variables**, which tak
 | `JOBFINDER_ALLOW_LAN` | `0` | Permit *binding* beyond loopback (see **Privacy & network safety**) |
 | `JOBFINDER_ALLOWED_HOSTS` | — | Extra `Host` names/IPs the server answers to (comma-separated) |
 | `JOBFINDER_REDACT_PII` | `true` | Mask contact details in your CV before the optional Claude send |
+| `JOBFINDER_ALERTS` | `false` | Turn on the opt-in background saved-search checker (also toggleable in ⚙ Settings) |
+| `JOBFINDER_ALERTS_INTERVAL_HOURS` | `6` | How often the background checker runs (clamped to a 6-hour minimum) |
 
 ---
 
@@ -213,7 +215,23 @@ job, grounded strictly in your original (shown alongside to verify).
 Click **★ Save this search** to store a query. Your saved searches live in the sidebar
 with a **"N new"** badge; click one to re-run it — postings you haven't seen are flagged
 **NEW** — or hit **check for new** to refresh every badge at once. It's how you catch new
-roles without re-typing the same search. (No background polling — searches run when you ask.)
+roles without re-typing the same search.
+
+### Background alerts (opt-in)
+
+By default searches run only when you ask. If you'd like the app to watch for you, turn on
+**Background alerts** in **⚙ Settings**: it re-runs your saved searches on a schedule (every
+6 / 12 / 24 hours) and drops **new matches** — plus **follow-up reminders** for applications
+that have gone quiet — into the **🔔 inbox** in the top bar. Click a new-matches notification
+to open that search; click a reminder to jump to the application.
+
+It's **fully local and in-app** — nothing is ever emailed or pushed anywhere; the app performs
+no outbound delivery. Prefer not to leave the app running? Run a single sweep from your OS
+scheduler (cron / Task Scheduler) instead:
+
+```bash
+python -m jobfinder.alerts      # run one check and exit
+```
 
 ---
 

@@ -6,9 +6,13 @@ application update) preserves its position.
 """
 from __future__ import annotations
 
-from .base import Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES
+import threading
+
+from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
+                   MAX_NOTIFICATIONS)
 from ..applications import Application
 from ..cv_parser import CVProfile
+from ..notifications import Notification
 from ..saved_searches import SavedSearch
 
 
@@ -23,6 +27,8 @@ class MemoryStore(Store):
         self._examples: dict[str, dict] = {}
         self._apps: dict[str, Application] = {}
         self._searches: dict[str, SavedSearch] = {}
+        self._notes: dict[str, Notification] = {}
+        self._lock = threading.Lock()      # serializes atomic saved-search updates
 
     def save_profile(self, cv_id: str, profile: CVProfile) -> None:
         self._profiles[cv_id] = profile
@@ -66,3 +72,24 @@ class MemoryStore(Store):
 
     def delete_saved_search(self, search_id: str) -> None:
         self._searches.pop(search_id, None)
+
+    def update_saved_search(self, search_id: str, mutator) -> SavedSearch | None:
+        with self._lock:
+            s = self._searches.get(search_id)
+            if s is None:
+                return None
+            mutator(s)
+            return s
+
+    def save_notification(self, note: Notification) -> None:
+        self._notes[note.id] = note
+        _evict(self._notes, MAX_NOTIFICATIONS)
+
+    def get_notification(self, note_id: str) -> Notification | None:
+        return self._notes.get(note_id)
+
+    def list_notifications(self) -> list[Notification]:
+        return list(reversed(self._notes.values()))      # newest first
+
+    def delete_notification(self, note_id: str) -> None:
+        self._notes.pop(note_id, None)

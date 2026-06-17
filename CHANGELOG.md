@@ -2,6 +2,52 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.19.0] — 2026-06-17
+
+### Added — Background alerts + a notification inbox (opt-in)
+- **Opt-in background checker** (`alerts.py`): a daemon thread that re-runs your saved searches on
+  a schedule and raises in-app notifications for **new matches** and **follow-up reminders** (for
+  applications that have gone quiet). Off by default; the interval is clamped to a polite 6-hour
+  minimum so it never hammers the job boards. Toggle it (and the interval) in **⚙ Settings**, or
+  set `JOBFINDER_ALERTS=1`.
+- **In-app notification inbox** (`notifications.py`): a 🔔 bell in the top bar with an unread badge
+  and a dropdown panel. New-matches items open that saved search; reminder items jump to the
+  application. Notifications persist (SQLite schema **v4**, new `notifications` table) and are
+  bounded.
+- **CLI sweep**: `python -m jobfinder.alerts` runs a single check and exits — for people who'd
+  rather drive it from the OS scheduler (cron / Task Scheduler) than keep the app running.
+- New endpoints: `GET /api/notifications`, `POST /api/notifications/read`,
+  `POST /api/notifications/{id}/read`, `DELETE /api/notifications/{id}`,
+  `GET|POST /api/alerts/config`, `POST /api/alerts/run-now`.
+
+### Privacy / safety
+- **Fully local, in-app, no outbound delivery.** Alerts are an inbox you read in the app — nothing
+  is emailed, toasted, or pushed anywhere. This keeps the "drafts/alerts never send" guarantee and
+  the no-auto-submit invariant intact (no SMTP/IMAP is imported). The sweep contacts only the same
+  job-board hosts a normal search does — no new egress.
+- Migrated the FastAPI startup/shutdown hooks to the modern `lifespan` API (drops the deprecation
+  warnings) and use it to start/stop the alerts thread cleanly.
+
+### Fixed (from adversarial review)
+- **Lost-update race:** the background sweep and the foreground `/run`·`/seen` endpoints did a
+  non-atomic load→mutate→save on the same saved-search row. Added an atomic
+  `Store.update_saved_search(id, mutator)` (single-lock read-modify-write) and routed all three
+  call sites through it.
+- **Unbounded duplicate reminders:** a reminder the user had *read* (but not dismissed) was
+  re-created from scratch on every sweep. Dedupe now spans all reminders (read + unread) and
+  refreshes the existing one in place (re-surfacing it as unread).
+- **Mis-sorted refreshed reminders:** `save_notification`'s upsert now also refreshes the
+  `created` column, so a refreshed reminder sorts and evicts by its new time.
+- **Scheduler races:** a dedicated sweep lock serializes the scheduled sweep against a
+  user-clicked "Check now" (no overlap, no `last_run` gate race); shutdown waits out an in-flight
+  sweep (bounded) instead of returning after 2s.
+
+### Tests
+- 230 → 243 (sweep raises new-matches then is idempotent, skips a search with a missing CV,
+  survives a failing source, reminder dedupe/refresh incl. the read-then-resurrect regression,
+  atomic `update_saved_search`, prefs default-off + interval clamp + env default, scheduler
+  interval gating, and the notifications + alerts-config + run-now API).
+
 ## [1.18.0] — 2026-06-17
 
 ### Added

@@ -33,6 +33,7 @@ const el = {
   egressNote: $('#egressNote'), egressText: $('#egressText'), redactPii: $('#redactPii'),
   board: $('#board'), boardEmpty: $('#boardEmpty'), draftLoading: $('#draftLoading'),
   drawer: $('#drawer'), drawerPanel: $('#drawerPanel'), drawerBackdrop: $('#drawerBackdrop'),
+  bellBtn: $('#bellBtn'), bellBadge: $('#bellBadge'), notifPanel: $('#notifPanel'),
 };
 
 // ---------- init ----------
@@ -72,6 +73,81 @@ function refreshKeyGating() {
   fetch('/api/draft-config').then(r => r.json()).then(applyDraftConfig).catch(() => {});
 }
 refreshKeyGating();
+
+// ---------- notifications (alerts inbox) ----------
+let _notifs = [];
+
+async function loadNotifications() {
+  try {
+    const d = await (await fetch('/api/notifications')).json();
+    _notifs = d.notifications || [];
+    const unread = d.unread || 0;
+    el.bellBadge.textContent = unread > 99 ? '99+' : String(unread);
+    el.bellBadge.classList.toggle('hidden', unread === 0);
+    if (!el.notifPanel.classList.contains('hidden')) renderNotifPanel();
+  } catch { /* ignore — notifications are best-effort */ }
+}
+
+function renderNotifPanel() {
+  if (!_notifs.length) {
+    el.notifPanel.innerHTML = `<div class="notif-head"><span>Notifications</span></div>
+      <div class="notif-empty">No notifications yet. Turn on background checks in ⚙ Settings to get alerted about new matches.</div>`;
+    return;
+  }
+  const items = _notifs.map(n => {
+    const icon = n.kind === 'new_matches' ? '🔎' : '⏰';
+    const meta = n.kind === 'new_matches' ? `${n.count} new` : 'reminder';
+    return `<div class="notif-item${n.read ? '' : ' unread'}" data-id="${esc(n.id)}" data-kind="${esc(n.kind)}" data-ref="${esc(n.ref_id)}">
+        <span class="notif-ic">${icon}</span>
+        <div class="notif-bd"><div class="notif-title">${esc(n.title)} <i class="muted small">${esc(meta)}</i></div>
+          <div class="muted small">${esc(n.body)}</div></div>
+        <button class="notif-x" data-id="${esc(n.id)}" title="Dismiss" aria-label="Dismiss">✕</button>
+      </div>`;
+  }).join('');
+  el.notifPanel.innerHTML = `<div class="notif-head"><span>Notifications</span>
+      <button id="notifReadAll" class="link-btn small" type="button">Mark all read</button></div>
+    <div class="notif-list">${items}</div>`;
+  el.notifPanel.querySelector('#notifReadAll').addEventListener('click', markAllNotifsRead);
+  el.notifPanel.querySelectorAll('.notif-x').forEach(b =>
+    b.addEventListener('click', (e) => { e.stopPropagation(); dismissNotif(b.dataset.id); }));
+  el.notifPanel.querySelectorAll('.notif-item').forEach(it =>
+    it.addEventListener('click', () => openNotif(it.dataset.kind, it.dataset.ref, it.dataset.id)));
+}
+
+async function openNotif(kind, ref, id) {
+  toggleNotifPanel(false);
+  await fetch(`/api/notifications/${id}/read`, { method: 'POST' }).catch(() => {});
+  if (kind === 'new_matches' && ref) {
+    runSavedSearch(ref);
+  } else if (kind === 'reminder' && ref) {
+    switchTab('pipeline');
+    await loadPipeline();
+    openDrawer(ref);
+  }
+  loadNotifications();
+}
+
+async function markAllNotifsRead() {
+  await fetch('/api/notifications/read', { method: 'POST' }).catch(() => {});
+  loadNotifications();
+}
+
+async function dismissNotif(id) {
+  await fetch(`/api/notifications/${id}`, { method: 'DELETE' }).catch(() => {});
+  loadNotifications();
+}
+
+function toggleNotifPanel(show) {
+  const open = show === undefined ? el.notifPanel.classList.contains('hidden') : show;
+  el.notifPanel.classList.toggle('hidden', !open);
+  if (open) renderNotifPanel();
+}
+
+el.bellBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleNotifPanel(); });
+document.addEventListener('click', (e) => {
+  if (!el.notifPanel.classList.contains('hidden') && !e.target.closest('.notif-wrap')) toggleNotifPanel(false);
+});
+loadNotifications();
 
 el.minScore.addEventListener('input', () => { el.minScoreVal.textContent = el.minScore.value; });
 
@@ -815,8 +891,50 @@ function renderSettings(s) {
         <div class="muted small">Cost is per generated letter, billed to your own Anthropic key. Lower tiers are cheaper and faster.</div></div>
     </div>
     <div class="set-section"><h3>API keys</h3>${rows}</div>
+    <div class="set-section" id="alertsSection">
+      <h3>Background alerts</h3>
+      <div class="muted small">Off by default. When on, the app re-runs your saved searches on a schedule and drops new matches (and follow-up reminders) into the 🔔 inbox. Nothing is emailed or sent anywhere — it's a local, in-app check.</div>
+      <div id="alertsBody" class="muted small" style="margin-top:.5rem">Loading…</div>
+    </div>
     <div class="set-actions"><button id="setSave" class="btn ok">Save settings</button><span class="msg copied" style="display:none">saved ✓</span></div>`;
   el.settingsBody.querySelector('#setSave').addEventListener('click', saveSettings);
+  loadAlertsConfig();
+}
+
+async function loadAlertsConfig() {
+  try { renderAlertsConfig(await (await fetch('/api/alerts/config')).json()); }
+  catch { const b = $('#alertsBody'); if (b) b.textContent = 'Could not load alert settings.'; }
+}
+
+function renderAlertsConfig(c) {
+  const body = $('#alertsBody');
+  if (!body) return;
+  const intervals = [6, 12, 24].map(h =>
+    `<option value="${h}"${(c.interval_hours || 6) === h ? ' selected' : ''}>every ${h} hours</option>`).join('');
+  const last = c.last_run ? `last checked ${fmtTime(c.last_run)}` : 'not checked yet';
+  body.innerHTML = `
+    <label class="chk"><input id="alertsEnabled" type="checkbox"${c.enabled ? ' checked' : ''} /> Check my saved searches in the background</label>
+    <div class="row" style="margin-top:.4rem;align-items:center;gap:.6rem">
+      <select id="alertsInterval"${c.enabled ? '' : ' disabled'}>${intervals}</select>
+      <button id="alertsRunNow" class="btn ghost small" type="button">Check now</button>
+      <span class="muted small" id="alertsLast">${esc(last)}</span>
+    </div>`;
+  const save = async (patch) => {
+    try { renderAlertsConfig(await (await fetch('/api/alerts/config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+    })).json()); } catch { /* ignore */ }
+  };
+  $('#alertsEnabled').addEventListener('change', e => save({ enabled: e.target.checked }));
+  $('#alertsInterval').addEventListener('change', e => save({ interval_hours: parseInt(e.target.value, 10) }));
+  $('#alertsRunNow').addEventListener('click', async (e) => {
+    const btn = e.target; btn.disabled = true; btn.textContent = 'checking…';
+    try {
+      const r = await (await fetch('/api/alerts/run-now', { method: 'POST' })).json();
+      btn.textContent = `${r.new_matches || 0} new ✓`;
+      loadNotifications();
+    } catch { btn.textContent = 'failed'; }
+    finally { setTimeout(() => { btn.textContent = 'Check now'; btn.disabled = false; loadAlertsConfig(); }, 2500); }
+  });
 }
 
 async function saveSettings() {
