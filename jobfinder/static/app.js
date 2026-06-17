@@ -782,6 +782,7 @@ const _KEY_FIELDS = [
   { id: 'adzuna_app_id', group: 'adzuna', env: 'ADZUNA_APP_ID', label: 'Adzuna app id', hint: 'With the app key, enables the Adzuna (Denmark) source', ph: '…' },
   { id: 'adzuna_app_key', group: 'adzuna', env: 'ADZUNA_APP_KEY', label: 'Adzuna app key', hint: '', ph: '…' },
   { id: 'jooble_key', group: 'jooble', env: 'JOOBLE_API_KEY', label: 'Jooble API key', hint: 'Enables the Jooble source', ph: '…' },
+  { id: 'careerjet_affid', group: 'careerjet', env: 'CAREERJET_AFFID', label: 'Careerjet affiliate id', hint: 'Enables the Careerjet (da_DK) source — free at careerjet.com/partners/api', ph: '…' },
 ];
 
 async function loadSettings() {

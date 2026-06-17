@@ -28,6 +28,7 @@ _ENV = {
     "adzuna_app_id": ("ADZUNA_APP_ID",),
     "adzuna_app_key": ("ADZUNA_APP_KEY",),
     "jooble_key": ("JOOBLE_API_KEY",),
+    "careerjet_affid": ("CAREERJET_AFFID",),
     "model": ("JOBFINDER_MODEL",),
 }
 
@@ -105,6 +106,7 @@ def present() -> dict:
         "jsearch": bool(get("rapidapi_key")),
         "adzuna": bool(get("adzuna_app_id") and get("adzuna_app_key")),
         "jooble": bool(get("jooble_key")),
+        "careerjet": bool(get("careerjet_affid")),
     }
 
 

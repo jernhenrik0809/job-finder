@@ -168,5 +168,5 @@ def test_factory_and_config_defaults(monkeypatch):
     monkeypatch.delenv("JOBFINDER_DEFAULT_SOURCES", raising=False)
     cfg = load_settings()
     assert cfg.storage == "memory"
-    assert cfg.default_sources == ["remotive", "arbeitnow", "thehub", "themuse"]   # no-key DK-relevant; LinkedIn/Jobindex opt-in
+    assert cfg.default_sources == ["remotive", "arbeitnow", "thehub", "themuse", "itjobbank", "hrmanager"]   # no-key DK-relevant
     assert isinstance(get_store(cfg), MemoryStore)

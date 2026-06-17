@@ -160,6 +160,7 @@ class SettingsUpdate(BaseModel):
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None
     jooble_key: str | None = None
+    careerjet_affid: str | None = None
     model: str | None = None
 
 
@@ -339,7 +340,8 @@ _MODEL_IDS = {m["id"] for m in _MODEL_TIERS}
 # logical secret -> the env var name shown to the user as the override that "locks" it
 _KEY_ENV = {"anthropic_key": "ANTHROPIC_API_KEY", "rapidapi_key": "RAPIDAPI_KEY",
             "adzuna_app_id": "ADZUNA_APP_ID", "adzuna_app_key": "ADZUNA_APP_KEY",
-            "jooble_key": "JOOBLE_API_KEY", "model": "JOBFINDER_MODEL"}
+            "jooble_key": "JOOBLE_API_KEY", "careerjet_affid": "CAREERJET_AFFID",
+            "model": "JOBFINDER_MODEL"}
 
 
 def _settings_payload() -> dict:
@@ -352,6 +354,7 @@ def _settings_payload() -> dict:
             "rapidapi": bool(get("rapidapi_key")),
             "adzuna": bool(get("adzuna_app_id") and get("adzuna_app_key")),
             "jooble": bool(get("jooble_key")),
+            "careerjet": bool(get("careerjet_affid")),
         },
         "env_locked": {name: secrets_store.is_env(name) for name in _KEY_ENV},
         "model": secrets_store.model(),

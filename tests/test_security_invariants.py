@@ -32,6 +32,10 @@ from jobfinder.sources.remotive import RemotiveSource
 from jobfinder.sources.thehub import TheHubSource
 from jobfinder.sources.themuse import TheMuseSource
 from jobfinder.sources.jobindex import JobindexSource
+from jobfinder.sources.itjobbank import ItJobbankSource
+from jobfinder.sources.hrmanager import HRManagerSource
+from jobfinder.sources.jobicy import JobicySource
+from jobfinder.sources.careerjet import CareerjetSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -51,6 +55,10 @@ _ALLOWED_HOSTS = {
     "thehub.io",                                    # The Hub source
     "www.themuse.com",                              # The Muse source
     "www.jobindex.dk",                              # Jobindex RSS source
+    "www.it-jobbank.dk",                            # it-jobbank RSS source
+    "api.hr-manager.net",                           # HR-Manager (DK public sector) source
+    "jobicy.com",                                   # Jobicy source
+    "public.api.careerjet.net", "www.careerjet.com",  # Careerjet source + signup-doc URL
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -65,11 +73,15 @@ def test_sentinels_cover_every_secret_field():
 
 
 def test_no_secret_in_get_responses(monkeypatch):
-    patched = dataclasses.replace(web.settings, **_SENTINELS)
-    monkeypatch.setattr(web, "settings", patched)
+    # inject sentinels via env (the secrets overlay reads env first), so this covers
+    # every secret incl. overlay-only ones, and the endpoints actually read them
+    import jobfinder.secrets_store as ss
+    for field, value in _SENTINELS.items():
+        monkeypatch.setenv(ss._ENV[field][0], value)
+    ss.reset_cache()
     client = TestClient(web.app)
 
-    paths = {"/api/health", "/api/sources", "/api/draft-config"}
+    paths = {"/api/health", "/api/sources", "/api/draft-config", "/api/settings"}
     for route in web.app.routes:
         if "GET" in (getattr(route, "methods", None) or set()) and "{" not in getattr(route, "path", "{"):
             paths.add(route.path)
@@ -140,6 +152,7 @@ def test_runtime_egress_allowlist(monkeypatch):
 
     sources = [
         RemotiveSource(), ArbeitnowSource(), TheHubSource(), TheMuseSource(), JobindexSource(),
+        ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

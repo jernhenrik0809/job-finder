@@ -2,6 +2,55 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.17.0] — 2026-06-17
+
+### Added
+- **Four new Danish job/consulting sources** (after a full-landscape research pass covering both
+  employee roles *and* consulting/freelance gigs), bringing the total to **13**:
+  - **it-jobbank** (`it-jobbank.dk`) — Denmark's leading IT/tech board (StepStone family), via its
+    free no-login **RSS** feed (same parser shape as Jobindex; stdlib + BeautifulSoup, no new
+    dependency). **On by default.**
+  - **Public sector (HR-Manager / SRL)** — the recruitment ATS behind a huge share of DK
+    public-sector, university and regional employers. One generic source queries a curated list of
+    HR-Manager *customer* aliases: `statensrekrutteringsloesning_tr` (Statens Rekrutteringsløsning —
+    ~140 Danish **state** institutions, a ToS-clean programmatic stand-in for the login-gated
+    Jobnet/STAR) and `regionsyddanmark` (regional health). No-auth JSON; survives a single failing
+    alias. **On by default.**
+  - **Jobicy** — free, no-key remote-jobs JSON API scoped to Denmark-eligible roles
+    (`geo=denmark`). **Opt-in.**
+  - **Careerjet** — large aggregator with a Danish portal (`da_DK`, `careerjet.dk`); the strongest
+    keyed *general-jobs* add for DK. **Opt-in, free affiliate id** (`CAREERJET_AFFID` / ⚙ Settings).
+- Default no-key source set is now `remotive, arbeitnow, thehub, themuse, itjobbank, hrmanager` —
+  all free and Denmark-relevant, with strong public-sector coverage out of the box.
+- **[`docs/SOURCES.md`](docs/SOURCES.md)** — the definitive catalog of **every** researched Danish
+  job + consulting/freelance source (integrated *and* not): integrable-next (StepStone.dk,
+  Brainville, KU, Findwork, Freelancer.com) and document-only platforms (Worksome, Malt, Onsiter,
+  Ework/Verama, 7N, EURAXESS, Graduateland, …), grouped by category with access type and status.
+  Linked from the README.
+
+### Security / privacy
+- The security host allow-list was extended to the four new hosts (`www.it-jobbank.dk`,
+  `api.hr-manager.net`, `jobicy.com`, `public.api.careerjet.net` + the Careerjet signup-doc host).
+  Careerjet's affiliate id rides in its request URL, so its errors are sanitised to the exception
+  **type name** only — never the key-bearing URL. The authoritative runtime egress-allow-list test
+  now also exercises all four new sources, and the no-secret-in-responses sweep injects the
+  `careerjet_affid` sentinel via env (covering the overlay-only secret).
+
+### Fixed (from adversarial review)
+- Hardened all four new parsers against the "one malformed record drops the whole source" class
+  (the parse loop runs *after* `resp.json()`, outside the request try/except, so a single bad
+  element would otherwise abort the batch): HR-Manager now skips non-dict `Items` and coerces a
+  non-dict `Department` / `PositionLocation` / first `Advertisements` element (and tolerates
+  `keywords`/`location` being `None`); Jobicy and Careerjet skip non-dict entries in their `jobs`
+  arrays and coerce a non-string `date`/`pubDate` before slicing. This matches the codebase's
+  existing convention (`themuse` already guards non-dict locations; `_strip_html` coerces with
+  `str(...)`). The review's security and wiring dimensions came back clean.
+
+### Tests
+- 215 → 223 (it-jobbank RSS parsing, HR-Manager JSON + `/Date(…)/` parsing + one-failing-alias
+  resilience, Jobicy JSON mapping, Careerjet affiliate-id requirement + parsing, plus three
+  malformed-upstream robustness regressions covering the review fixes above).
+
 ## [1.16.0] — 2026-06-16
 
 ### Added

@@ -14,7 +14,7 @@ from pathlib import Path
 # The credential-bearing Settings fields — the single source of truth for "what is a
 # secret". The security-regression suite derives its no-leak sweep from this, so adding a
 # new key here automatically forces it into the test.
-SECRET_FIELDS = ("anthropic_key", "rapidapi_key", "adzuna_app_id", "adzuna_app_key", "jooble_key")
+SECRET_FIELDS = ("anthropic_key", "rapidapi_key", "adzuna_app_id", "adzuna_app_key", "jooble_key", "careerjet_affid")
 
 
 def _default_data_dir() -> Path:
@@ -87,8 +87,8 @@ def load_settings() -> Settings:
     if sources_env:
         default_sources = [s.strip() for s in sources_env.split(",") if s.strip()]
     else:
-        # Free/no-key, Denmark-relevant sources on by default; LinkedIn + Jobindex opt-in.
-        default_sources = ["remotive", "arbeitnow", "thehub", "themuse"]
+        # Free/no-key, Denmark-relevant sources on by default; keyed + heavier ones opt-in.
+        default_sources = ["remotive", "arbeitnow", "thehub", "themuse", "itjobbank", "hrmanager"]
 
     return Settings(
         anthropic_key=os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"),

@@ -233,3 +233,135 @@ def test_thehub_tolerates_non_string_description():
     with patch("jobfinder.sources.thehub.requests.get", return_value=_FakeResp(payload)):
         jobs = TheHubSource().search("dev", limit=5)
     assert len(jobs) == 1 and jobs[0].description == "12345"          # coerced, no TypeError
+
+
+# --- it-jobbank / HR-Manager / Jobicy / Careerjet -------------------------
+
+from jobfinder.sources.itjobbank import ItJobbankSource
+from jobfinder.sources.hrmanager import HRManagerSource, _msdate
+from jobfinder.sources.jobicy import JobicySource
+from jobfinder.sources.careerjet import CareerjetSource
+
+
+def test_itjobbank_parses_rss():
+    rss = (
+        '<?xml version="1.0" encoding="ISO-8859-1"?><rss><channel>'
+        '<item><title>Python Udvikler, Acme A/S</title><link>https://www.it-jobbank.dk/vis-job/h1</link>'
+        '<pubDate>Mon, 16 Jun 2026 00:00:00 +0200</pubDate>'
+        '<description>&lt;span class="jix_robotjob--area"&gt;København&lt;/span&gt; Build Python.&lt;/description&gt;</description></item>'
+        '</channel></rss>'
+    ).encode("iso-8859-1")
+    with patch("jobfinder.sources.itjobbank.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = ItJobbankSource().search("python", limit=5)
+    assert len(jobs) == 1
+    assert jobs[0].title == "Python Udvikler" and jobs[0].company == "Acme A/S"
+    assert jobs[0].location == "København" and jobs[0].source == "it-jobbank"
+
+
+def test_hrmanager_parses_json_and_msdate():
+    assert _msdate("/Date(1780396745000+0200)/") == "2026-06-02"
+    assert _msdate(None) == "" and _msdate("nonsense") == ""
+    payload = {"Items": [{
+        "Name": "Jurist til Miljøstyrelsen",
+        "Department": {"Name": "Miljøstyrelsen", "City": "Odense"},
+        "WorkPlace": "Odense", "AdvertisementUrlSecure": "https://candidate.hr-manager.net/x",
+        "Advertisements": [{"Content": "<p>Behandling af sager</p>"}],
+        "Published": "/Date(1780396745000+0200)/",
+    }]}
+    # single alias, mocked
+    src = HRManagerSource(aliases=("statensrekrutteringsloesning_tr",))
+    with patch("jobfinder.sources.hrmanager.requests.get", return_value=_FakeResp(payload)):
+        jobs = src.search("jurist", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Jurist til Miljøstyrelsen" and j.company == "Miljøstyrelsen"
+    assert j.location == "Odense" and "Behandling" in j.description and j.posted == "2026-06-02"
+    assert j.source == "HR-Manager (DK public sector)"
+
+
+def test_hrmanager_survives_one_failing_alias():
+    payload = {"Items": [{"Name": "Role", "Department": {"Name": "Co"}, "WorkPlace": "Aarhus",
+                          "Advertisements": [{"Content": "x"}], "Published": "/Date(1780396745000)/"}]}
+    calls = {"n": 0}
+    def flaky(*a, **k):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")          # first alias fails
+        return _FakeResp(payload)
+    src = HRManagerSource(aliases=("a", "b"))
+    with patch("jobfinder.sources.hrmanager.requests.get", side_effect=flaky):
+        jobs = src.search("role", limit=5)
+    assert len(jobs) == 1                        # the second alias still produced a job
+
+
+def test_jobicy_parses_json():
+    payload = {"jobs": [{
+        "jobTitle": "Backend Developer", "companyName": "Synthesia", "jobGeo": "Europe",
+        "url": "https://jobicy.com/jobs/1", "jobDescription": "<p>Python</p>", "pubDate": "2026-06-16 10:00:00",
+    }]}
+    with patch("jobfinder.sources.jobicy.requests.get", return_value=_FakeResp(payload)):
+        jobs = JobicySource().search("developer", limit=5)
+    assert len(jobs) == 1
+    assert jobs[0].title == "Backend Developer" and jobs[0].remote is True and jobs[0].posted == "2026-06-16"
+
+
+def test_careerjet_requires_affid_and_parses():
+    with pytest.raises(RuntimeError):
+        CareerjetSource(affid=None).search("python")     # no affid → skipped with a clear error
+    payload = {"jobs": [{
+        "title": "Python Developer", "company": "DanskCo", "locations": "København",
+        "url": "https://careerjet/1", "description": "<b>Django</b>", "date": "2026-06-15", "salary": "600000",
+    }]}
+    with patch("jobfinder.sources.careerjet.requests.get", return_value=_FakeResp(payload)):
+        jobs = CareerjetSource(affid="aff123").search("python", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Python Developer" and j.location == "København" and j.source == "Careerjet"
+    assert "Django" in j.description and j.salary == "600000"
+
+
+# --- malformed-upstream robustness (review-found: one bad record must not drop the batch) ---
+
+def test_hrmanager_survives_malformed_records_and_none_keywords():
+    # a non-dict Item, plus records whose nested fields are the wrong type, must not crash or
+    # discard the good record; and keywords=None must not crash on .lower()
+    payload = {"Items": [
+        "i-am-not-a-dict",                                   # non-dict element
+        {"Name": "Bad dept", "Department": "Just a string",  # Department is a str, not a dict
+         "Advertisements": ["raw string ad"],                # first ad is a str, not a dict
+         "PositionLocation": "also a string", "Published": "/Date(1780396745000)/"},
+        {"Name": "Good Role", "Department": {"Name": "Styrelsen", "City": "Odense"},
+         "Advertisements": [{"Content": "<p>Sagsbehandling</p>"}], "Published": "/Date(1780396745000+0200)/"},
+    ]}
+    src = HRManagerSource(aliases=("statensrekrutteringsloesning_tr",))
+    with patch("jobfinder.sources.hrmanager.requests.get", return_value=_FakeResp(payload)):
+        jobs = src.search(keywords=None, location=None, limit=5)   # None must not crash
+    titles = [j.title for j in jobs]
+    assert "Good Role" in titles                             # the clean record survived
+    assert "i-am-not-a-dict" not in titles
+    good = next(j for j in jobs if j.title == "Good Role")
+    assert good.company == "Styrelsen" and good.location == "Odense" and "Sagsbehandling" in good.description
+
+
+def test_jobicy_skips_non_dict_and_coerces_nonstring_date():
+    payload = {"jobs": [
+        "not-a-dict",                                        # malformed entry — must be skipped
+        {"jobTitle": "Dev", "companyName": "C", "jobGeo": "Denmark", "url": "u",
+         "jobDescription": "<p>Python</p>", "pubDate": 1780396745},   # int date — must coerce, not crash
+    ]}
+    with patch("jobfinder.sources.jobicy.requests.get", return_value=_FakeResp(payload)):
+        jobs = JobicySource().search("dev", limit=5)
+    assert len(jobs) == 1 and jobs[0].title == "Dev"         # good record survived the bad one
+    assert isinstance(jobs[0].posted, str)                   # int pubDate coerced, no TypeError
+
+
+def test_careerjet_skips_non_dict_and_coerces_nonstring_date():
+    payload = {"jobs": [
+        12345,                                               # malformed entry — must be skipped
+        {"title": "Python Dev", "company": "C", "locations": "København", "url": "u",
+         "description": "<b>Django</b>", "date": 20260615, "salary": "x"},   # int date — must coerce
+    ]}
+    with patch("jobfinder.sources.careerjet.requests.get", return_value=_FakeResp(payload)):
+        jobs = CareerjetSource(affid="aff123").search("python", limit=5)
+    assert len(jobs) == 1 and jobs[0].title == "Python Dev"  # good record survived
+    assert isinstance(jobs[0].posted, str)                   # int date coerced, no TypeError
