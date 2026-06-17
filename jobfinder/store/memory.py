@@ -28,50 +28,67 @@ class MemoryStore(Store):
         self._apps: dict[str, Application] = {}
         self._searches: dict[str, SavedSearch] = {}
         self._notes: dict[str, Notification] = {}
-        self._lock = threading.Lock()      # serializes atomic saved-search updates
+        # A single non-reentrant lock guards every dict access, so a background alert sweep
+        # writing (save_notification / update_saved_search) can't race a concurrent export_all
+        # iteration ("dictionary changed size") or a delete_all clear. No method calls another
+        # while holding the lock, so non-reentrancy is safe.
+        self._lock = threading.Lock()
 
     def save_profile(self, cv_id: str, profile: CVProfile) -> None:
-        self._profiles[cv_id] = profile
-        _evict(self._profiles, MAX_PROFILES)
+        with self._lock:
+            self._profiles[cv_id] = profile
+            _evict(self._profiles, MAX_PROFILES)
 
     def get_profile(self, cv_id: str) -> CVProfile | None:
-        return self._profiles.get(cv_id)
+        with self._lock:
+            return self._profiles.get(cv_id)
 
     def save_example(self, example: dict) -> None:
-        self._examples[example["id"]] = example
-        _evict(self._examples, MAX_EXAMPLES)
+        with self._lock:
+            self._examples[example["id"]] = example
+            _evict(self._examples, MAX_EXAMPLES)
 
     def list_examples(self) -> list[dict]:
-        return list(self._examples.values())
+        with self._lock:
+            return list(self._examples.values())
 
     def delete_example(self, example_id: str) -> None:
-        self._examples.pop(example_id, None)
+        with self._lock:
+            self._examples.pop(example_id, None)
 
     def save_application(self, app: Application) -> None:
-        self._apps[app.id] = app
-        _evict(self._apps, MAX_APPLICATIONS)
+        with self._lock:
+            self._apps[app.id] = app
+            _evict(self._apps, MAX_APPLICATIONS)
 
     def get_application(self, app_id: str) -> Application | None:
-        return self._apps.get(app_id)
+        with self._lock:
+            return self._apps.get(app_id)
 
     def list_applications(self) -> list[Application]:
-        return list(self._apps.values())
+        with self._lock:
+            return list(self._apps.values())
 
     def delete_application(self, app_id: str) -> None:
-        self._apps.pop(app_id, None)
+        with self._lock:
+            self._apps.pop(app_id, None)
 
     def save_saved_search(self, search: SavedSearch) -> None:
-        self._searches[search.id] = search
-        _evict(self._searches, MAX_SAVED_SEARCHES)
+        with self._lock:
+            self._searches[search.id] = search
+            _evict(self._searches, MAX_SAVED_SEARCHES)
 
     def get_saved_search(self, search_id: str) -> SavedSearch | None:
-        return self._searches.get(search_id)
+        with self._lock:
+            return self._searches.get(search_id)
 
     def list_saved_searches(self) -> list[SavedSearch]:
-        return list(self._searches.values())
+        with self._lock:
+            return list(self._searches.values())
 
     def delete_saved_search(self, search_id: str) -> None:
-        self._searches.pop(search_id, None)
+        with self._lock:
+            self._searches.pop(search_id, None)
 
     def update_saved_search(self, search_id: str, mutator) -> SavedSearch | None:
         with self._lock:
@@ -81,15 +98,37 @@ class MemoryStore(Store):
             mutator(s)
             return s
 
+    def export_all(self) -> dict:
+        with self._lock:
+            return {
+                "profiles": {cid: p.to_dict() for cid, p in self._profiles.items()},
+                "examples": list(self._examples.values()),
+                "applications": [a.to_dict() for a in self._apps.values()],
+                "saved_searches": [s.to_dict() for s in self._searches.values()],
+                "notifications": [n.to_dict() for n in self._notes.values()],
+            }
+
+    def delete_all(self) -> None:
+        with self._lock:
+            self._profiles.clear()
+            self._examples.clear()
+            self._apps.clear()
+            self._searches.clear()
+            self._notes.clear()
+
     def save_notification(self, note: Notification) -> None:
-        self._notes[note.id] = note
-        _evict(self._notes, MAX_NOTIFICATIONS)
+        with self._lock:
+            self._notes[note.id] = note
+            _evict(self._notes, MAX_NOTIFICATIONS)
 
     def get_notification(self, note_id: str) -> Notification | None:
-        return self._notes.get(note_id)
+        with self._lock:
+            return self._notes.get(note_id)
 
     def list_notifications(self) -> list[Notification]:
-        return list(reversed(self._notes.values()))      # newest first
+        with self._lock:
+            return list(reversed(self._notes.values()))      # newest first
 
     def delete_notification(self, note_id: str) -> None:
-        self._notes.pop(note_id, None)
+        with self._lock:
+            self._notes.pop(note_id, None)

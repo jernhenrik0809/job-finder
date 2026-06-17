@@ -153,6 +153,27 @@ def test_sqlite_saved_search_round_trip(tmp_path):
     s2.close()
 
 
+def test_export_and_delete_all(tmp_path):
+    from jobfinder.saved_searches import new_saved_search
+    from jobfinder.notifications import Notification
+    s = SqliteStore(tmp_path / "jf.db")
+    s.save_profile("cv1", build_profile(CV))
+    s.save_application(_app("a1"))
+    s.save_saved_search(new_saved_search("S", {"cv_id": "cv1", "keywords": "py"}))
+    s.save_notification(Notification(kind="reminder", title="T", created=1.0))
+
+    bundle = s.export_all()
+    assert "cv1" in bundle["profiles"] and len(bundle["applications"]) == 1
+    assert len(bundle["saved_searches"]) == 1 and len(bundle["notifications"]) == 1
+
+    s.delete_all()
+    empty = s.export_all()
+    assert empty == {"profiles": {}, "examples": [], "applications": [],
+                     "saved_searches": [], "notifications": []}
+    assert s.get_profile("cv1") is None and s.list_applications() == []
+    s.close()
+
+
 def test_memory_store_basics():
     s = MemoryStore()
     s.save_profile("cv1", build_profile(CV))

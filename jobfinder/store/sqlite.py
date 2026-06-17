@@ -210,6 +210,35 @@ class SqliteStore(Store):
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM saved_searches WHERE id=?", (search_id,))
 
+    # --- data rights ---
+    def export_all(self) -> dict:
+        with self._lock:
+            prof = self._conn.execute("SELECT cv_id, data FROM profiles").fetchall()
+            ex = self._conn.execute("SELECT id, name, text, chars FROM examples ORDER BY created ASC").fetchall()
+            apps = self._conn.execute("SELECT data FROM applications ORDER BY created ASC").fetchall()
+            ss = self._conn.execute("SELECT data FROM saved_searches ORDER BY created ASC").fetchall()
+            notes = self._conn.execute("SELECT data FROM notifications ORDER BY created DESC").fetchall()
+        return {
+            "profiles": {r["cv_id"]: json.loads(r["data"]) for r in prof},
+            "examples": [dict(r) for r in ex],
+            "applications": [json.loads(r["data"]) for r in apps],
+            "saved_searches": [json.loads(r["data"]) for r in ss],
+            "notifications": [json.loads(r["data"]) for r in notes],
+        }
+
+    def delete_all(self) -> None:
+        # one lock acquisition across DELETE + commit + VACUUM, so no other thread can INSERT in
+        # a gap. VACUUM can't run inside a transaction, so commit() explicitly first, then VACUUM
+        # runs in autocommit — still under the lock.
+        with self._lock:
+            for table in ("profiles", "examples", "applications", "saved_searches", "notifications"):
+                self._conn.execute(f"DELETE FROM {table}")
+            self._conn.commit()
+            try:
+                self._conn.execute("VACUUM")    # reclaim/overwrite the freed pages
+            except sqlite3.Error:
+                pass
+
     # --- notifications ---
     def save_notification(self, note: Notification) -> None:
         with self._lock, self._conn:

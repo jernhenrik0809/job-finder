@@ -702,5 +702,38 @@ def run_alerts_now() -> dict:
     return alert_scheduler.run_now()
 
 
+# ---------------------------------------------------------------------------
+# Data rights — export everything / delete everything
+# ---------------------------------------------------------------------------
+
+@app.get("/api/export")
+def export_all_data() -> JSONResponse:
+    """Download a full local backup of everything stored (no API keys — those live
+    outside the database)."""
+    bundle = {"app": "Job Finder", "version": __version__,
+              "exported_at": time.time(), "data": store.export_all()}
+    return JSONResponse(bundle, headers={
+        "Content-Disposition": 'attachment; filename="jobfinder-export.json"'})
+
+
+@app.post("/api/data/delete-all")
+def delete_all_data() -> dict:
+    """Permanently delete all stored user data on this machine. API keys (Settings) are
+    not affected. Same-origin is enforced by the security middleware, so a stray site
+    can't trigger this."""
+    snap = store.export_all()
+    counts = {
+        "profiles": len(snap.get("profiles") or {}),
+        "applications": len(snap.get("applications") or []),
+        "saved_searches": len(snap.get("saved_searches") or []),
+        "examples": len(snap.get("examples") or []),
+        "notifications": len(snap.get("notifications") or []),
+    }
+    # hold the sweep lock so an in-flight background sweep can't re-insert just-deleted rows
+    with alert_scheduler.paused():
+        store.delete_all()
+    return {"ok": True, "deleted": counts}
+
+
 # Static assets (css/js)
 app.mount("/static", StaticFiles(directory=str(_STATIC)), name="static")

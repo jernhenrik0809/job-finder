@@ -67,6 +67,17 @@ class Store(ABC):
         seen_ids/new_count (lost update). Returns the updated search, or None if it's gone."""
         ...
 
+    # --- data rights (export / wipe everything) ---
+    @abstractmethod
+    def export_all(self) -> dict:
+        """A serializable bundle of everything stored (profiles, examples, applications,
+        saved searches, notifications). Excludes API keys — those live outside the DB."""
+        ...
+    @abstractmethod
+    def delete_all(self) -> None:
+        """Permanently delete all stored user data (every table). API keys are not touched."""
+        ...
+
     # --- notifications (the in-app alert inbox) ---
     @abstractmethod
     def save_notification(self, note: Notification) -> None: ...

@@ -896,9 +896,52 @@ function renderSettings(s) {
       <div class="muted small">Off by default. When on, the app re-runs your saved searches on a schedule and drops new matches (and follow-up reminders) into the 🔔 inbox. Nothing is emailed or sent anywhere — it's a local, in-app check.</div>
       <div id="alertsBody" class="muted small" style="margin-top:.5rem">Loading…</div>
     </div>
+    <div class="set-section">
+      <h3>Your data</h3>
+      <div class="muted small">Everything is stored locally on this machine. (Note: the database is not yet encrypted at rest — see docs/PRIVACY.md.)</div>
+      <div class="row" style="gap:.6rem;margin-top:.5rem">
+        <button id="dataExport" class="btn ghost small" type="button">⬇ Export all my data</button>
+        <button id="dataWipe" class="btn danger small" type="button">🗑 Delete all my data</button>
+      </div>
+      <div id="wipeConfirm" class="hidden" style="margin-top:.6rem">
+        <div class="muted small">This permanently deletes your CVs, pipeline, saved searches, style examples and notifications from this machine. Your API keys are not affected. Type <b>DELETE</b> to confirm.</div>
+        <div class="row" style="gap:.5rem;margin-top:.4rem;align-items:center">
+          <input id="wipeText" type="text" placeholder="DELETE" autocomplete="off" style="max-width:150px" />
+          <button id="wipeGo" class="btn danger small" type="button">Delete everything</button>
+          <button id="wipeCancel" class="btn ghost small" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
     <div class="set-actions"><button id="setSave" class="btn ok">Save settings</button><span class="msg copied" style="display:none">saved ✓</span></div>`;
   el.settingsBody.querySelector('#setSave').addEventListener('click', saveSettings);
   loadAlertsConfig();
+  wireDataRights();
+}
+
+function wireDataRights() {
+  const $$ = (s) => el.settingsBody.querySelector(s);
+  $$('#dataExport').addEventListener('click', async () => {
+    try {
+      const resp = await fetch('/api/export');
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'jobfinder-export.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch { showWarnings(['Export failed.']); }
+  });
+  $$('#dataWipe').addEventListener('click', () => $$('#wipeConfirm').classList.remove('hidden'));
+  $$('#wipeCancel').addEventListener('click', () => {
+    $$('#wipeConfirm').classList.add('hidden'); $$('#wipeText').value = '';
+  });
+  $$('#wipeGo').addEventListener('click', async () => {
+    if ($$('#wipeText').value.trim() !== 'DELETE') { $$('#wipeText').focus(); return; }
+    try {
+      await fetch('/api/data/delete-all', { method: 'POST' });
+      location.reload();      // simplest correct reset of all in-memory UI state
+    } catch { showWarnings(['Delete failed.']); }
+  });
 }
 
 async function loadAlertsConfig() {

@@ -2,6 +2,40 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.20.0] — 2026-06-17
+
+### Added — Data rights (export / delete everything)
+- **Export all my data** (**⚙ Settings → Your data**, or `GET /api/export`): downloads a single
+  JSON backup of your profiles, applications/pipeline, saved searches, style examples and
+  notifications. **No API keys** are included — they live outside the database.
+- **Delete all my data** (`POST /api/data/delete-all`, type `DELETE` to confirm in the UI):
+  permanently wipes every table and `VACUUM`s the SQLite file so freed pages are overwritten. API
+  keys are not touched. Same-origin enforcement means a stray browser tab can't trigger a wipe.
+- Store gains `export_all()` / `delete_all()` (both backends).
+
+### Privacy / honesty
+- **Disclosed in [`docs/PRIVACY.md`](docs/PRIVACY.md) that the database is currently *unencrypted*
+  at rest** — protected by OS file permissions + the network-boundary guard, but plaintext on
+  disk. At-rest encryption (with key recovery) is a documented, deferred-but-committed enhancement
+  (see [`docs/ROADMAP.md`](docs/ROADMAP.md)); Export/Delete-all are the interim way to back up and
+  securely wipe your data. (Delete-all is a hard wipe, not yet a *cryptographic* shred.)
+
+### Fixed (from adversarial review)
+- **Delete-all vs the background sweep:** a sweep mid-flight (between its reads and its
+  `save_notification` writes) could re-insert rows *after* a wipe, resurrecting "deleted" data.
+  The delete handler now holds the scheduler's sweep lock (`alert_scheduler.paused()`) so no sweep
+  runs during the wipe.
+- **SQLite `delete_all` atomicity:** it released the lock between the `DELETE`s and `VACUUM`,
+  leaving a window for a concurrent insert to survive. Now DELETE → explicit `commit()` → `VACUUM`
+  all happen under one lock acquisition (VACUUM still runs outside the transaction, as required).
+- **MemoryStore locking:** every dict access now holds the store lock, so a concurrent sweep write
+  can't trip an `export_all` iteration ("dictionary changed size") or race a wipe.
+
+### Tests
+- 243 → 246 (store export bundle + delete-all empties every table; the export endpoint is swept by
+  the no-secret CI test, confirming it never leaks a key; delete-all endpoint wipes the inbox; and
+  delete-all runs under the sweep lock).
+
 ## [1.19.0] — 2026-06-17
 
 ### Added — Background alerts + a notification inbox (opt-in)

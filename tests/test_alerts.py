@@ -197,3 +197,27 @@ def test_alerts_run_now_api(monkeypatch):
     monkeypatch.setattr(web.alert_scheduler, "run_now",
                         lambda: {"searches_run": 0, "new_matches": 0, "reminders": 0, "ran_at": 1.0})
     assert TestClient(web.app).post("/api/alerts/run-now").json()["new_matches"] == 0
+
+
+def test_export_and_delete_all_api():
+    client = TestClient(web.app)
+    web.store.save_notification(Notification(kind="reminder", title="ToWipe", created=2.0))
+    bundle = client.get("/api/export").json()
+    assert bundle["app"] == "Job Finder" and "data" in bundle
+    assert "notifications" in bundle["data"] and "profiles" in bundle["data"]
+    r = client.post("/api/data/delete-all").json()
+    assert r["ok"] is True and "notifications" in r["deleted"]
+    assert client.get("/api/notifications").json()["notifications"] == []   # wiped
+
+
+def test_delete_all_runs_under_sweep_lock(monkeypatch):
+    # regression: delete-all must hold the scheduler's sweep lock so an in-flight sweep can't
+    # resurrect just-deleted rows
+    held = {}
+    real = web.store.delete_all
+    def spy():
+        held["locked"] = web.alert_scheduler._sweep_lock.locked()
+        real()
+    monkeypatch.setattr(web.store, "delete_all", spy)
+    TestClient(web.app).post("/api/data/delete-all")
+    assert held.get("locked") is True

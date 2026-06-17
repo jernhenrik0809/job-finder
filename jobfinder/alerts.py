@@ -205,6 +205,12 @@ class AlertScheduler:
         return {"enabled": p["enabled"], "interval_hours": p["interval_hours"],
                 "last_run": self.last_run, "last_summary": self.last_summary}
 
+    def paused(self):
+        """Context manager: hold the sweep lock so no sweep can run inside the block (and any
+        in-flight one finishes first). Used to make a Delete-all atomic against the sweep, so a
+        mid-flight sweep can't resurrect just-deleted rows."""
+        return self._sweep_lock
+
 
 def _main() -> None:
     """`python -m jobfinder.alerts` — run one sweep and exit (for OS-scheduled cron/Task
