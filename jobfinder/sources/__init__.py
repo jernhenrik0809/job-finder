@@ -1,74 +1,66 @@
-"""Pluggable job sources. Each source implements :class:`JobSource`."""
+"""Pluggable job sources. Each source implements :class:`JobSource`.
+
+Sources are declared once in the ``_SOURCES`` registry below — a single source of truth for
+the name, aliases and (lazily-imported) class of every source. ``get_source`` imports the
+module only when a source is actually requested, so an optional source whose dependency is
+missing never breaks app startup.
+"""
 from __future__ import annotations
+
+import importlib
+from dataclasses import dataclass, field
 
 from .base import Job, JobSource
 
-# Registry of available sources is built lazily to avoid import-time failures
-# when an optional source's dependency is missing.
+
+@dataclass(frozen=True)
+class SourceMeta:
+    name: str                       # canonical id (also the UI checkbox value)
+    module: str                     # module under jobfinder.sources
+    cls: str                        # class name to instantiate
+    aliases: tuple = field(default_factory=tuple)
+
+
+# Order is cosmetic. Aliases preserve the historical accept-list so existing configs/tests
+# keep working. ``ats`` covers the Greenhouse/Lever/Ashby public board APIs.
+_SOURCES: tuple[SourceMeta, ...] = (
+    SourceMeta("linkedin", "linkedin", "LinkedInSource", ("li",)),
+    SourceMeta("remotive", "remotive", "RemotiveSource", ("remote",)),
+    SourceMeta("arbeitnow", "arbeitnow", "ArbeitnowSource", ("arbeit",)),
+    SourceMeta("thehub", "thehub", "TheHubSource", ("hub",)),
+    SourceMeta("themuse", "themuse", "TheMuseSource", ("muse",)),
+    SourceMeta("itjobbank", "itjobbank", "ItJobbankSource", ("it-jobbank",)),
+    SourceMeta("hrmanager", "hrmanager", "HRManagerSource", ("hr-manager", "srl")),
+    SourceMeta("jobicy", "jobicy", "JobicySource"),
+    SourceMeta("stepstonedk", "stepstonedk", "StepStoneDkSource", ("stepstone", "stepstone-dk")),
+    SourceMeta("jobindex", "jobindex", "JobindexSource"),
+    SourceMeta("remoteok", "remoteok", "RemoteOKSource", ("remote-ok",)),
+    SourceMeta("weworkremotely", "weworkremotely", "WeWorkRemotelySource", ("wwr",)),
+    SourceMeta("workingnomads", "workingnomads", "WorkingNomadsSource", ("working-nomads",)),
+    SourceMeta("ats", "ats", "ATSSource", ("greenhouse", "lever", "ashby")),
+    SourceMeta("adzuna", "adzuna", "AdzunaSource"),
+    SourceMeta("jooble", "jooble", "JoobleSource"),
+    SourceMeta("careerjet", "careerjet", "CareerjetSource"),
+    SourceMeta("freelancer", "freelancer", "FreelancerSource", ("freelancer.com",)),
+    SourceMeta("jsearch", "jsearch", "JSearchSource"),
+)
+
+_BY_NAME: dict[str, SourceMeta] = {}
+for _m in _SOURCES:
+    for _n in (_m.name, *_m.aliases):
+        _BY_NAME[_n] = _m
+
 
 def get_source(name: str) -> JobSource:
-    name = (name or "").lower()
-    if name in ("linkedin", "li"):
-        from .linkedin import LinkedInSource
-        return LinkedInSource()
-    if name in ("remotive", "remote"):
-        from .remotive import RemotiveSource
-        return RemotiveSource()
-    if name in ("arbeitnow", "arbeit"):
-        from .arbeitnow import ArbeitnowSource
-        return ArbeitnowSource()
-    if name in ("jsearch",):
-        from .jsearch import JSearchSource
-        return JSearchSource()
-    if name in ("adzuna",):
-        from .adzuna import AdzunaSource
-        return AdzunaSource()
-    if name in ("jooble",):
-        from .jooble import JoobleSource
-        return JoobleSource()
-    if name in ("thehub", "hub"):
-        from .thehub import TheHubSource
-        return TheHubSource()
-    if name in ("themuse", "muse"):
-        from .themuse import TheMuseSource
-        return TheMuseSource()
-    if name in ("jobindex",):
-        from .jobindex import JobindexSource
-        return JobindexSource()
-    if name in ("itjobbank", "it-jobbank"):
-        from .itjobbank import ItJobbankSource
-        return ItJobbankSource()
-    if name in ("hrmanager", "hr-manager", "srl"):
-        from .hrmanager import HRManagerSource
-        return HRManagerSource()
-    if name in ("jobicy",):
-        from .jobicy import JobicySource
-        return JobicySource()
-    if name in ("careerjet",):
-        from .careerjet import CareerjetSource
-        return CareerjetSource()
-    if name in ("stepstonedk", "stepstone", "stepstone-dk"):
-        from .stepstonedk import StepStoneDkSource
-        return StepStoneDkSource()
-    if name in ("remoteok", "remote-ok"):
-        from .remoteok import RemoteOKSource
-        return RemoteOKSource()
-    if name in ("weworkremotely", "wwr"):
-        from .weworkremotely import WeWorkRemotelySource
-        return WeWorkRemotelySource()
-    if name in ("workingnomads", "working-nomads"):
-        from .workingnomads import WorkingNomadsSource
-        return WorkingNomadsSource()
-    if name in ("freelancer", "freelancer.com"):
-        from .freelancer import FreelancerSource
-        return FreelancerSource()
-    raise ValueError(f"Unknown job source: {name!r}")
+    meta = _BY_NAME.get((name or "").lower())
+    if meta is None:
+        raise ValueError(f"Unknown job source: {name!r}")
+    module = importlib.import_module(f".{meta.module}", __name__)   # lazy: optional deps stay optional
+    return getattr(module, meta.cls)()
 
 
 def available_sources() -> list[str]:
-    return ["linkedin", "remotive", "arbeitnow", "thehub", "themuse", "itjobbank",
-            "hrmanager", "jobicy", "stepstonedk", "jobindex", "remoteok", "weworkremotely",
-            "workingnomads", "adzuna", "jooble", "careerjet", "freelancer", "jsearch"]
+    return [m.name for m in _SOURCES]
 
 
-__all__ = ["Job", "JobSource", "get_source", "available_sources"]
+__all__ = ["Job", "JobSource", "SourceMeta", "get_source", "available_sources"]

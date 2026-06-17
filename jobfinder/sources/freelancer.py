@@ -20,9 +20,7 @@ from .. import secrets_store
 _API = "https://www.freelancer.com/api/projects/0.1/projects/active/"
 
 
-def _strip_html(text) -> str:
-    text = re.sub(r"<[^>]+>", " ", str(text or ""))
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+from .normalize import strip_html as _strip_html   # shared (was a local copy)
 
 
 def _posted(value) -> str:

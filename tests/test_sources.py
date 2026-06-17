@@ -480,6 +480,90 @@ def test_freelancer_requires_token_and_parses():
     assert j.source == "Freelancer"
 
 
+# --- ATS (Greenhouse / Lever / Ashby) ------------------------------------
+
+from jobfinder.sources.ats import ATSSource
+
+
+def _ats_get(payloads):
+    def _get(url, *a, **k):
+        if "greenhouse.io" in url:
+            return _FakeResp(payloads.get("greenhouse", {"jobs": []}))
+        if "lever.co" in url:
+            return _FakeResp(payloads.get("lever", []))
+        if "ashbyhq.com" in url:
+            return _FakeResp(payloads.get("ashby", {"jobs": []}))
+        return _FakeResp({})
+    return _get
+
+
+def test_ats_greenhouse_unescapes_entity_encoded_content():
+    payload = {"jobs": [{
+        "title": "Account Executive Denmark", "location": {"name": "Copenhagen"},
+        "absolute_url": "https://corporate.trustpilot.com/careers/job/1",
+        "content": "&lt;p&gt;Build &amp; grow&lt;/p&gt;", "updated_at": "2026-06-16T15:48:40-04:00",
+        "company_name": "Trustpilot",
+    }]}
+    with patch("jobfinder.sources.ats.requests.get", side_effect=_ats_get({"greenhouse": payload})):
+        jobs = ATSSource(boards=[("greenhouse", "trustpilot")]).search("denmark", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Account Executive Denmark" and j.company == "Trustpilot"
+    assert j.location == "Copenhagen" and j.posted == "2026-06-16" and j.source == "ATS (Greenhouse)"
+    assert "Build & grow" in j.description and "<" not in j.description   # entity-decoded, tags stripped
+
+
+def test_ats_lever_epoch_ms_and_remote():
+    payload = [{
+        "text": "Android Engineer", "categories": {"location": "Copenhagen"},
+        "hostedUrl": "https://jobs.lever.co/veo/1", "workplaceType": "remote",
+        "descriptionPlain": "Build Android apps", "createdAt": 1779435981707,   # epoch MS
+    }]
+    with patch("jobfinder.sources.ats.requests.get", side_effect=_ats_get({"lever": payload})):
+        jobs = ATSSource(boards=[("lever", "veo")]).search("android", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Android Engineer" and j.company == "Veo" and j.location == "Copenhagen"
+    assert j.remote is True and j.posted == "2026-05-22" and j.source == "ATS (Lever)"
+
+
+def test_ats_ashby_skips_unlisted():
+    payload = {"jobs": [
+        {"title": "Hidden", "isListed": False, "location": "X", "jobUrl": "u",
+         "descriptionPlain": "x", "publishedAt": "2026-01-01T00:00:00.000+00:00"},
+        {"title": "ML Engineer", "isListed": True, "location": "Copenhagen, Denmark",
+         "jobUrl": "https://jobs.ashbyhq.com/Corti/2", "descriptionPlain": "Build ML",
+         "publishedAt": "2026-04-07T17:12:35.753+00:00", "isRemote": True},
+    ]}
+    with patch("jobfinder.sources.ats.requests.get", side_effect=_ats_get({"ashby": payload})):
+        jobs = ATSSource(boards=[("ashby", "Corti")]).search("", limit=5)
+    assert len(jobs) == 1 and jobs[0].title == "ML Engineer"          # unlisted skipped
+    assert jobs[0].posted == "2026-04-07" and jobs[0].remote is True and jobs[0].source == "ATS (Ashby)"
+
+
+def test_ats_survives_a_failing_board():
+    def _get(url, *a, **k):
+        if "greenhouse" in url:
+            raise RuntimeError("boom")
+        return _FakeResp([{"text": "Dev", "categories": {"location": "Aarhus"},
+                           "hostedUrl": "u", "descriptionPlain": "go", "createdAt": 1779435981707}])
+    with patch("jobfinder.sources.ats.requests.get", side_effect=_get):
+        jobs = ATSSource(boards=[("greenhouse", "x"), ("lever", "y")]).search("dev", limit=5)
+    assert len(jobs) == 1 and jobs[0].title == "Dev"                  # lever survived greenhouse failing
+
+
+def test_ats_empty_board_list_returns_empty_not_error():
+    # a fully-misconfigured JOBFINDER_ATS_COMPANIES (no valid boards) must yield [], not a
+    # misleading "all boards unavailable" RuntimeError — and must make no request
+    called = {"n": 0}
+    def _get(*a, **k):
+        called["n"] += 1
+        return _FakeResp({})
+    with patch("jobfinder.sources.ats.requests.get", side_effect=_get):
+        assert ATSSource(boards=[]).search("python", limit=5) == []
+    assert called["n"] == 0
+
+
 def test_freelancer_tolerates_string_and_junk_budget():
     # a budget serialised as strings (or junk) must NOT crash the :g salary format and drop the batch
     payload = {"result": {"projects": [

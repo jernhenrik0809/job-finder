@@ -90,10 +90,7 @@ def _resolve_geo_id(location: str) -> str | None:
     return None
 
 
-def _strip_html(text: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", text or "")
-    text = html.unescape(text)
-    return re.sub(r"\s+", " ", text).strip()
+from .normalize import strip_html as _strip_html   # shared (was a local copy)
 
 
 def _tpr_param(days: int | None) -> str | None:

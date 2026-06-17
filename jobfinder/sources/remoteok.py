@@ -25,9 +25,7 @@ _HEADERS = {
 }
 
 
-def _strip_html(text) -> str:
-    text = re.sub(r"<[^>]+>", " ", str(text or ""))
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+from .normalize import strip_html as _strip_html   # shared (was a local copy)
 
 
 def _posted(j: dict) -> str:

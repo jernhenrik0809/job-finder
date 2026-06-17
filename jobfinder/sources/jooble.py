@@ -15,14 +15,10 @@ import re
 import requests
 
 from .base import Job, JobSource
+from .normalize import strip_html as _strip_html
 from .. import secrets_store
 
 _HEADERS = {"User-Agent": "JobFinder/1.0 (personal job search)", "Content-Type": "application/json"}
-
-
-def _strip_html(text: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", text or "")
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
 def _s(v) -> str:

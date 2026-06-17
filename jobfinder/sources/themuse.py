@@ -19,9 +19,7 @@ _DK_LOCATIONS = ["Copenhagen, Denmark", "Aarhus, Denmark", "Odense, Denmark"]
 _MAX_PAGES = 6
 
 
-def _strip_html(text) -> str:
-    text = re.sub(r"<[^>]+>", " ", str(text or ""))          # str() guards a non-string field
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+from .normalize import strip_html as _strip_html   # shared (was a local copy)
 
 
 def _is_denmark(locations) -> str | None:

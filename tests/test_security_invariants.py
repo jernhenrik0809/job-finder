@@ -41,6 +41,7 @@ from jobfinder.sources.remoteok import RemoteOKSource
 from jobfinder.sources.weworkremotely import WeWorkRemotelySource
 from jobfinder.sources.workingnomads import WorkingNomadsSource
 from jobfinder.sources.freelancer import FreelancerSource
+from jobfinder.sources.ats import ATSSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -69,6 +70,9 @@ _ALLOWED_HOSTS = {
     "weworkremotely.com",                           # We Work Remotely RSS source
     "www.workingnomads.com",                        # Working Nomads source
     "www.freelancer.com",                           # Freelancer.com source + signup-doc URL
+    "boards-api.greenhouse.io",                     # ATS source — Greenhouse public boards
+    "api.lever.co",                                 # ATS source — Lever public postings
+    "api.ashbyhq.com",                              # ATS source — Ashby public job board
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -164,7 +168,7 @@ def test_runtime_egress_allowlist(monkeypatch):
         RemotiveSource(), ArbeitnowSource(), TheHubSource(), TheMuseSource(), JobindexSource(),
         ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
         StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
-        FreelancerSource(token="x"),
+        FreelancerSource(token="x"), ATSSource(),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

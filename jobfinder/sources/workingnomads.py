@@ -17,9 +17,7 @@ _API = "https://www.workingnomads.com/api/exposed_jobs/"
 _HEADERS = {"User-Agent": "JobFinder/1.0 (personal job search)"}
 
 
-def _strip_html(text) -> str:
-    text = re.sub(r"<[^>]+>", " ", str(text or ""))
-    return re.sub(r"\s+", " ", html.unescape(text)).strip()
+from .normalize import strip_html as _strip_html   # shared (was a local copy)
 
 
 class WorkingNomadsSource(JobSource):

@@ -11,15 +11,10 @@ import html
 import requests
 
 from .base import Job, JobSource
+from .normalize import strip_html as _strip_html
 
 _API = "https://remotive.com/api/remote-jobs"
 _HEADERS = {"User-Agent": "JobFinder/1.0 (personal job search)"}
-
-
-def _strip_html(text: str) -> str:
-    text = re.sub(r"<[^>]+>", " ", text or "")
-    text = html.unescape(text)
-    return re.sub(r"\s+", " ", text).strip()
 
 
 class RemotiveSource(JobSource):

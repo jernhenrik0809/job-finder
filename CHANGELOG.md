@@ -2,6 +2,42 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.21.0] — 2026-06-17
+
+### Added — Company boards (ATS): full descriptions from named employers
+- **New `ats` source** covering the public, no-key APIs behind companies' own careers pages —
+  **Greenhouse, Lever and Ashby**. These return **full job descriptions** (the same data on the
+  public careers site), the most ethical full-text source class. Queried per company board token,
+  seeded with a curated, live-verified Denmark/Nordic list (Trustpilot, Too Good To Go, Veo,
+  Corti, Pleo, Lunar) and extendable via `JOBFINDER_ATS_COMPANIES` (`provider:token,…`). Opt-in,
+  resilient (one bad/empty board never aborts the rest). → **19 sources.**
+
+### Changed — source-contract refactor (internal)
+- **`jobfinder/sources/normalize.py`**: the `_strip_html` helper that had been copy-pasted into
+  **17** source modules is now a single shared `strip_html` (plus shared `rfc822_date` /
+  `epoch_date` / `iso_date` date parsers). Every source imports it; behaviour is unchanged (the
+  shared version is the defensive `str(...)`-coercing superset).
+- **Plugin registry**: the long `if/elif` chain in `sources/__init__.py` is replaced by a single
+  `SourceMeta` registry (name, aliases, lazily-imported class). `get_source` / `available_sources`
+  derive from it; optional-dependency lazy-import is preserved, and every historical source
+  name/alias still resolves to the same class. (The shared rate-limiter from the roadmap is still
+  pending — noted, not yet built.)
+
+### Security
+- Allow-list + runtime egress test extended to the three ATS API hosts
+  (`boards-api.greenhouse.io`, `api.lever.co`, `api.ashbyhq.com`).
+
+### Fixed (from adversarial review)
+- A fully-misconfigured `JOBFINDER_ATS_COMPANIES` (every entry malformed) left an empty board list,
+  and `search()` then raised a misleading "all boards unavailable" error having made no request.
+  It now returns an empty result. (The refactor-regression and registry review dimensions came back
+  clean — all 19 sources resolve and parse unchanged.)
+
+### Tests
+- 246 → 251 (Greenhouse entity-encoded-content unescape, Lever epoch-ms date + remote, Ashby
+  `isListed` skip, ATS per-board failure resilience, empty-board-list returns-empty). The full
+  suite re-runs green over all 19 sources after the refactor.
+
 ## [1.20.0] — 2026-06-17
 
 ### Added — Data rights (export / delete everything)

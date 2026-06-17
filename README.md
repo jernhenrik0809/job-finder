@@ -15,7 +15,7 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles — **18 sources**, the no-key Danish ones
+2. **Searches live job boards** for matching roles — **19 sources**, the no-key Danish ones
    **on by default**, broadening to remote / short-term work:
    - **Denmark:** **it-jobbank** & **Public sector (HR-Manager / SRL)** (default) — DK's leading IT
      board plus the public-sector backbone: one feed spans ~140 Danish **state** institutions
@@ -24,6 +24,10 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
      DK's largest, also covers Ofir); **Adzuna**, **Jooble** & **Careerjet** (free-key, strong DK).
    - **Remote / global:** **Remotive** & **Arbeitnow** (default), plus **Jobicy**, **RemoteOK**,
      **We Work Remotely** & **Working Nomads** (opt-in, no-key remote boards).
+   - **Company boards (ATS):** **Greenhouse / Lever / Ashby** — the public, no-key APIs behind
+     companies' own careers pages, giving **full job descriptions** straight from a curated list of
+     Danish/Nordic firms (Trustpilot, Pleo, Corti, Lunar, Veo, Too Good To Go…). Opt-in; extend the
+     list with `JOBFINDER_ATS_COMPANIES`.
    - **Freelance / short-term gigs:** **Freelancer.com** — active project listings via the official
      API (opt-in, free token).
    - **JSearch** (optional) — aggregates Google for Jobs incl. LinkedIn/Indeed/Glassdoor (free RapidAPI key).
@@ -96,6 +100,7 @@ immediately. Everything below also works as **environment variables**, which tak
 | `JOOBLE_API_KEY` | — | Enables the **Jooble** source (free key at jooble.org/api/about) |
 | `CAREERJET_AFFID` | — | Enables the **Careerjet** source (free affiliate id at careerjet.com/partners/api) |
 | `FREELANCER_TOKEN` | — | Enables the **Freelancer.com** gigs source (free OAuth token at freelancer.com/api/docs) |
+| `JOBFINDER_ATS_COMPANIES` | (curated DK list) | Company boards to query, as `provider:token` (e.g. `greenhouse:trustpilot,ashby:Pleo,lever:veo`) |
 | `JOBFINDER_MODEL` | `claude-opus-4-8` | Claude model tier (e.g. `claude-haiku-4-5` to cut cost) |
 | `JOBFINDER_STORAGE` | `sqlite` | `sqlite` (persistent) or `memory` (ephemeral) |
 | `JOBFINDER_DATA_DIR` / `JOBFINDER_DB` | OS app-data dir | Where the SQLite DB lives |
@@ -326,7 +331,7 @@ Job finder/
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)
-│  └─ sources/            # 18 job sources (see docs/SOURCES.md for the full catalog)
+│  └─ sources/            # 19 sources + normalize.py (see docs/SOURCES.md for the full catalog)
 └─ tests/                 # pytest unit tests + sample CV
 ```
 

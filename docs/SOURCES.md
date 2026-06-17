@@ -31,7 +31,7 @@ no machine feed · *login* = gated behind an account.
 
 ---
 
-## Integrated (18 live sources)
+## Integrated (19 live sources)
 
 Wired and tested. The **default** no-key set runs unless you pick others; **opt-in** sources are
 unticked by default; **keyed** sources light up once their free credential is set in ⚙ Settings.
@@ -62,6 +62,12 @@ unticked by default; **keyed** sources light up once their free credential is se
 | **Working Nomads** | Curated remote-jobs JSON feed | Remote, global | no-key API | opt-in | `workingnomads.py` |
 | JSearch (RapidAPI) | Aggregates Google for Jobs (LinkedIn/Indeed/Glassdoor) | Query-scoped | free-key | keyed | `jsearch.py` |
 | LinkedIn (guest) | Public `jobs-guest` search endpoint (cards + per-job description) | Strong (geoId-filterable) | no-key (unofficial) | opt-in | `linkedin.py` |
+
+### Company boards (ATS)
+
+| Name | What | Relevance | Access | Default? | Module |
+|---|---|---|---|---|---|
+| **Greenhouse / Lever / Ashby** | The public, no-key board APIs behind companies' own careers pages — **full descriptions** from a curated list of Danish/Nordic firms (Trustpilot, Too Good To Go, Veo, Corti, Pleo, Lunar) | Strong (named DK firms) | no-key | opt-in | `ats.py` |
 
 ### Freelance / short-term gigs
 
