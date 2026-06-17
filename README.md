@@ -15,25 +15,23 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles (Denmark-focused) — **13 sources**, the
-   no-key Danish ones **on by default**:
-   - **it-jobbank** & **Public sector (HR-Manager / SRL)** — Denmark's leading IT board (StepStone
-     family, RSS) and the public-sector recruitment backbone: one feed spans ~140 Danish **state**
-     institutions (Statens Rekrutteringsløsning) plus Region Syddanmark. Both no-key, on by default.
-   - **The Hub** & **The Muse** — free, no-key JSON APIs with real Danish coverage (The Hub
-     filters to `countryCode=DK` startups/scale-ups; The Muse to Denmark-located roles). On by default.
-   - **Remotive** & **Arbeitnow** — free, no-key JSON APIs (remote / EU incl. Denmark). On by default.
-   - **Jobindex** — Denmark's **largest** job board, via its free no-login RSS feed (opt-in;
-     personal-use). Also covers Ofir (now merged into Jobindex).
-   - **Jobicy** — free, no-key remote-jobs API scoped to Denmark-eligible roles (opt-in).
-   - **Adzuna** (dedicated Denmark endpoint), **Jooble** & **Careerjet** (Danish `da_DK` portal) —
-     free-key aggregators with strong Danish coverage.
-   - **JSearch** (optional) — aggregates Google for Jobs incl. LinkedIn/Indeed/Glassdoor (needs a free RapidAPI key).
+2. **Searches live job boards** for matching roles — **18 sources**, the no-key Danish ones
+   **on by default**, broadening to remote / short-term work:
+   - **Denmark:** **it-jobbank** & **Public sector (HR-Manager / SRL)** (default) — DK's leading IT
+     board plus the public-sector backbone: one feed spans ~140 Danish **state** institutions
+     (Statens Rekrutteringsløsning) + Region Syddanmark; **The Hub** & **The Muse** (default; DK
+     startups / Denmark-located roles); **StepStone.dk** & **Jobindex** (opt-in RSS — Jobindex is
+     DK's largest, also covers Ofir); **Adzuna**, **Jooble** & **Careerjet** (free-key, strong DK).
+   - **Remote / global:** **Remotive** & **Arbeitnow** (default), plus **Jobicy**, **RemoteOK**,
+     **We Work Remotely** & **Working Nomads** (opt-in, no-key remote boards).
+   - **Freelance / short-term gigs:** **Freelancer.com** — active project listings via the official
+     API (opt-in, free token).
+   - **JSearch** (optional) — aggregates Google for Jobs incl. LinkedIn/Indeed/Glassdoor (free RapidAPI key).
    - **LinkedIn** — via the public, no-login guest job search (opt-in; personal, low-volume use).
 
-   👉 **The full catalog** of every Danish job + consulting/freelance source we researched — wired
-   *and* not-yet-wired (Brainville, Worksome, StepStone.dk, university/EURAXESS feeds, and more) —
-   is documented in [`docs/SOURCES.md`](docs/SOURCES.md).
+   👉 **The full catalog** of every job + consulting/freelance source we researched — wired *and*
+   not-yet-wired (Brainville, Worksome, Himalayas, university/EURAXESS feeds, and more), each with
+   its access type and integration status — is documented in [`docs/SOURCES.md`](docs/SOURCES.md).
 3. **Scores every job 0–100** against your CV using a transparent hybrid of
    text similarity (TF-IDF), skill overlap, and job-title match — and shows you
    exactly **which skills you have** and **which you're missing** for each role.
@@ -85,7 +83,7 @@ database, so they **survive a restart**. By default it lives at
 ### Configuration
 
 API keys and the Claude model tier can be set **in the app** — open the **⚙ Settings** tab and
-paste them (Anthropic, RapidAPI/JSearch, Adzuna, Jooble, Careerjet). They're saved to a local owner-only file
+paste them (Anthropic, RapidAPI/JSearch, Adzuna, Jooble, Careerjet, Freelancer.com). They're saved to a local owner-only file
 (never the database, never echoed back), and the matching source / Claude option lights up
 immediately. Everything below also works as **environment variables**, which take precedence:
 
@@ -97,6 +95,7 @@ immediately. Everything below also works as **environment variables**, which tak
 | `JOBFINDER_ADZUNA_COUNTRY` | `dk` | Adzuna country (Denmark by default; e.g. `gb`, `de`, `se`) |
 | `JOOBLE_API_KEY` | — | Enables the **Jooble** source (free key at jooble.org/api/about) |
 | `CAREERJET_AFFID` | — | Enables the **Careerjet** source (free affiliate id at careerjet.com/partners/api) |
+| `FREELANCER_TOKEN` | — | Enables the **Freelancer.com** gigs source (free OAuth token at freelancer.com/api/docs) |
 | `JOBFINDER_MODEL` | `claude-opus-4-8` | Claude model tier (e.g. `claude-haiku-4-5` to cut cost) |
 | `JOBFINDER_STORAGE` | `sqlite` | `sqlite` (persistent) or `memory` (ephemeral) |
 | `JOBFINDER_DATA_DIR` / `JOBFINDER_DB` | OS app-data dir | Where the SQLite DB lives |
@@ -309,7 +308,7 @@ Job finder/
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)
-│  └─ sources/            # 13 job sources (see docs/SOURCES.md for the full catalog)
+│  └─ sources/            # 18 job sources (see docs/SOURCES.md for the full catalog)
 └─ tests/                 # pytest unit tests + sample CV
 ```
 

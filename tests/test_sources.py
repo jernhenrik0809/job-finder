@@ -365,3 +365,132 @@ def test_careerjet_skips_non_dict_and_coerces_nonstring_date():
         jobs = CareerjetSource(affid="aff123").search("python", limit=5)
     assert len(jobs) == 1 and jobs[0].title == "Python Dev"  # good record survived
     assert isinstance(jobs[0].posted, str)                   # int date coerced, no TypeError
+
+
+# --- StepStone.dk / RemoteOK / We Work Remotely / Working Nomads / Freelancer.com ---------
+
+from jobfinder.sources.stepstonedk import StepStoneDkSource
+from jobfinder.sources.remoteok import RemoteOKSource
+from jobfinder.sources.weworkremotely import WeWorkRemotelySource
+from jobfinder.sources.workingnomads import WorkingNomadsSource
+from jobfinder.sources.freelancer import FreelancerSource
+
+
+def test_stepstonedk_parses_rss_and_description_fields():
+    # location/company live in the HTML description (.job-location/.job-company), not a span.area
+    desc = ('&lt;div class="result"&gt;&lt;div class="job-company"&gt;Trackman&lt;/div&gt;'
+            '&lt;span class="job-location"&gt;Hørsholm&lt;/span&gt;'
+            '&lt;div class="job-body"&gt;Build embedded Python services&lt;/div&gt;&lt;/div&gt;')
+    rss = (
+        '<?xml version="1.0" encoding="ISO-8859-1"?><rss><channel>'
+        f'<item><title>Senior Python Developer, Trackman</title>'
+        f'<link>https://www.stepstone.dk/vis-job/i1674365</link>'
+        f'<pubDate>Mon, 15 Jun 2026 00:00:00 +0200</pubDate>'
+        f'<description>{desc}</description></item>'
+        '</channel></rss>'
+    ).encode("iso-8859-1")
+    with patch("jobfinder.sources.stepstonedk.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = StepStoneDkSource().search("python", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Senior Python Developer" and j.company == "Trackman"
+    assert j.location == "Hørsholm" and "embedded Python" in j.description
+    assert j.url == "https://www.stepstone.dk/vis-job/i1674365" and j.source == "StepStone.dk"
+    assert j.posted == "2026-06-15"
+
+
+def test_remoteok_skips_legal_head_and_maps():
+    payload = [
+        {"legal": "Please mention Remote OK", "last_updated": 123},     # element[0] metadata — skip
+        {"id": "1", "position": "Senior Python Engineer", "company": "Acme",
+         "location": "Remote", "url": "https://remoteok.com/jobs/1",
+         "description": "<p>Build APIs</p>", "tags": ["python", "backend"],
+         "date": "2026-06-16T04:08:17+00:00", "salary_min": 90000, "salary_max": 120000},
+        {"id": "2", "position": "Sales Lead", "company": "Z", "tags": ["sales"],
+         "description": "quota", "url": "u2", "epoch": 1781582897},
+    ]
+    with patch("jobfinder.sources.remoteok.requests.get", return_value=_FakeResp(payload)):
+        jobs = RemoteOKSource().search("python", limit=5)
+    assert len(jobs) == 1                                    # only the python job matched
+    j = jobs[0]
+    assert j.title == "Senior Python Engineer" and j.remote is True and j.posted == "2026-06-16"
+    assert j.source == "Remote OK" and "120,000" in j.salary
+
+
+def test_remoteok_skips_non_dict_elements():
+    payload = [{"legal": "x"}, "not-a-dict", 42,
+               {"id": "9", "position": "Dev", "company": "C", "url": "u", "description": "d", "tags": []}]
+    with patch("jobfinder.sources.remoteok.requests.get", return_value=_FakeResp(payload)):
+        jobs = RemoteOKSource().search("dev", limit=5)
+    assert len(jobs) == 1 and jobs[0].title == "Dev"        # bad elements skipped, no crash
+
+
+def test_weworkremotely_splits_company_role_on_first_colon():
+    rss = (
+        '<?xml version="1.0" encoding="UTF-8"?><rss><channel>'
+        '<item><title>Knowmad Mood: Java/DevOps Senior</title>'
+        '<region>Anywhere in the World</region>'
+        '<link>https://weworkremotely.com/remote-jobs/x</link>'
+        '<pubDate>Tue, 16 Jun 2026 20:31:47 +0000</pubDate>'
+        '<description>&lt;p&gt;Build CI/CD pipelines&lt;/p&gt;</description></item>'
+        '</channel></rss>'
+    ).encode("utf-8")
+    with patch("jobfinder.sources.weworkremotely.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = WeWorkRemotelySource().search("devops", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.company == "Knowmad Mood" and j.title == "Java/DevOps Senior"
+    assert j.location == "Anywhere in the World" and j.remote is True and j.posted == "2026-06-16"
+    assert j.source == "We Work Remotely"
+
+
+def test_workingnomads_parses_array_and_skips_non_dict():
+    payload = [
+        "not-a-dict",
+        {"url": "https://www.workingnomads.com/job/1", "title": "React Developer (Remote)",
+         "description": "<p>React + Node</p>", "company_name": "TELUS", "category_name": "Development",
+         "tags": "react,nodejs,english", "location": "Europe only", "pub_date": "2026-06-11T11:06:58-04:00"},
+    ]
+    with patch("jobfinder.sources.workingnomads.requests.get", return_value=_FakeResp(payload)):
+        jobs = WorkingNomadsSource().search("react", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "React Developer (Remote)" and j.company == "TELUS"
+    assert j.location == "Europe only" and j.remote is True and j.posted == "2026-06-11"
+    assert j.source == "Working Nomads"
+
+
+def test_freelancer_requires_token_and_parses():
+    with pytest.raises(RuntimeError):
+        FreelancerSource(token=None).search("python")        # no token → skipped with a clear error
+    payload = {"status": "success", "result": {"projects": [
+        "not-a-dict",
+        {"title": "Build a Django API", "seo_url": "web/build-a-django-api",
+         "description": "Need a REST API", "jobs": [{"name": "Python"}, {"name": "Django"}],
+         "submitdate": 1781678580, "budget": {"minimum": 250, "maximum": 750},
+         "currency": {"code": "USD"}},
+    ], "total_count": 1}}
+    with patch("jobfinder.sources.freelancer.requests.get", return_value=_FakeResp(payload)):
+        jobs = FreelancerSource(token="tok123").search("python", limit=5)
+    assert len(jobs) == 1                                    # non-dict project skipped
+    j = jobs[0]
+    assert j.title == "Build a Django API" and j.remote is True and j.company == ""
+    assert j.url == "https://www.freelancer.com/projects/web/build-a-django-api"
+    assert "Django" in j.description and "USD" in j.salary and j.posted == "2026-06-17"
+    assert j.source == "Freelancer"
+
+
+def test_freelancer_tolerates_string_and_junk_budget():
+    # a budget serialised as strings (or junk) must NOT crash the :g salary format and drop the batch
+    payload = {"result": {"projects": [
+        {"title": "String budget", "seo_url": "a", "description": "x",
+         "budget": {"minimum": "100", "maximum": "200"}, "currency": {"code": "USD"}, "submitdate": 1781678580},
+        {"title": "Junk budget", "seo_url": "b", "description": "y",
+         "budget": "not-a-dict", "submitdate": 1781678580},
+        {"title": "No budget", "seo_url": "c", "description": "z", "submitdate": 1781678580},
+    ]}}
+    with patch("jobfinder.sources.freelancer.requests.get", return_value=_FakeResp(payload)):
+        jobs = FreelancerSource(token="t").search("dev", limit=5)
+    assert [j.title for j in jobs] == ["String budget", "Junk budget", "No budget"]   # none dropped
+    assert "100" in jobs[0].salary and "USD" in jobs[0].salary
+    assert jobs[1].salary == "" and jobs[2].salary == ""                              # no crash

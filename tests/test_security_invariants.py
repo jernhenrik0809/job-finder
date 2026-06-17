@@ -36,6 +36,11 @@ from jobfinder.sources.itjobbank import ItJobbankSource
 from jobfinder.sources.hrmanager import HRManagerSource
 from jobfinder.sources.jobicy import JobicySource
 from jobfinder.sources.careerjet import CareerjetSource
+from jobfinder.sources.stepstonedk import StepStoneDkSource
+from jobfinder.sources.remoteok import RemoteOKSource
+from jobfinder.sources.weworkremotely import WeWorkRemotelySource
+from jobfinder.sources.workingnomads import WorkingNomadsSource
+from jobfinder.sources.freelancer import FreelancerSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -59,6 +64,11 @@ _ALLOWED_HOSTS = {
     "api.hr-manager.net",                           # HR-Manager (DK public sector) source
     "jobicy.com",                                   # Jobicy source
     "public.api.careerjet.net", "www.careerjet.com",  # Careerjet source + signup-doc URL
+    "www.stepstone.dk",                             # StepStone.dk RSS source
+    "remoteok.com",                                 # RemoteOK source
+    "weworkremotely.com",                           # We Work Remotely RSS source
+    "www.workingnomads.com",                        # Working Nomads source
+    "www.freelancer.com",                           # Freelancer.com source + signup-doc URL
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -153,6 +163,8 @@ def test_runtime_egress_allowlist(monkeypatch):
     sources = [
         RemotiveSource(), ArbeitnowSource(), TheHubSource(), TheMuseSource(), JobindexSource(),
         ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
+        StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
+        FreelancerSource(token="x"),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

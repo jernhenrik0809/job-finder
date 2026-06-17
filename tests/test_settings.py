@@ -17,7 +17,8 @@ import jobfinder.secrets_store as ss
 import jobfinder.web as web
 
 _ENV_VARS = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "RAPIDAPI_KEY", "JSEARCH_API_KEY",
-             "ADZUNA_APP_ID", "ADZUNA_APP_KEY", "JOOBLE_API_KEY", "JOBFINDER_MODEL")
+             "ADZUNA_APP_ID", "ADZUNA_APP_KEY", "JOOBLE_API_KEY", "CAREERJET_AFFID",
+             "FREELANCER_TOKEN", "JOBFINDER_MODEL")
 
 
 @pytest.fixture
@@ -53,7 +54,8 @@ def test_file_persists_and_empty_clears(tmp_secrets):
 
 def test_model_default_and_present(tmp_secrets):
     assert ss.model()                      # falls back to the configured default
-    assert ss.present() == {"jsearch": False, "adzuna": False, "jooble": False, "careerjet": False}
+    assert ss.present() == {"jsearch": False, "adzuna": False, "jooble": False,
+                            "careerjet": False, "freelancer": False}
     ss.set_many({"adzuna_app_id": "id", "adzuna_app_key": "key"})
     assert ss.present()["adzuna"] is True
 

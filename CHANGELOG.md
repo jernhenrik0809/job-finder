@@ -2,6 +2,45 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.18.0] — 2026-06-17
+
+### Added
+- **Five new sources** (live-probed before building), broadening from Denmark to remote /
+  short-term work — total **18**:
+  - **StepStone.dk** — major Danish general/professional board (StepStone/Jobindex RSS family);
+    no-key, `q=` keyword param, location/company parsed from the description HTML
+    (`span.job-location` / `div.job-company`). **Opt-in.**
+  - **RemoteOK** — large global remote-jobs JSON API (no key). Skips the leading legal/metadata
+    array element; keeps the original RemoteOK job URL and credits "Remote OK" (its attribution
+    terms). **Opt-in.**
+  - **We Work Remotely** — major remote-jobs board via RSS (no key); `"Company: Role"` titles split
+    on the first colon, location from `<region>`. **Opt-in.**
+  - **Working Nomads** — curated remote-jobs JSON feed (no key). **Opt-in.**
+  - **Freelancer.com** — active short-term **gig** listings via the official Projects REST API;
+    free OAuth token (`FREELANCER_TOKEN` / ⚙ Settings), token sent in a header. **Opt-in, keyed.**
+- The three no-key remote boards + StepStone.dk were verified live end-to-end (real jobs parsed);
+  Freelancer.com is wired behind its free token, off until set.
+
+### Researched but not added (documented in `docs/SOURCES.md`)
+- **Himalayas** — a clean, publicly-advertised remote-jobs API that works technically, but its ToS
+  §30 prohibits automated data gathering without written approval; left **document-only** to stay
+  consistent with the ToS-friendly principle (same basis as EURES).
+- **University of Copenhagen** — runs on HR-Manager under the already-queried SRL customer, but the
+  syndicated feed excludes KU postings and no alias surfaces them; would need a small scraper.
+- **Brainville** — the documented consulting-gig API is paid + approval-gated (confirmed); the full
+  endpoint/auth/shape spec is recorded for if the user obtains a paid account.
+
+### Security / privacy
+- Host allow-list extended to `www.stepstone.dk`, `remoteok.com`, `weworkremotely.com`,
+  `www.workingnomads.com`, `www.freelancer.com`; the runtime egress test exercises all five new
+  sources; `freelancer_token` joins `SECRET_FIELDS` (auto-swept by the no-leak test). Freelancer's
+  token rides in a request header, and its errors are sanitised to the exception type name.
+
+### Tests
+- 223 → 229 (StepStone.dk RSS + description-field parsing, RemoteOK legal-head skip + non-dict
+  tolerance + salary/date mapping, We Work Remotely first-colon title split, Working Nomads array +
+  non-dict tolerance, Freelancer token-required + parse + non-dict-project tolerance).
+
 ## [1.17.0] — 2026-06-17
 
 ### Added

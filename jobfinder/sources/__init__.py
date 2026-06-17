@@ -47,12 +47,28 @@ def get_source(name: str) -> JobSource:
     if name in ("careerjet",):
         from .careerjet import CareerjetSource
         return CareerjetSource()
+    if name in ("stepstonedk", "stepstone", "stepstone-dk"):
+        from .stepstonedk import StepStoneDkSource
+        return StepStoneDkSource()
+    if name in ("remoteok", "remote-ok"):
+        from .remoteok import RemoteOKSource
+        return RemoteOKSource()
+    if name in ("weworkremotely", "wwr"):
+        from .weworkremotely import WeWorkRemotelySource
+        return WeWorkRemotelySource()
+    if name in ("workingnomads", "working-nomads"):
+        from .workingnomads import WorkingNomadsSource
+        return WorkingNomadsSource()
+    if name in ("freelancer", "freelancer.com"):
+        from .freelancer import FreelancerSource
+        return FreelancerSource()
     raise ValueError(f"Unknown job source: {name!r}")
 
 
 def available_sources() -> list[str]:
     return ["linkedin", "remotive", "arbeitnow", "thehub", "themuse", "itjobbank",
-            "hrmanager", "jobicy", "adzuna", "jooble", "jobindex", "careerjet", "jsearch"]
+            "hrmanager", "jobicy", "stepstonedk", "jobindex", "remoteok", "weworkremotely",
+            "workingnomads", "adzuna", "jooble", "careerjet", "freelancer", "jsearch"]
 
 
 __all__ = ["Job", "JobSource", "get_source", "available_sources"]
