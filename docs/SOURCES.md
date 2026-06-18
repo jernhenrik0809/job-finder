@@ -31,7 +31,7 @@ no machine feed · *login* = gated behind an account.
 
 ---
 
-## Integrated (21 live sources)
+## Integrated (24 live sources)
 
 Wired and tested. The **default** no-key set runs unless you pick others; **opt-in** sources are
 unticked by default; **keyed** sources light up once their free credential is set in ⚙ Settings.
@@ -75,7 +75,14 @@ unticked by default; **keyed** sources light up once their free credential is se
 |---|---|---|---|---|---|
 | **Verama** (Ework Group) | Public feed of open **consulting assignments** — fixed-term contracts with rate, hours/week, start/end dates | Strong (Nordic incl. DK) | no-key | opt-in | `verama.py` |
 | **Hacker News** | Monthly "Freelancer? Seeking freelancer?" threads via the public Algolia API | Remote/tech gigs | no-key | opt-in | `hackernews.py` |
+| **EU TED** | Danish public-sector IT/business-consultancy **tenders** (CPV 72/79) — limited-time projects you bid on | Strong (DK public sector) | no-key | opt-in | `ted.py` |
+| **Jobspresso** | Curated remote board (WP Job Manager `job_feed` RSS) | Remote, contract mix | no-key | opt-in | `wpjobs.py` |
+| **Authentic Jobs** | Remote design/dev board (WP Job Manager `job_feed` RSS) | Remote, contract mix | no-key | opt-in | `wpjobs.py` |
 | **Freelancer.com** | Active short-term project listings (gigs) via the official Projects REST API | Global, remote gigs | free token | keyed | `freelancer.py` |
+
+> The **ATS** source (Greenhouse/Lever/Ashby) seeds a curated Danish/Nordic board list — Trustpilot,
+> Too Good To Go, Veo, Corti, Pleo, Lunar, **Planday** (Copenhagen) and **Netlight** (Nordic IT
+> consultancy, Copenhagen office) — extendable via `JOBFINDER_ATS_COMPANIES`.
 
 > **"Consulting / contract only" filter:** a search toggle (`gigs_only`) keeps just contract/freelance
 > work across every source that exposes an employment type — `Job.employment_type` is populated from
@@ -112,7 +119,8 @@ API is wired (Freelancer.com); the rest are document-only.
 | Freelancer.com | Global project marketplace; official REST API | Global/remote gigs | free token (`FREELANCER_TOKEN`) | **Integrated** | `freelancer.py` — see the integrated table. |
 | **Verama** (Ework Group) | Top Nordic independent-consultant broker; open assignments | Strong | **no-key public REST** | **Integrated** | `verama.py`. Re-probe found a genuine public feed at `GET https://app.verama.com/api/public/job-requests` (`public:true` records) — the earlier "login SPA" assessment was superseded. |
 | **Hacker News** | "Freelancer? Seeking freelancer?" monthly threads | Remote/tech gigs | no-key (Algolia API) | **Integrated** | `hackernews.py` — see the integrated table. |
-| **EU TED** (Tenders Electronic Daily) | DK public-sector IT/business **consultancy tenders** (CPV 72/79) | Strong (authoritative) | no-key public API | **Integrable (now, deferred)** | `POST https://api.ted.europa.eu/v3/notices/search` works keyless and live-returns Danish consultancy tenders (subsumes udbud.dk + Mercell). Deferred because these are procurement **RFPs you bid on**, not job postings (terse multilingual titles, no salary, company-bidder semantics) — would be wired as an explicitly-labelled "tenders" source on request. |
+| **EU TED** (Tenders Electronic Daily) | DK public-sector IT/business **consultancy tenders** (CPV 72/79) | Strong (authoritative) | no-key public API | **Integrated** | `ted.py` — `POST https://api.ted.europa.eu/v3/notices/search`, keyless. Labelled "EU TED (tender)" (these are RFPs you bid on, not employee jobs); clean Danish titles via `title-proc`. Subsumes udbud.dk + Mercell. |
+| **Himalayas** | Large remote-jobs API (~87k) incl. Contractor/Freelance + salary | Remote, global | no-key API | **Document-only** | The API is rich and works, **but** its ToS §30 forbids automated data gathering without written approval — left document-only for the same ToS-friendly reason as EURES/Reddit. Revisit only with explicit approval. |
 | **Brainville** | Nordic marketplace for freelance/consulting assignments + brokers (ex-Resrc) | Strong | paid + approval (Bearer Base64(`UserKey:SenderKey`)) | **Document-only** | API v2 is genuinely documented — `POST https://api.brainville.com/v2/market/search`. **But** the Market/Search endpoint needs a **paid** Premium subscription + Assignment-Export add-on **and** an approval-gated Sender Key (internal-use-only data). Buildable only for a user's own paid account. Captures Right People Group gigs transitively. |
 | emagine (ex-ProData Consult) | Large IT/business consulting broker, HQ Copenhagen | Strong | login | Document-only | Re-probe found the real backend `portal-api.emagine.org`, but every job endpoint returns **HTTP 401** — the board requires auth. ProData now redirects to emagine and shares this gated portal. |
 | Onsiter | Nordic contractor/consultant aggregator (~1000 assignments/day, DK confirmed) | Strong | scrape (Cloudflare 403) | Document-only | Index + `/api/assignments` are Cloudflare-403 to bots; detail pages public. No usable feed. |

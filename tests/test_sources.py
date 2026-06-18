@@ -694,6 +694,82 @@ def test_engine_gigs_only_filters_to_contract_freelance():
     assert len(res2.jobs) == 4
 
 
+def test_ted_parses_tender_with_multilingual_fields():
+    from jobfinder.sources.ted import TEDSource
+    payload = {"notices": [{
+        "publication-number": "3616-2026",
+        "notice-title": {"eng": "Denmark – IT consultancy services", "dan": "Danmark – IT-konsulent"},
+        "buyer-name": {"dan": ["Københavns Kommune"]},
+        "place-of-performance": ["DK01"],
+        "publication-date": "2026-06-16",
+        "deadline-receipt-request": "2026-07-15T12:00:00+02:00",
+    }], "totalNoticeCount": 1}
+    with patch("jobfinder.sources.ted.requests.post", return_value=_FakeResp(payload)):
+        jobs = TEDSource().search("consultancy", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Denmark – IT consultancy services" and j.company == "Københavns Kommune"
+    assert j.source == "EU TED (tender)" and j.employment_type == "contract"
+    assert j.posted == "2026-06-16" and j.url.endswith("/notice/3616-2026/html")
+    assert "deadline" in j.description.lower()
+
+
+def test_wpjobs_parses_job_feed_and_tags_contract():
+    from jobfinder.sources.wpjobs import JobspressoSource
+    rss = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<rss version="2.0" xmlns:job_listing="http://x/jl" xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+        '<channel><item>'
+        '<title>Contract React Developer</title>'
+        '<link>https://jobspresso.co/job/123</link>'
+        '<pubDate>Tue, 16 Jun 2026 00:00:00 +0000</pubDate>'
+        '<job_listing:company>Acme</job_listing:company>'
+        '<job_listing:location>Remote</job_listing:location>'
+        '<job_listing:job_type>Contract</job_listing:job_type>'
+        '<content:encoded>&lt;p&gt;Build React apps&lt;/p&gt;</content:encoded>'
+        '</item></channel></rss>'
+    ).encode("utf-8")
+    with patch("jobfinder.sources.wpjobs.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = JobspressoSource().search("react", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Contract React Developer" and j.company == "Acme"
+    assert j.employment_type == "contract" and j.source == "Jobspresso"
+    assert j.posted == "2026-06-16" and j.url == "https://jobspresso.co/job/123"
+    assert "Build React" in j.description and j.remote is True
+
+
+def test_wpjobs_multiple_job_types_resolve_to_gig():
+    from jobfinder.sources.wpjobs import JobspressoSource
+    # a listing tagged both Full Time AND Freelance must resolve to a gig regardless of order
+    def feed(*types):
+        items = "".join(f"<job_listing:job_type>{t}</job_listing:job_type>" for t in types)
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<rss version="2.0" xmlns:job_listing="http://x/jl">'
+            f'<channel><item><title>Dev</title><link>u</link>'
+            f'<job_listing:company>C</job_listing:company>{items}</item></channel></rss>'
+        ).encode("utf-8")
+    for order in (("Full Time", "Freelance"), ("Freelance", "Full Time")):
+        with patch("jobfinder.sources.wpjobs.requests.get", return_value=_FakeRssResp(feed(*order))):
+            jobs = JobspressoSource().search("dev", limit=5)
+        assert jobs[0].employment_type == "freelance"     # not lost to last-wins
+
+
+def test_ted_handles_list_wrapped_dates():
+    from jobfinder.sources.ted import TEDSource
+    payload = {"notices": [{
+        "publication-number": "9-2026", "title-proc": {"dan": "Cloud-migration"},
+        "buyer-name": {"dan": ["Kommune"]},
+        "publication-date": ["2026-04-20+02:00"],          # TED sometimes wraps scalars in a list
+        "deadline-receipt-request": ["2026-05-01"],
+    }], "totalNoticeCount": 1}
+    with patch("jobfinder.sources.ted.requests.post", return_value=_FakeResp(payload)):
+        jobs = TEDSource().search("", limit=5)
+    assert len(jobs) == 1
+    assert jobs[0].posted == "2026-04-20" and jobs[0].title == "Cloud-migration"   # not "['2026-04-"
+
+
 def test_engine_gigs_only_warns_when_it_filters_everything():
     from jobfinder.engine import find_jobs, SearchSettings
     from jobfinder.cv_parser import build_profile

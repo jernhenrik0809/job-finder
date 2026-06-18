@@ -15,7 +15,7 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles — **21 sources**, the no-key Danish ones
+2. **Searches live job boards** for matching roles — **24 sources**, the no-key Danish ones
    **on by default**, broadening to remote / short-term / consulting work:
    - **Denmark:** **it-jobbank** & **Public sector (HR-Manager / SRL)** (default) — DK's leading IT
      board plus the public-sector backbone: one feed spans ~140 Danish **state** institutions
@@ -30,7 +30,9 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
      list with `JOBFINDER_ATS_COMPANIES`.
    - **Consulting / freelance gigs:** **Verama** (Ework Group's public consultant-assignment feed —
      fixed-term contracts with rate & hours, no key), **Hacker News** "Seeking freelancer" monthly
-     threads (no key), and **Freelancer.com** (official API, free token). All opt-in.
+     threads (no key), **EU TED** (Danish public-sector IT/consultancy **tenders** — limited-time
+     projects, no key), **Jobspresso** & **Authentic Jobs** (remote/contract boards, no key), and
+     **Freelancer.com** (official API, free token). All opt-in.
    - **Consulting / contract only:** a search toggle that keeps just contract/freelance work across
      every source that exposes an employment type — turning the app into a **job board for a
      consultant**.
@@ -335,7 +337,7 @@ Job finder/
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)
-│  └─ sources/            # 21 sources + normalize.py (see docs/SOURCES.md for the full catalog)
+│  └─ sources/            # 24 sources + normalize.py (see docs/SOURCES.md for the full catalog)
 └─ tests/                 # pytest unit tests + sample CV
 ```
 

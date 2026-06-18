@@ -45,6 +45,14 @@ def epoch_date(value) -> str:
         return ""
 
 
+_ISO_PREFIX = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
 def iso_date(value) -> str:
-    """A loosely-ISO date/datetime string → its 'YYYY-MM-DD' prefix (coerces non-strings)."""
-    return str(value or "")[:10]
+    """A loosely-ISO date/datetime string → its 'YYYY-MM-DD' prefix. Coerces non-strings,
+    unwraps single-element lists (some APIs, e.g. TED v3, wrap scalars in a list), and rejects
+    non-date garbage (a stringified dict/list) instead of slicing it blindly."""
+    if isinstance(value, (list, tuple)):
+        value = value[0] if value else ""
+    m = _ISO_PREFIX.match(str(value or ""))
+    return m.group(0) if m else ""

@@ -34,6 +34,8 @@ _DEFAULT_BOARDS = (
     ("ashby", "Corti"),               # Copenhagen AI healthcare
     ("ashby", "Pleo"),                # Danish fintech
     ("ashby", "Lunar"),               # Nordic neobank
+    ("ashby", "planday"),             # Copenhagen workforce-management scaleup
+    ("lever", "netlight"),            # Nordic IT consultancy (Copenhagen office)
 )
 
 

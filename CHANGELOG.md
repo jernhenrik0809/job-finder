@@ -2,6 +2,45 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.23.0] — 2026-06-18
+
+### Added — more consultant / freelance / limited-time sources (→ 24)
+- **EU TED** (Tenders Electronic Daily) — Danish public-sector **IT & business-consultancy tenders**
+  (CPV 72/79, place-of-performance Denmark) via the keyless open-data API. These are limited-time
+  projects you bid on (labelled "EU TED (tender)"); the clean Danish title comes from `title-proc`.
+  Subsumes udbud.dk + Mercell. Opt-in.
+- **Jobspresso** & **Authentic Jobs** — curated remote boards on WP Job Manager, via the public
+  `?feed=job_feed` RSS (structured `job_listing:company/location/job_type`, so contract/freelance
+  roles feed the consulting filter). One shared `wpjobs.py` parser. Opt-in.
+- **ATS board list** grew with two live-verified Danish-relevant tokens: **Planday** (Copenhagen,
+  Ashby) and **Netlight** (Nordic IT consultancy with a Copenhagen office, Lever).
+
+### Researched but not added (documented)
+- A second sweep confirmed the rest of the remote/gig long tail is unusable: NoDesk, Remote.co,
+  EuropeRemotely (Cloudflare/403), RubyNow (expired TLS), Remoters, Outsourcely, Wellfound (login).
+  **Himalayas** has a rich API but its ToS forbids automated extraction without written approval, so
+  it stays **document-only** (consistent with EURES/Reddit). Most named Danish consultancies
+  (Netcompany, Trifork, Systematic, KMD, Implement, Devoteam…) aren't on Greenhouse/Lever/Ashby —
+  they're already reachable via the StepStone.dk / it-jobbank / HR-Manager sources.
+
+### Security
+- Allow-list + runtime egress test extended to `api.ted.europa.eu`, `ted.europa.eu`,
+  `jobspresso.co`, `authenticjobs.com`.
+
+### Fixed (from adversarial review)
+- **`iso_date` hardened** (the shared parser): it now unwraps single-element lists (TED v3 wraps
+  scalar dates in a list, which `str(...)[:10]` turned into `"['2026-04-"`) and validates the
+  `YYYY-MM-DD` prefix, rejecting stringified-dict/garbage instead of slicing it.
+- **TED** over-fetches (page size 50) when keyword-filtering client-side so the filter has headroom;
+  `_lang` resolves nested-dict language leaves (`{value: …}`) instead of leaking a dict repr into a
+  title/company.
+- **WP feeds** accumulate all `job_type` values, so a listing tagged both *Full Time* and
+  *Freelance* classifies as a gig regardless of feed order (was last-wins).
+
+### Tests
+- 259 → 263 (TED multilingual-field parsing + tender mapping + list-wrapped dates, WP `job_feed`
+  parse + contract tagging + multi-`job_type` ordering).
+
 ## [1.22.0] — 2026-06-18
 
 ### Added — Consultant / freelance / contract work ("a job board for a consultant")

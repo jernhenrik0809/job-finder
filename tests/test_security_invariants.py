@@ -44,6 +44,8 @@ from jobfinder.sources.freelancer import FreelancerSource
 from jobfinder.sources.ats import ATSSource
 from jobfinder.sources.verama import VeramaSource
 from jobfinder.sources.hackernews import HackerNewsSource
+from jobfinder.sources.ted import TEDSource
+from jobfinder.sources.wpjobs import JobspressoSource, AuthenticJobsSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -78,6 +80,10 @@ _ALLOWED_HOSTS = {
     "app.verama.com",                               # Verama (Ework) public consulting feed
     "hn.algolia.com",                               # Hacker News "Seeking freelancer" via Algolia
     "news.ycombinator.com",                         # HN job-item links (built, not fetched)
+    "api.ted.europa.eu",                            # EU TED tenders API
+    "ted.europa.eu",                                # TED notice links (built, not fetched)
+    "jobspresso.co",                                # Jobspresso WP job_feed
+    "authenticjobs.com",                            # Authentic Jobs WP job_feed
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -173,7 +179,8 @@ def test_runtime_egress_allowlist(monkeypatch):
         RemotiveSource(), ArbeitnowSource(), TheHubSource(), TheMuseSource(), JobindexSource(),
         ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
         StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
-        FreelancerSource(token="x"), ATSSource(), VeramaSource(), HackerNewsSource(),
+        FreelancerSource(token="x"), ATSSource(), VeramaSource(), HackerNewsSource(), TEDSource(),
+        JobspressoSource(), AuthenticJobsSource(),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]
