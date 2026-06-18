@@ -26,6 +26,7 @@ class SavedSearch:
     days: int | None = None
     semantic: bool = False
     min_score: float = 0.0
+    gigs_only: bool = False                          # "consulting/contract only"
     seen_ids: list = field(default_factory=list)     # job ids already surfaced
     new_count: int = 0                               # new matches at last run, not yet viewed
     last_run: float | None = None
@@ -59,6 +60,7 @@ def new_saved_search(name: str, req: dict) -> SavedSearch:
         days=req.get("days"),
         semantic=bool(req.get("semantic")),
         min_score=float(req.get("min_score") or 0),
+        gigs_only=bool(req.get("gigs_only")),
         created=now,
     )
 

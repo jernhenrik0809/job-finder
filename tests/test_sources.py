@@ -578,3 +578,132 @@ def test_freelancer_tolerates_string_and_junk_budget():
     assert [j.title for j in jobs] == ["String budget", "Junk budget", "No budget"]   # none dropped
     assert "100" in jobs[0].salary and "USD" in jobs[0].salary
     assert jobs[1].salary == "" and jobs[2].salary == ""                              # no crash
+
+
+# --- Verama / Hacker News (consulting & gig sources) + employment_type + gigs filter -----
+
+from jobfinder.sources.verama import VeramaSource
+from jobfinder.sources.hackernews import HackerNewsSource
+
+
+def test_verama_parses_consulting_assignment():
+    payload = {"content": [{
+        "systemId": "JR-52780", "title": "IT Compliance Consultant",
+        "locations": [{"name": "Ballerup, Denmark", "country": "Denmark", "countryCode": "DNK"}],
+        "skills": [{"skill": {"name": "GDPR"}}, {"skill": {"name": "ISO 27001"}}],
+        "level": "SENIOR", "startDate": "2026-09-01", "endDate": "2027-03-31", "hoursPerWeek": 37.0,
+        "remoteness": 2, "rate": {"currency": "DKK", "maxRate": 950, "clientRateType": "HOURLY"},
+        "createdDate": "2026-06-10T08:00:00+02:00",
+    }], "totalElements": 1}
+    with patch("jobfinder.sources.verama.requests.get", return_value=_FakeResp(payload)):
+        jobs = VeramaSource().search("compliance", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "IT Compliance Consultant" and j.company == "Verama"
+    assert j.location == "Ballerup, Denmark" and j.employment_type == "contract"
+    assert j.remote is True and j.posted == "2026-06-10"
+    assert "GDPR" in j.description and j.url.endswith("/JR-52780") and "DKK" in j.salary
+
+
+def test_verama_survives_weird_field_types():
+    # non-string level, non-numeric hoursPerWeek, non-list locations, junk skill — must not crash
+    payload = {"content": [
+        {"systemId": "JR-1", "title": "Weird record", "level": 3, "hoursPerWeek": "oops",
+         "locations": "not-a-list", "skills": [{"skill": "not-a-dict"}], "remoteness": "NO"},
+        {"systemId": "JR-2", "title": "Good record", "locations": [{"name": "Aarhus, Denmark"}],
+         "remoteness": 75},
+    ]}
+    with patch("jobfinder.sources.verama.requests.get", return_value=_FakeResp(payload)):
+        jobs = VeramaSource().search("record", limit=5)
+    titles = {j.title for j in jobs}
+    assert titles == {"Weird record", "Good record"}      # neither dropped, no crash
+    good = next(j for j in jobs if j.title == "Good record")
+    assert good.remote is True                            # remoteness 75 → remote
+    weird = next(j for j in jobs if j.title == "Weird record")
+    assert weird.remote is False                          # "NO" is not a remote vocab word
+
+
+def test_hackernews_extracts_seeking_freelancer_only():
+    search_payload = {"hits": [
+        {"objectID": "999", "title": "Ask HN: Freelancer? Seeking freelancer? (June 2026)"},
+        {"objectID": "111", "title": "Some unrelated story"},
+    ]}
+    items_payload = {"id": 999, "children": [
+        {"id": 1001, "created_at": "2026-06-01T19:12:37.000Z",
+         "text": "SEEKING FREELANCER | Remote (US+EU only)<p>Stack: Vue3, Ruby. Build a platform."},
+        {"id": 1002, "created_at": "2026-06-01T20:00:00.000Z",
+         "text": "SEEKING WORK | Copenhagen<p>Senior Python dev available for hire."},
+    ]}
+    def _get(url, *a, **k):
+        return _FakeResp(search_payload if "search_by_date" in url else items_payload)
+    with patch("jobfinder.sources.hackernews.requests.get", side_effect=_get):
+        jobs = HackerNewsSource().search("", limit=10)
+    assert len(jobs) == 1                                       # SEEKING WORK is skipped
+    j = jobs[0]
+    assert j.title.startswith("SEEKING FREELANCER") and j.employment_type == "freelance"
+    assert j.remote is True and j.url == "https://news.ycombinator.com/item?id=1001"
+    assert j.posted == "2026-06-01" and "Vue3" in j.description
+
+
+def test_remotive_captures_job_type():
+    payload = {"jobs": [{"title": "Dev", "company_name": "C", "url": "u", "description": "x",
+                         "publication_date": "2026-06-01", "job_type": "contract"}]}
+    with patch("jobfinder.sources.remotive.requests.get", return_value=_FakeResp(payload)):
+        jobs = RemotiveSource().search("dev", limit=5)
+    assert jobs[0].employment_type == "contract"
+
+
+def test_weworkremotely_captures_contract_type():
+    rss = ('<?xml version="1.0" encoding="UTF-8"?><rss><channel>'
+           '<item><title>C: Senior Dev</title><region>Anywhere</region><type>Contract</type>'
+           '<link>u</link><pubDate>Tue, 16 Jun 2026 00:00:00 +0000</pubDate>'
+           '<description>x</description></item></channel></rss>').encode("utf-8")
+    with patch("jobfinder.sources.weworkremotely.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = WeWorkRemotelySource().search("dev", limit=5)
+    assert jobs[0].employment_type == "contract"
+
+
+def test_jobicy_captures_contract_jobtype():
+    payload = {"jobs": [{"jobTitle": "Dev", "companyName": "C", "url": "u", "jobDescription": "x",
+                         "jobGeo": "Denmark", "pubDate": "2026-06-01", "jobType": ["Contract"]}]}
+    with patch("jobfinder.sources.jobicy.requests.get", return_value=_FakeResp(payload)):
+        jobs = JobicySource().search("dev", limit=5)
+    assert jobs[0].employment_type == "contract"
+
+
+def test_engine_gigs_only_filters_to_contract_freelance():
+    from jobfinder.engine import find_jobs, SearchSettings
+    from jobfinder.cv_parser import build_profile
+    from jobfinder.sources.base import Job
+
+    class _FakeSrc:
+        def search(self, **k):
+            return [
+                Job(title="FT role", company="A", employment_type="full_time"),
+                Job(title="Contract role", company="B", employment_type="contract"),
+                Job(title="Freelance gig", company="C", employment_type="freelance"),
+                Job(title="Unknown", company="D", employment_type=""),
+            ]
+
+    prof = build_profile("Jane Doe\nPython Engineer\nSkills: Python")
+    with patch("jobfinder.engine.get_source", return_value=_FakeSrc()):
+        res = find_jobs(prof, SearchSettings(sources=["x"], gigs_only=True))
+    assert {j.title for j in res.jobs} == {"Contract role", "Freelance gig"}
+    with patch("jobfinder.engine.get_source", return_value=_FakeSrc()):
+        res2 = find_jobs(prof, SearchSettings(sources=["x"], gigs_only=False))
+    assert len(res2.jobs) == 4
+
+
+def test_engine_gigs_only_warns_when_it_filters_everything():
+    from jobfinder.engine import find_jobs, SearchSettings
+    from jobfinder.cv_parser import build_profile
+    from jobfinder.sources.base import Job
+
+    class _FullTimeSrc:
+        def search(self, **k):
+            return [Job(title="FT", company="A", employment_type="full_time")]
+
+    prof = build_profile("Jane Doe\nPython Engineer\nSkills: Python")
+    with patch("jobfinder.engine.get_source", return_value=_FullTimeSrc()):
+        res = find_jobs(prof, SearchSettings(sources=["x"], gigs_only=True))
+    assert res.jobs == [] and any("Consulting / contract only" in w for w in res.warnings)

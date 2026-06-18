@@ -18,7 +18,7 @@ const el = {
   pYears: $('#pYears'), pSkills: $('#pSkills'),
   editProfileBtn: $('#editProfileBtn'), profileEdit: $('#profileEdit'),
   keywords: $('#keywords'), location: $('#location'), days: $('#days'), limit: $('#limit'),
-  remote: $('#remote'), semantic: $('#semantic'), minScore: $('#minScore'), minScoreVal: $('#minScoreVal'),
+  remote: $('#remote'), semantic: $('#semantic'), gigsOnly: $('#gigsOnly'), minScore: $('#minScore'), minScoreVal: $('#minScoreVal'),
   searchBtn: $('#searchBtn'), hint: $('#hint'),
   saveSearchBtn: $('#saveSearchBtn'), savedBox: $('#savedBox'), savedList: $('#savedList'), checkNew: $('#checkNew'),
   resultMeta: $('#resultMeta'), warnings: $('#warnings'),
@@ -339,6 +339,7 @@ async function runSearch() {
     limit_per_source: parseInt(el.limit.value, 10), remote: el.remote.checked,
     days: el.days.value ? parseInt(el.days.value, 10) : null,
     semantic: el.semantic.checked, min_score: parseFloat(el.minScore.value),
+    gigs_only: !!(el.gigsOnly && el.gigsOnly.checked),
   };
   try {
     const resp = await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -469,6 +470,7 @@ function currentSearchPayload() {
     limit_per_source: parseInt(el.limit.value, 10), remote: el.remote.checked,
     days: el.days.value ? parseInt(el.days.value, 10) : null,
     semantic: el.semantic.checked, min_score: parseFloat(el.minScore.value),
+    gigs_only: !!(el.gigsOnly && el.gigsOnly.checked),
   };
 }
 

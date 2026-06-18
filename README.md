@@ -15,8 +15,8 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles — **19 sources**, the no-key Danish ones
-   **on by default**, broadening to remote / short-term work:
+2. **Searches live job boards** for matching roles — **21 sources**, the no-key Danish ones
+   **on by default**, broadening to remote / short-term / consulting work:
    - **Denmark:** **it-jobbank** & **Public sector (HR-Manager / SRL)** (default) — DK's leading IT
      board plus the public-sector backbone: one feed spans ~140 Danish **state** institutions
      (Statens Rekrutteringsløsning) + Region Syddanmark; **The Hub** & **The Muse** (default; DK
@@ -28,8 +28,12 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
      companies' own careers pages, giving **full job descriptions** straight from a curated list of
      Danish/Nordic firms (Trustpilot, Pleo, Corti, Lunar, Veo, Too Good To Go…). Opt-in; extend the
      list with `JOBFINDER_ATS_COMPANIES`.
-   - **Freelance / short-term gigs:** **Freelancer.com** — active project listings via the official
-     API (opt-in, free token).
+   - **Consulting / freelance gigs:** **Verama** (Ework Group's public consultant-assignment feed —
+     fixed-term contracts with rate & hours, no key), **Hacker News** "Seeking freelancer" monthly
+     threads (no key), and **Freelancer.com** (official API, free token). All opt-in.
+   - **Consulting / contract only:** a search toggle that keeps just contract/freelance work across
+     every source that exposes an employment type — turning the app into a **job board for a
+     consultant**.
    - **JSearch** (optional) — aggregates Google for Jobs incl. LinkedIn/Indeed/Glassdoor (free RapidAPI key).
    - **LinkedIn** — via the public, no-login guest job search (opt-in; personal, low-volume use).
 
@@ -331,7 +335,7 @@ Job finder/
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)
-│  └─ sources/            # 19 sources + normalize.py (see docs/SOURCES.md for the full catalog)
+│  └─ sources/            # 21 sources + normalize.py (see docs/SOURCES.md for the full catalog)
 └─ tests/                 # pytest unit tests + sample CV
 ```
 

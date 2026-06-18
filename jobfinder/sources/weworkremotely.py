@@ -55,6 +55,7 @@ class WeWorkRemotelySource(JobSource):
                 company, title = "", raw_title
             region = (item.findtext("region") or "").strip()
             desc = _strip_html(item.findtext("description") or "")
+            emp = "contract" if (item.findtext("type") or "").strip().lower() == "contract" else ""
 
             if kw and not any(w in f"{title} {company} {desc}".lower() for w in kw):
                 continue
@@ -70,6 +71,7 @@ class WeWorkRemotelySource(JobSource):
                 source="We Work Remotely",
                 posted=_posted(item.findtext("pubDate") or ""),
                 remote=True,
+                employment_type=emp,
             ))
             if len(jobs) >= limit:
                 break

@@ -83,6 +83,8 @@
           <label class="chk"><input type="checkbox" value="ats" /> Company boards <i class="muted">(DK firms · full text · opt-in)</i></label>
           <label class="chk"><input type="checkbox" value="careerjet" /> Careerjet <i class="muted">(DK · needs key)</i></label>
           <label class="chk"><input type="checkbox" value="freelancer" /> Freelancer.com <i class="muted">(gigs · needs key)</i></label>
+          <label class="chk"><input type="checkbox" value="verama" /> Verama <i class="muted">(consulting assignments · opt-in)</i></label>
+          <label class="chk"><input type="checkbox" value="hackernews" /> Hacker News <i class="muted">(freelance gigs · opt-in)</i></label>
           <label class="chk"><input type="checkbox" value="linkedin" /> <b>LinkedIn</b> <i class="muted">(opt-in · live scrape)</i></label>
           <label class="chk"><input type="checkbox" value="adzuna" /> Adzuna <i class="muted">(Denmark · needs key)</i></label>
           <label class="chk"><input type="checkbox" value="jooble" /> Jooble <i class="muted">(DK · needs key)</i></label>
@@ -114,6 +116,9 @@
       <div class="row">
         <label class="chk"><input id="remote" type="checkbox" /> Remote only</label>
         <label class="chk" title="Uses sentence-transformers if installed"><input id="semantic" type="checkbox" /> Semantic match</label>
+      </div>
+      <div class="row">
+        <label class="chk" title="Keep only contract / freelance work — a job board for a consultant"><input id="gigsOnly" type="checkbox" /> Consulting / contract only</label>
       </div>
 
       <label class="field">

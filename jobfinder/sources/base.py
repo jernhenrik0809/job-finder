@@ -16,6 +16,9 @@ class Job:
     posted: str = ""                       # human-readable "posted" string if available
     salary: str = ""
     remote: bool = False
+    # "" | full_time | part_time | contract | freelance — drives the "consulting/contract only"
+    # filter. Populated by sources that expose it; pure-gig sources set contract/freelance.
+    employment_type: str = ""
     job_skills: list[str] = field(default_factory=list)   # skills detected in the posting
 
     # Filled in by the matcher:

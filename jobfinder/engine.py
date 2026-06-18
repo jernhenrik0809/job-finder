@@ -20,6 +20,7 @@ class SearchSettings:
     days: int | None = None          # only jobs posted within N days
     semantic: bool = False           # use embeddings if available
     min_score: float = 0.0           # filter out jobs below this match score
+    gigs_only: bool = False          # "consulting/contract only" — keep contract/freelance work
 
 
 @dataclass
@@ -76,6 +77,21 @@ def find_jobs(profile: CVProfile, settings: SearchSettings) -> SearchResult:
     for job in all_jobs:
         deduped.setdefault(job.id, job)
     jobs = list(deduped.values())
+
+    # "Consulting / contract only": keep contract/freelance work (pure-gig sources tag every
+    # listing, and aggregators that expose an employment type are mapped to the same vocab).
+    # Most sources don't tag employment type, so warn rather than silently return nothing.
+    if settings.gigs_only:
+        before = len(jobs)
+        jobs = [j for j in jobs if j.employment_type in ("contract", "freelance")]
+        if before and not jobs:
+            warnings.append(
+                "‘Consulting / contract only’ kept 0 jobs — only contract/freelance-tagged listings "
+                "qualify, and most boards don't tag employment type. Add a gig source (Verama, "
+                "Hacker News, Freelancer) or turn the filter off."
+            )
+        elif before and len(jobs) < before:
+            warnings.append(f"‘Consulting / contract only’ kept {len(jobs)} of {before} jobs.")
 
     # Score & rank (thread the search location/remote so the fit nudge can use them).
     rank_jobs(profile, jobs, MatchConfig(

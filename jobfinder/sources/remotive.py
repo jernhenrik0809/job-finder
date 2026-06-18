@@ -45,5 +45,6 @@ class RemotiveSource(JobSource):
                 posted=(item.get("publication_date") or "")[:10],
                 salary=item.get("salary") or "",
                 remote=True,
+                employment_type=(item.get("job_type") or "").strip().lower(),   # full_time|contract|freelance|…
             ))
         return jobs

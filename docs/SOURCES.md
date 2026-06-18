@@ -31,7 +31,7 @@ no machine feed · *login* = gated behind an account.
 
 ---
 
-## Integrated (19 live sources)
+## Integrated (21 live sources)
 
 Wired and tested. The **default** no-key set runs unless you pick others; **opt-in** sources are
 unticked by default; **keyed** sources light up once their free credential is set in ⚙ Settings.
@@ -73,7 +73,15 @@ unticked by default; **keyed** sources light up once their free credential is se
 
 | Name | What | Relevance | Access | Default? | Module |
 |---|---|---|---|---|---|
+| **Verama** (Ework Group) | Public feed of open **consulting assignments** — fixed-term contracts with rate, hours/week, start/end dates | Strong (Nordic incl. DK) | no-key | opt-in | `verama.py` |
+| **Hacker News** | Monthly "Freelancer? Seeking freelancer?" threads via the public Algolia API | Remote/tech gigs | no-key | opt-in | `hackernews.py` |
 | **Freelancer.com** | Active short-term project listings (gigs) via the official Projects REST API | Global, remote gigs | free token | keyed | `freelancer.py` |
+
+> **"Consulting / contract only" filter:** a search toggle (`gigs_only`) keeps just contract/freelance
+> work across every source that exposes an employment type — `Job.employment_type` is populated from
+> Remotive's `job_type`, We Work Remotely's `<type>`, Jobicy's `jobType[]`, and the pure-gig sources
+> (Verama/Hacker News/Freelancer are always contract/freelance). This turns the app into a job board
+> for a consultant without needing consulting-only sources.
 
 **Notes on the integrated set**
 
@@ -102,10 +110,14 @@ API is wired (Freelancer.com); the rest are document-only.
 | Name | What | DK relevance | Access | Status | Notes |
 |---|---|---|---|---|---|
 | Freelancer.com | Global project marketplace; official REST API | Global/remote gigs | free token (`FREELANCER_TOKEN`) | **Integrated** | `freelancer.py` — see the integrated table. |
-| **Brainville** | Nordic marketplace for freelance/consulting assignments + brokers (ex-Resrc) | Strong | paid + approval (Bearer Base64(`UserKey:SenderKey`)) | **Document-only** | API v2 is genuinely documented — `POST https://api.brainville.com/v2/market/search`, JSON body (text/locations/competenceAreas/allowRemote), response maps cleanly to our Job. **But** the Market/Search (assignment export) endpoint requires a **paid** Premium subscription + Assignment-Export add-on **and** an approval-gated Sender Key, and the data is contractually internal-use-only. The May-2026 "one-click API access" grants only the base application, not free market reads. Buildable only for a user's own paid, approved account. Captures Right People Group gigs transitively. |
-| emagine (ex-ProData Consult) | Large IT/business consulting broker, HQ Copenhagen; public DK-filterable board | Strong | scrape (JS-rendered) | Document-only | `portal.emagine.org/jobs/` is public + DK-filterable but JS-rendered; needs the undocumented internal XHR JSON. |
-| Onsiter | Nordic contractor/consultant aggregator (~1000 assignments/day, DK confirmed) | Strong | scrape (index 403s bots) | Document-only | Detail pages public; index Cloudflare-protected. No feed/sitemap. |
-| Ework Group / Verama | Top Nordic independent-consultant broker; 700+ assignments/mo on Verama | Strong | login (SPA) | Document-only | `app.verama.com` SPA needs a free login; no public REST/RSS. |
+| **Verama** (Ework Group) | Top Nordic independent-consultant broker; open assignments | Strong | **no-key public REST** | **Integrated** | `verama.py`. Re-probe found a genuine public feed at `GET https://app.verama.com/api/public/job-requests` (`public:true` records) — the earlier "login SPA" assessment was superseded. |
+| **Hacker News** | "Freelancer? Seeking freelancer?" monthly threads | Remote/tech gigs | no-key (Algolia API) | **Integrated** | `hackernews.py` — see the integrated table. |
+| **EU TED** (Tenders Electronic Daily) | DK public-sector IT/business **consultancy tenders** (CPV 72/79) | Strong (authoritative) | no-key public API | **Integrable (now, deferred)** | `POST https://api.ted.europa.eu/v3/notices/search` works keyless and live-returns Danish consultancy tenders (subsumes udbud.dk + Mercell). Deferred because these are procurement **RFPs you bid on**, not job postings (terse multilingual titles, no salary, company-bidder semantics) — would be wired as an explicitly-labelled "tenders" source on request. |
+| **Brainville** | Nordic marketplace for freelance/consulting assignments + brokers (ex-Resrc) | Strong | paid + approval (Bearer Base64(`UserKey:SenderKey`)) | **Document-only** | API v2 is genuinely documented — `POST https://api.brainville.com/v2/market/search`. **But** the Market/Search endpoint needs a **paid** Premium subscription + Assignment-Export add-on **and** an approval-gated Sender Key (internal-use-only data). Buildable only for a user's own paid account. Captures Right People Group gigs transitively. |
+| emagine (ex-ProData Consult) | Large IT/business consulting broker, HQ Copenhagen | Strong | login | Document-only | Re-probe found the real backend `portal-api.emagine.org`, but every job endpoint returns **HTTP 401** — the board requires auth. ProData now redirects to emagine and shares this gated portal. |
+| Onsiter | Nordic contractor/consultant aggregator (~1000 assignments/day, DK confirmed) | Strong | scrape (Cloudflare 403) | Document-only | Index + `/api/assignments` are Cloudflare-403 to bots; detail pages public. No usable feed. |
+| PeoplePerHour / Guru / Twine / Workana / Truelancer | Global freelance project marketplaces | Some–Minimal | scrape / login | Document-only | Re-probed live: no project RSS/JSON (feed URLs 404 or return HTML); listings are login- or scrape-only. |
+| Braintrust / Gun.io / Wellfound / YunoJuno / Arc.dev / A.Team / Contra | Vetted / curated freelance & contract networks | Some | login (apply-to-join) | Document-only | Public pages show teaser roles only; the real job APIs are 401/session-gated behind account + screening. Contra's `/feed` + `/api/jobs` both 404. |
 | 7N | Danish-origin elite IT consultancy/broker; agent-mediated | Strong | scrape (JS ATS) | Document-only | `jobs.7n.com` is a JS-rendered ATS shell; value is agent representation. |
 | Right People Group | Copenhagen IT/management consulting broker | Strong | login / email alerts | Document-only | No public board/API. Its gigs flow into Brainville. |
 | Worksome | Danish-origin Freelance Management System; vetted tech freelancers | Strong (the most DK-relevant freelance platform) | login + GraphQL (auth-only) | Document-only | Private client talent pools; GraphQL manages your own contracts, not open gigs. Create a profile to enter pools. |

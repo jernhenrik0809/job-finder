@@ -2,6 +2,51 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.22.0] — 2026-06-18
+
+### Added — Consultant / freelance / contract work ("a job board for a consultant")
+- **Verama** (Ework Group's marketplace) — a new source over its **public, no-login** feed of open
+  **consulting assignments** (every listing is a fixed-term contract with a rate, hours/week and
+  start/end dates). The standout find — Ework/Verama was previously document-only. Opt-in, no key.
+- **Hacker News** — a new source over the monthly *"Freelancer? Seeking freelancer?"* threads via
+  the free public Algolia API (no key). Each "SEEKING FREELANCER" comment becomes a freelance gig;
+  "SEEKING WORK" (people offering themselves) is skipped. Opt-in. → **21 sources.**
+- **"Consulting / contract only" filter** — a new `Job.employment_type` field
+  (`contract`/`freelance`/`full_time`/`part_time`/`""`) populated by every source that exposes it
+  (Remotive `job_type`, We Work Remotely `<type>`, Jobicy `jobType[]`, and the pure-gig sources
+  Freelancer/Verama/Hacker News), plus a **search toggle** (and saved-search/alert support) that
+  keeps only contract/freelance work — turning the whole app into a consultant board.
+
+### Researched — the full consultant/gig landscape (documented in `docs/SOURCES.md`)
+- A multi-agent sweep confirmed the consulting/freelance space is overwhelmingly login/approval/
+  paid/scrape-gated: **PeoplePerHour, Guru, Twine, Workana, Braintrust, Gun.io, Wellfound, Contra,
+  Toptal, Onsiter, emagine/ProData, Brainville, 7N, Right People Group, Hays/Michael Page/Robert
+  Half** all lack a usable public feed (documented with the exact reason). Reddit r/forhire's public
+  `.json` is now edge-blocked (403). **EU TED** (Tenders Electronic Daily) *does* expose a public,
+  keyless API for Danish IT/consultancy tenders (CPV 72/79) — recorded as integrable-now but
+  deferred (it's procurement RFPs you bid on, not job postings).
+
+### Security
+- Allow-list + runtime egress test extended to `app.verama.com`, `hn.algolia.com`, and
+  `news.ycombinator.com` (HN item links are built into job URLs, not contacted).
+
+### Fixed (from adversarial review)
+- **Verama:** the per-record loop was unguarded — a non-string `level` (`.title()`) or non-numeric
+  `hoursPerWeek` (`:g`) would abort the whole batch. Each fragile field is now coerced/guarded and
+  the per-record body is wrapped (one bad record is skipped, not fatal). `remoteness` is now
+  interpreted explicitly (`0` = onsite) instead of bare truthiness, so partial-remote/enum values
+  aren't mis-flagged.
+- **Hacker News:** a comment missing an `id` produced a dead `…?id=None` URL — now yields an empty
+  URL.
+- **`gigs_only`:** with the default sources (which don't tag employment type) the filter could
+  silently return zero results; `find_jobs` now adds a clear warning explaining the filter and
+  pointing to the gig sources.
+
+### Tests
+- 251 → 259 (Verama assignment parsing + weird-field-type resilience, Hacker News
+  SEEKING-FREELANCER extraction + SEEKING-WORK skip, employment_type capture in Remotive/WWR/Jobicy,
+  the engine `gigs_only` filter, and its zero-result warning).
+
 ## [1.21.0] — 2026-06-17
 
 ### Added — Company boards (ATS): full descriptions from named employers

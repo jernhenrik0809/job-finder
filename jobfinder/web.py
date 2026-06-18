@@ -118,6 +118,7 @@ class SearchRequest(BaseModel):
     days: int | None = None
     semantic: bool = False
     min_score: float = 0.0
+    gigs_only: bool = False          # "consulting/contract only"
 
 
 class SaveSearchRequest(BaseModel):
@@ -131,6 +132,7 @@ class SaveSearchRequest(BaseModel):
     days: int | None = None
     semantic: bool = False
     min_score: float = 0.0
+    gigs_only: bool = False
 
 
 class SaveApplicationRequest(BaseModel):
@@ -297,7 +299,8 @@ async def update_profile(cv_id: str, req: ProfileUpdate) -> JSONResponse:
     return JSONResponse({"cv_id": cv_id, "profile": _profile_summary(profile)})
 
 
-def _build_settings(keywords, location, sources, limit_per_source, remote, days, semantic, min_score) -> SearchSettings:
+def _build_settings(keywords, location, sources, limit_per_source, remote, days, semantic,
+                    min_score, gigs_only=False) -> SearchSettings:
     # Keep only known sources, de-duplicated and order-preserving — guards against a
     # client sending unknown or repeated names (which would amplify outbound requests).
     known = set(available_sources())
@@ -305,7 +308,7 @@ def _build_settings(keywords, location, sources, limit_per_source, remote, days,
     return SearchSettings(
         keywords=keywords, location=location, sources=chosen,
         limit_per_source=max(1, min(limit_per_source, 50)),
-        remote=remote, days=days, semantic=semantic, min_score=min_score,
+        remote=remote, days=days, semantic=semantic, min_score=min_score, gigs_only=gigs_only,
     )
 
 
@@ -316,7 +319,7 @@ def search(req: SearchRequest) -> JSONResponse:
         raise HTTPException(status_code=404, detail="CV not found — please upload your CV again.")
 
     search_settings = _build_settings(req.keywords, req.location, req.sources, req.limit_per_source,
-                                      req.remote, req.days, req.semantic, req.min_score)
+                                      req.remote, req.days, req.semantic, req.min_score, req.gigs_only)
     result = find_jobs(profile, search_settings)
     return JSONResponse({
         "jobs": [j.to_dict() for j in result.jobs],
@@ -603,7 +606,7 @@ def _run_one(s) -> dict:
         raise HTTPException(status_code=400,
                             detail="The CV for this saved search isn't available — re-upload your CV.")
     settings_ = _build_settings(s.keywords, s.location, s.sources, s.limit_per_source,
-                                s.remote, s.days, s.semantic, s.min_score)
+                                s.remote, s.days, s.semantic, s.min_score, getattr(s, "gigs_only", False))
     result = find_jobs(profile, settings_)
     # atomic diff + seen-set update so a concurrent background sweep can't clobber it
     box = {"new": []}

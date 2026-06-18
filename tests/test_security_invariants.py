@@ -42,6 +42,8 @@ from jobfinder.sources.weworkremotely import WeWorkRemotelySource
 from jobfinder.sources.workingnomads import WorkingNomadsSource
 from jobfinder.sources.freelancer import FreelancerSource
 from jobfinder.sources.ats import ATSSource
+from jobfinder.sources.verama import VeramaSource
+from jobfinder.sources.hackernews import HackerNewsSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -73,6 +75,9 @@ _ALLOWED_HOSTS = {
     "boards-api.greenhouse.io",                     # ATS source — Greenhouse public boards
     "api.lever.co",                                 # ATS source — Lever public postings
     "api.ashbyhq.com",                              # ATS source — Ashby public job board
+    "app.verama.com",                               # Verama (Ework) public consulting feed
+    "hn.algolia.com",                               # Hacker News "Seeking freelancer" via Algolia
+    "news.ycombinator.com",                         # HN job-item links (built, not fetched)
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -168,7 +173,7 @@ def test_runtime_egress_allowlist(monkeypatch):
         RemotiveSource(), ArbeitnowSource(), TheHubSource(), TheMuseSource(), JobindexSource(),
         ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
         StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
-        FreelancerSource(token="x"), ATSSource(),
+        FreelancerSource(token="x"), ATSSource(), VeramaSource(), HackerNewsSource(),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

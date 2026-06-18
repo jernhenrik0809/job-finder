@@ -74,6 +74,7 @@ def _settings_for(s) -> SearchSettings:
         keywords=s.keywords, location=s.location, sources=chosen,
         limit_per_source=max(1, min(s.limit_per_source, 50)),
         remote=s.remote, days=s.days, semantic=s.semantic, min_score=s.min_score,
+        gigs_only=getattr(s, "gigs_only", False),
     )
 
 

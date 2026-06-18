@@ -101,6 +101,7 @@ class FreelancerSource(JobSource):
                 posted=_posted(p.get("submitdate") or p.get("time_submitted")),
                 salary=_salary(p),
                 remote=True,
+                employment_type="freelance",                 # every Freelancer project is a gig
             ))
             if len(jobs) >= limit:
                 break

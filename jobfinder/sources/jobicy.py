@@ -42,6 +42,8 @@ class JobicySource(JobSource):
             if kw and not any(w in f"{title} {desc}".lower() for w in kw):
                 continue
             geo = j.get("jobGeo") or "Remote"
+            jtypes = [str(t).strip().lower() for t in (j.get("jobType") or []) if isinstance(t, str)]
+            emp = "contract" if "contract" in jtypes else ("freelance" if "freelance" in jtypes else "")
             jobs.append(Job(
                 title=title,
                 company=(j.get("companyName") or "").strip(),
@@ -51,6 +53,7 @@ class JobicySource(JobSource):
                 source="Jobicy",
                 posted=str(j.get("pubDate") or "")[:10],
                 remote=True,
+                employment_type=emp,
             ))
             if len(jobs) >= limit:
                 break

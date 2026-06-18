@@ -42,6 +42,8 @@ _SOURCES: tuple[SourceMeta, ...] = (
     SourceMeta("jooble", "jooble", "JoobleSource"),
     SourceMeta("careerjet", "careerjet", "CareerjetSource"),
     SourceMeta("freelancer", "freelancer", "FreelancerSource", ("freelancer.com",)),
+    SourceMeta("verama", "verama", "VeramaSource", ("ework",)),
+    SourceMeta("hackernews", "hackernews", "HackerNewsSource", ("hn",)),
     SourceMeta("jsearch", "jsearch", "JSearchSource"),
 )
 
