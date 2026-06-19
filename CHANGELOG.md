@@ -2,6 +2,30 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.29.0] — 2026-06-19
+
+### Added — consulting engine: web wiring + Bench UI (gig → ranked bench, end-to-end)
+The bench is now reachable from the browser. New JSON endpoints in `web.py`:
+- **Consultants:** `POST/GET /api/consultants`, `GET/PATCH/DELETE /api/consultants/{id}` — onboard
+  a bench member from pasted CV text (reuses `build_profile` → `consultant_from_profile`), an
+  existing `cv_id`, or just a name; edit availability/rates/status; small enum fields validated.
+- **House:** `GET/POST /api/house` — the single-row house identity.
+- **Staffing:** `POST /api/bench/rank` — adapt a posting/brief/`job` card into a `Project`, load
+  the bench once, and rank it **outside the store lock** (pure `bench.py`); returns matches with
+  score, eligibility + disqualifiers, matched/missing skills, reasons, and `bench_size`.
+- **Bench UI tab** (`static/`): manage the consultant roster, set the house identity, and paste a
+  gig to see the bench ranked (ineligible consultants visually distinct, with reasons).
+
+Built via parallel agents on disjoint files (frontend + tests) against the verified contract.
+
+### Fixed (from preview verification of the integrated UI)
+- **`/api/bench/rank` rejected the UI's payload (422).** The form sends `null` for empty inputs,
+  but the request model typed those fields as `str`; they're now `str | None` (handler already
+  coerces `null → ""`). Same hardening applied to `ConsultantCreate`. Regression test added.
+- **New consultants were silently un-presentable.** The add-form's "right to present" checkbox
+  defaulted *unchecked*, so every onboarded consultant was excluded as "not cleared to put
+  forward." New consultants now default to presentable; API-level regression test added.
+
 ## [1.28.0] — 2026-06-19
 
 ### Added — consulting engine: bench matcher (gig → ranked bench)

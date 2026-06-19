@@ -1,3 +1,3 @@
 """Job Finder — match a user's CV to live job postings (LinkedIn + free APIs)."""
 
-__version__ = "1.28.0"
+__version__ = "1.29.0"

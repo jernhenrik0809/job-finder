@@ -25,6 +25,9 @@ const el = {
   loading: $('#loading'), empty: $('#empty'), jobs: $('#jobs'),
   tabMatches: $('#tabMatches'), tabPipeline: $('#tabPipeline'), tabInsights: $('#tabInsights'), pipelineCount: $('#pipelineCount'),
   tabSettings: $('#tabSettings'), viewSettings: $('#view-settings'), settingsBody: $('#settingsBody'),
+  tabBench: $('#tabBench'), viewBench: $('#view-bench'),
+  consultantForm: $('#consultantForm'), consultantList: $('#consultantList'), benchAddToggle: $('#benchAddToggle'),
+  houseForm: $('#houseForm'), gigForm: $('#gigForm'), rankLoading: $('#rankLoading'), rankResults: $('#rankResults'),
   viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'), viewInsights: $('#view-insights'),
   insightsEmpty: $('#insightsEmpty'), insightsBody: $('#insightsBody'),
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
@@ -302,6 +305,7 @@ if (el.editProfileBtn) el.editProfileBtn.addEventListener('click', () => {
 el.tabMatches.addEventListener('click', () => switchTab('matches'));
 el.tabPipeline.addEventListener('click', () => { switchTab('pipeline'); loadPipeline(); });
 el.tabInsights.addEventListener('click', () => { switchTab('insights'); loadInsights(); });
+el.tabBench.addEventListener('click', () => { switchTab('bench'); loadBench(); });
 el.tabSettings.addEventListener('click', () => { switchTab('settings'); loadSettings(); });
 
 function switchTab(name) {
@@ -309,6 +313,7 @@ function switchTab(name) {
     matches: [el.tabMatches, el.viewMatches],
     pipeline: [el.tabPipeline, el.viewPipeline],
     insights: [el.tabInsights, el.viewInsights],
+    bench: [el.tabBench, el.viewBench],
     settings: [el.tabSettings, el.viewSettings],
   };
   for (const [k, [tab, view]] of Object.entries(map)) {
@@ -1057,6 +1062,338 @@ function renderInsights(r) {
     await loadPipeline();
     openDrawer(id);
   }));
+}
+
+// ---------- bench (consulting house) ----------
+// Field metadata kept from GET /api/consultants so selects always match the server's vocabulary.
+let benchMeta = { engagement_types: ['employee', 'associate', 'subcontractor'], data_origins: ['direct_from_subject', 'third_party', 'public_source'], statuses: ['active', 'inactive'] };
+let benchInited = false;          // wire the sub-tabs + house/gig forms once
+let editingConsultantId = null;   // id when the form is editing an existing consultant
+let editingConsultant = null;     // the object being edited (to diff for PATCH)
+
+function loadBench() {
+  if (!benchInited) {
+    benchInited = true;
+    el.viewBench.querySelectorAll('.bench-subtab').forEach(btn =>
+      btn.addEventListener('click', () => switchBenchSection(btn.dataset.bench)));
+    el.benchAddToggle.addEventListener('click', () => {
+      if (el.consultantForm.classList.contains('hidden')) openConsultantForm(); else closeConsultantForm();
+    });
+    renderHouseForm();
+    renderGigForm();
+  }
+  loadConsultants();
+  loadHouse();
+}
+
+function switchBenchSection(name) {
+  el.viewBench.querySelectorAll('.bench-subtab').forEach(b => b.classList.toggle('active', b.dataset.bench === name));
+  el.viewBench.querySelectorAll('.bench-section').forEach(s => s.classList.toggle('hidden', s.id !== `bench-${name}`));
+}
+
+// ----- A) consultants -----
+async function loadConsultants() {
+  try {
+    const data = await (await fetch('/api/consultants')).json();
+    if (Array.isArray(data.engagement_types) && data.engagement_types.length) benchMeta.engagement_types = data.engagement_types;
+    if (Array.isArray(data.data_origins) && data.data_origins.length) benchMeta.data_origins = data.data_origins;
+    if (Array.isArray(data.statuses) && data.statuses.length) benchMeta.statuses = data.statuses;
+    renderConsultants(data.consultants || []);
+  } catch { el.consultantList.innerHTML = '<p class="muted small">Could not load the bench.</p>'; }
+}
+
+function renderConsultants(list) {
+  el.consultantList.innerHTML = '';
+  if (!list.length) {
+    el.consultantList.innerHTML = '<p class="muted small">No consultants on the bench yet — add one to start staffing gigs.</p>';
+    return;
+  }
+  list.forEach(c => el.consultantList.appendChild(consultantCard(c)));
+}
+
+function consultantCard(c) {
+  const card = document.createElement('div');
+  card.className = 'consultant';
+  card.dataset.id = c.id;
+  const skills = (c.skills || []).slice(0, 10).map(s => `<span class="chip">${esc(s)}</span>`).join('');
+  const avail = [
+    c.available_from ? `from ${esc(c.available_from)}` : '',
+    c.available_until ? `until ${esc(c.available_until)}` : '',
+  ].filter(Boolean).join(' · ');
+  const rate = c.sell_rate != null && c.sell_rate !== '' ? `${esc(c.sell_rate)} ${esc(c.currency || '')}`.trim() : '';
+  const sub = [
+    c.title ? `<b>${esc(c.title)}</b>` : '',
+    c.seniority ? esc(c.seniority) : '',
+    c.engagement_type ? esc(c.engagement_type) : '',
+    rate ? `💰 ${rate}` : '',
+  ].filter(Boolean).join('<span> · </span>');
+  card.innerHTML = `
+    <div class="consultant-main">
+      <div class="consultant-head">
+        <h4>${esc(c.name || 'Unnamed')}</h4>
+        <span class="cstatus st-${esc(c.status || 'active')}">${esc(c.status || 'active')}</span>
+      </div>
+      ${sub ? `<div class="consultant-sub">${sub}</div>` : ''}
+      ${avail ? `<div class="muted small">${esc(avail)}</div>` : ''}
+      ${skills ? `<div class="chips" style="margin-top:8px">${skills}</div>` : ''}
+    </div>
+    <div class="consultant-actions">
+      <button class="btn mini ghost c-edit" type="button">Edit</button>
+      <button class="btn mini danger c-del" type="button">Delete</button>
+    </div>`;
+  card.querySelector('.c-edit').addEventListener('click', () => openConsultantForm(c));
+  card.querySelector('.c-del').addEventListener('click', () => deleteConsultant(c));
+  return card;
+}
+
+// Build the add/edit form. Pass a consultant to edit (PATCH only changed fields), or nothing to add.
+function openConsultantForm(c) {
+  editingConsultantId = c ? c.id : null;
+  editingConsultant = c || null;
+  const v = c || {};
+  const engOpts = benchMeta.engagement_types.map(o =>
+    `<option value="${esc(o)}"${o === v.engagement_type ? ' selected' : ''}>${esc(o)}</option>`).join('');
+  const statusOpts = benchMeta.statuses.map(o =>
+    `<option value="${esc(o)}"${o === (v.status || 'active') ? ' selected' : ''}>${esc(o)}</option>`).join('');
+  const senOpts = ['', 'junior', 'mid', 'senior', 'lead', 'principal'].map(o =>
+    `<option value="${esc(o)}"${o === (v.seniority || '') ? ' selected' : ''}>${o ? esc(o) : '(unknown)'}</option>`).join('');
+  el.consultantForm.innerHTML = `
+    <div class="bf-grid">
+      <label class="full">Name<input id="cfName" type="text" /></label>
+      ${c ? '' : `<label class="full">Paste CV text <i class="muted small">(optional — parsed to pre-fill fields)</i><textarea id="cfText" rows="5" placeholder="Paste the consultant's CV / resume text here…"></textarea></label>`}
+      <label class="full">Title<input id="cfTitle" type="text" placeholder="e.g. Senior Cloud Engineer" /></label>
+      <label class="full">Key skills <i class="muted small">(comma-separated)</i><input id="cfSkills" type="text" placeholder="e.g. AWS, Terraform, Python" /></label>
+      <label>Seniority<select id="cfSeniority">${senOpts}</select></label>
+      <label>Engagement<select id="cfEngagement">${engOpts}</select></label>
+      <label>Available from<input id="cfFrom" type="date" /></label>
+      <label>Available until<input id="cfUntil" type="date" /></label>
+      <label>Sell rate<input id="cfRate" type="number" min="0" step="any" placeholder="e.g. 900" /></label>
+      <label>Currency<input id="cfCurrency" type="text" placeholder="e.g. DKK" /></label>
+      <label>Status<select id="cfStatus">${statusOpts}</select></label>
+      <label class="chk full"><input id="cfPresent" type="checkbox" /> Right to present to clients</label>
+    </div>
+    <div class="bf-actions">
+      <button id="cfSave" class="btn primary small" type="button">${c ? 'Save changes' : 'Add to bench'}</button>
+      <button id="cfCancel" class="btn ghost small" type="button">Cancel</button>
+      <span class="msg copied" style="display:none">saved ✓</span>
+    </div>`;
+  el.consultantForm.classList.remove('hidden');
+  const q = (s) => el.consultantForm.querySelector(s);
+  q('#cfName').value = v.name || '';
+  q('#cfTitle').value = v.title || '';
+  q('#cfSkills').value = (v.skills || []).join(', ');
+  q('#cfFrom').value = v.available_from || '';
+  q('#cfUntil').value = v.available_until || '';
+  q('#cfRate').value = v.sell_rate != null ? v.sell_rate : '';
+  q('#cfCurrency').value = v.currency || '';
+  q('#cfPresent').checked = c ? !!v.right_to_present : true;   // new consultants are presentable by default
+  q('#cfCancel').addEventListener('click', closeConsultantForm);
+  q('#cfSave').addEventListener('click', saveConsultant);
+}
+
+function closeConsultantForm() {
+  el.consultantForm.classList.add('hidden');
+  el.consultantForm.innerHTML = '';
+  editingConsultantId = null;
+  editingConsultant = null;
+}
+
+function splitCsv(s) { return (s || '').split(',').map(x => x.trim()).filter(Boolean); }
+
+async function saveConsultant() {
+  const q = (s) => el.consultantForm.querySelector(s);
+  const fields = {
+    name: q('#cfName').value.trim(),
+    title: q('#cfTitle').value.trim(),
+    skills: splitCsv(q('#cfSkills').value),
+    seniority: q('#cfSeniority').value,
+    available_from: q('#cfFrom').value || null,
+    available_until: q('#cfUntil').value || null,
+    sell_rate: q('#cfRate').value.trim() !== '' ? parseFloat(q('#cfRate').value) : null,
+    currency: q('#cfCurrency').value.trim(),
+    engagement_type: q('#cfEngagement').value,
+    status: q('#cfStatus').value,
+    right_to_present: q('#cfPresent').checked,
+  };
+  const btn = q('#cfSave'); btn.disabled = true;
+  try {
+    if (editingConsultantId) {
+      // PATCH only the fields that actually changed.
+      const before = editingConsultant || {};
+      const patch = {};
+      for (const [k, val] of Object.entries(fields)) {
+        const old = k === 'skills' ? (before.skills || []).join('|') : (before[k] == null ? '' : before[k]);
+        const now = k === 'skills' ? val.join('|') : (val == null ? '' : val);
+        if (String(old) !== String(now)) patch[k] = val;
+      }
+      if (Object.keys(patch).length === 0) { closeConsultantForm(); return; }
+      const resp = await fetch(`/api/consultants/${editingConsultantId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Save failed'); }
+    } else {
+      const text = (q('#cfText') && q('#cfText').value.trim()) || '';
+      const body = { ...fields };
+      if (text) body.text = text;            // optional CV text the server parses
+      const resp = await fetch('/api/consultants', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Add failed'); }
+    }
+    closeConsultantForm();
+    loadConsultants();
+  } catch (err) { showWarnings(['Consultant: ' + err.message]); btn.disabled = false; }
+}
+
+async function deleteConsultant(c) {
+  if (!confirm(`Remove ${c.name || 'this consultant'} from the bench?`)) return;
+  try {
+    const resp = await fetch(`/api/consultants/${c.id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('Delete failed');
+    loadConsultants();
+  } catch (err) { showWarnings(['Delete: ' + err.message]); }
+}
+
+// ----- B) house identity -----
+const _HOUSE_FIELDS = [
+  { id: 'name', label: 'House name', ph: 'e.g. Northbridge Consulting' },
+  { id: 'tagline', label: 'Tagline', ph: 'e.g. Senior engineers, on demand' },
+  { id: 'voice', label: 'Voice / tone', ph: 'e.g. pragmatic, warm, no fluff', area: true },
+  { id: 'signatory', label: 'Signatory', ph: 'e.g. Henrik Andersen, Partner' },
+  { id: 'boilerplate', label: 'Boilerplate', ph: 'Standard blurb about your house…', area: true },
+  { id: 'contact', label: 'Contact', ph: 'e.g. henrik@northbridge.dk · +45 …' },
+  { id: 'website', label: 'Website', ph: 'e.g. https://northbridge.dk' },
+];
+
+function renderHouseForm() {
+  const rows = _HOUSE_FIELDS.map(f => `
+    <label class="full">${esc(f.label)}
+      ${f.area ? `<textarea data-house="${f.id}" rows="3" placeholder="${esc(f.ph)}"></textarea>`
+        : `<input data-house="${f.id}" type="text" placeholder="${esc(f.ph)}" />`}
+    </label>`).join('');
+  el.houseForm.innerHTML = `
+    <div class="bf-grid">${rows}</div>
+    <div class="bf-actions">
+      <button id="houseSave" class="btn primary small" type="button">Save house identity</button>
+      <span class="msg copied" style="display:none">saved ✓</span>
+    </div>`;
+  el.houseForm.querySelector('#houseSave').addEventListener('click', saveHouse);
+}
+
+async function loadHouse() {
+  try {
+    const h = await (await fetch('/api/house')).json();
+    _HOUSE_FIELDS.forEach(f => {
+      const inp = el.houseForm.querySelector(`[data-house="${f.id}"]`);
+      if (inp) inp.value = h[f.id] || '';
+    });
+  } catch { /* default/empty house is fine */ }
+}
+
+async function saveHouse() {
+  const body = {};
+  _HOUSE_FIELDS.forEach(f => {
+    const inp = el.houseForm.querySelector(`[data-house="${f.id}"]`);
+    if (inp) body[f.id] = inp.value.trim();
+  });
+  const btn = el.houseForm.querySelector('#houseSave'); btn.disabled = true;
+  try {
+    const resp = await fetch('/api/house', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Save failed'); }
+    flash('#houseForm .msg');
+  } catch (err) { showWarnings(['House: ' + err.message]); }
+  finally { btn.disabled = false; }
+}
+
+// ----- C) staff a gig -----
+function renderGigForm() {
+  el.gigForm.innerHTML = `
+    <div class="bf-grid">
+      <label class="full">Title<input id="gigTitle" type="text" placeholder="e.g. Cloud platform lead, 6 months" /></label>
+      <label class="full">Gig / brief<textarea id="gigDesc" rows="6" placeholder="Paste the gig description or brief here…"></textarea></label>
+      <label class="full">Required skills <i class="muted small">(comma-separated)</i><input id="gigSkills" type="text" placeholder="e.g. AWS, Kubernetes, Go" /></label>
+      <label>Location<input id="gigLocation" type="text" placeholder="e.g. Copenhagen" /></label>
+      <label>Rate ceiling<input id="gigRate" type="number" min="0" step="any" placeholder="e.g. 1100" /></label>
+      <label>Currency<input id="gigCurrency" type="text" placeholder="e.g. DKK" /></label>
+      <label>Start date<input id="gigStart" type="date" /></label>
+      <label class="chk full"><input id="gigRemote" type="checkbox" /> Remote OK</label>
+    </div>
+    <div class="bf-actions">
+      <button id="rankBtn" class="btn primary small" type="button">Rank bench</button>
+    </div>`;
+  el.gigForm.querySelector('#rankBtn').addEventListener('click', rankBench);
+}
+
+async function rankBench() {
+  const q = (s) => el.gigForm.querySelector(s);
+  const title = q('#gigTitle').value.trim();
+  const description = q('#gigDesc').value.trim();
+  if (!title && !description) { showWarnings(['Add a title or paste a gig brief to rank the bench.']); return; }
+  const body = {
+    title, description,
+    skills: splitCsv(q('#gigSkills').value),
+    location: q('#gigLocation').value.trim(),
+    remote: q('#gigRemote').checked,
+    rate_ceiling: q('#gigRate').value.trim() !== '' ? parseFloat(q('#gigRate').value) : null,
+    currency: q('#gigCurrency').value.trim(),
+    start_date: q('#gigStart').value || null,
+  };
+  el.rankResults.innerHTML = '';
+  el.rankLoading.classList.remove('hidden');
+  const btn = q('#rankBtn'); btn.disabled = true;
+  try {
+    const resp = await fetch('/api/bench/rank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Ranking failed');
+    renderRankResults(data);
+  } catch (err) { showWarnings(['Rank: ' + err.message]); }
+  finally { el.rankLoading.classList.add('hidden'); btn.disabled = false; }
+}
+
+function renderRankResults(data) {
+  const matches = data.matches || [];
+  const meta = [`bench of ${data.bench_size != null ? data.bench_size : matches.length}`,
+    `${matches.length} ranked`].join(' · ');
+  if (!matches.length) {
+    el.rankResults.innerHTML = `<p class="muted small">No consultants to rank — add some to your bench first.</p>`;
+    return;
+  }
+  el.rankResults.innerHTML = `<div class="muted small rank-meta">${esc(meta)}</div>` +
+    matches.map(rankCard).join('');
+}
+
+function rankCard(m) {
+  const c = m.consultant || {};
+  const score = Math.round(m.score || 0);
+  const band = m.eligible ? (score >= 65 ? 'strong' : score >= 40 ? 'good' : 'fair') : 'weak';
+  const badge = m.eligible
+    ? '<span class="elig-badge ok">eligible</span>'
+    : '<span class="elig-badge no">ineligible</span>';
+  const dq = (m.disqualifiers || []).length
+    ? `<div class="rank-dq"><span class="lbl">✕ disqualifiers</span><ul>${m.disqualifiers.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : '';
+  const matched = (m.matched_skills || []).map(s => `<span class="chip matched">${esc(s)}</span>`).join('');
+  const missing = (m.missing_skills || []).map(s => `<span class="chip missing">${esc(s)}</span>`).join('');
+  const reasons = (m.reasons || []).length
+    ? `<ul class="rank-reasons">${m.reasons.map(r => `<li>${esc(r)}</li>`).join('')}</ul>` : '';
+  const notes = (m.notes || []).length
+    ? `<div class="rank-notes muted small">${m.notes.map(n => esc(n)).join(' · ')}</div>` : '';
+  const sub = [c.title ? `<b>${esc(c.title)}</b>` : '', c.seniority ? esc(c.seniority) : '', c.engagement_type ? esc(c.engagement_type) : '']
+    .filter(Boolean).join('<span> · </span>');
+  return `
+    <div class="rank-card${m.eligible ? '' : ' ineligible'}">
+      <div class="score-wrap">
+        <div class="score ${band}">${score}<small>${m.eligible ? 'fit' : '—'}</small></div>
+      </div>
+      <div class="rank-main">
+        <div class="rank-head"><h4>${esc(c.name || 'Unnamed')}</h4>${badge}</div>
+        ${sub ? `<div class="consultant-sub">${sub}</div>` : ''}
+        ${dq}
+        ${matched ? `<div class="skill-row"><span class="lbl">✓ has</span>${matched}</div>` : ''}
+        ${missing ? `<div class="skill-row" style="margin-top:6px"><span class="lbl">missing</span>${missing}</div>` : ''}
+        ${reasons}
+        ${notes}
+      </div>
+    </div>`;
 }
 
 // ---------- style examples ----------

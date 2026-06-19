@@ -531,8 +531,74 @@ input[type=range] { accent-color: var(--accent); }
 .tailor-bullets .b-src { color: var(--muted); font-size: 11px; margin-top: 3px; }
 .tailor-bullets .b-score { color: var(--accent); font-weight: 700; text-align: right; font-size: 12px; }
 
+/* ---------- bench (consulting house) ---------- */
+#view-bench { margin-top: 16px; }
+.bench-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.bench-subtab {
+  background: var(--bg); border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+  border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600;
+}
+.bench-subtab:hover { color: var(--text); }
+.bench-subtab.active { color: #fff; background: var(--accent); border-color: var(--accent); }
+.bench-section h3 { margin: 0 0 4px; font-size: 16px; }
+.bench-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.bench-head h3 { margin: 0; }
+
+.bench-form { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+.bf-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.bf-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.bf-grid label.full { grid-column: 1 / -1; }
+.bf-grid label.chk { flex-direction: row; align-items: center; gap: 8px; color: var(--text); font-size: 13.5px; }
+.bf-grid input[type=text], .bf-grid input[type=number], .bf-grid input[type=date], .bf-grid select, .bf-grid textarea {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; width: 100%;
+}
+.bf-grid textarea { resize: vertical; font-family: inherit; line-height: 1.5; }
+.bf-grid input[type=date] { color-scheme: dark; }
+.bf-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+
+/* consultant list */
+.bench-list { display: flex; flex-direction: column; gap: 12px; }
+.consultant {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; display: flex; gap: 14px; justify-content: space-between; align-items: flex-start;
+}
+.consultant:hover { border-color: var(--accent); }
+.consultant-main { flex: 1; min-width: 0; }
+.consultant-head { display: flex; align-items: center; gap: 10px; }
+.consultant-head h4 { margin: 0; font-size: 15px; }
+.consultant-sub { color: var(--muted); font-size: 13px; margin-top: 3px; }
+.cstatus {
+  border-radius: 999px; font-size: 11px; font-weight: 700; padding: 1px 9px;
+  background: var(--bg); border: 1px solid var(--st, var(--line)); color: var(--st, var(--muted)); text-transform: capitalize;
+}
+.st-active   { --st: #34d399; }
+.st-inactive { --st: #6b7280; }
+.consultant-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
+
+/* rank results */
+.rank-results { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+.rank-meta { margin-bottom: 2px; }
+.rank-card {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; display: grid; grid-template-columns: 64px 1fr; gap: 16px;
+}
+.rank-card.ineligible { opacity: .82; border-color: #6b2f2f; border-style: dashed; }
+.rank-main { min-width: 0; }
+.rank-head { display: flex; align-items: center; gap: 10px; }
+.rank-head h4 { margin: 0; font-size: 16px; }
+.elig-badge { border-radius: 999px; font-size: 11px; font-weight: 700; padding: 1px 9px; }
+.elig-badge.ok { background: var(--green-dim); color: #b8f3d8; border: 1px solid #1f7a52; }
+.elig-badge.no { background: rgba(239,68,68,.1); color: #f3b8b8; border: 1px solid #7f1d1d; }
+.rank-dq { margin: 8px 0; padding: 8px 12px; background: rgba(239,68,68,.08); border: 1px solid #7f1d1d; border-radius: 8px; }
+.rank-dq .lbl { font-size: 11px; color: #f3b8b8; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; }
+.rank-dq ul { margin: 5px 0 0; padding-left: 18px; font-size: 12.5px; color: #f3b8b8; line-height: 1.5; }
+.rank-reasons { margin: 8px 0 0; padding-left: 16px; font-size: 12.5px; color: #c3c9e0; line-height: 1.5; }
+.rank-notes { margin-top: 6px; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 920px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; }
+  .bf-grid { grid-template-columns: 1fr; }
 }

@@ -155,6 +155,7 @@
           <button class="tab active" data-tab="matches" id="tabMatches">Matches</button>
           <button class="tab" data-tab="pipeline" id="tabPipeline">Pipeline <span id="pipelineCount" class="badge">0</span></button>
           <button class="tab" data-tab="insights" id="tabInsights">Insights</button>
+          <button class="tab" data-tab="bench" id="tabBench">Bench</button>
           <button class="tab" data-tab="settings" id="tabSettings">⚙ Settings</button>
         </div>
         <div id="resultMeta" class="muted small"></div>
@@ -234,6 +235,41 @@
           <p>Insights appear once you have applications in your <b>Pipeline</b>.</p>
         </div>
         <div id="insightsBody"></div>
+      </div>
+
+      <!-- ===== Bench view ===== -->
+      <div id="view-bench" class="hidden">
+        <div class="bench-tabs">
+          <button class="bench-subtab active" data-bench="consultants" type="button">Consultants</button>
+          <button class="bench-subtab" data-bench="house" type="button">House identity</button>
+          <button class="bench-subtab" data-bench="staff" type="button">Staff a gig</button>
+        </div>
+
+        <!-- ----- A) Consultants (the bench) ----- -->
+        <div id="bench-consultants" class="bench-section">
+          <div class="bench-head">
+            <h3>Your bench</h3>
+            <button id="benchAddToggle" class="btn ghost small" type="button">＋ Add consultant</button>
+          </div>
+          <div id="consultantForm" class="bench-form hidden"></div>
+          <div id="consultantList" class="bench-list"></div>
+        </div>
+
+        <!-- ----- B) House identity ----- -->
+        <div id="bench-house" class="bench-section hidden">
+          <h3>House identity</h3>
+          <p class="muted small">Who your consulting house is — used to frame how the bench is presented to clients.</p>
+          <div id="houseForm" class="bench-form"></div>
+        </div>
+
+        <!-- ----- C) Staff a gig ----- -->
+        <div id="bench-staff" class="bench-section hidden">
+          <h3>Staff a gig</h3>
+          <p class="muted small">Paste a gig or brief, then rank your bench against it — best fit first.</p>
+          <div id="gigForm" class="bench-form"></div>
+          <div id="rankLoading" class="loading hidden"><div class="spinner"></div><p>Ranking your bench…</p></div>
+          <div id="rankResults" class="rank-results"></div>
+        </div>
       </div>
 
       <!-- ===== Settings view ===== -->

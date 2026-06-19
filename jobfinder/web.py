@@ -22,7 +22,13 @@ from . import alerts
 from .applications import (
     STATUSES, SUGGESTED_NEXT, attach_letter, job_snapshot, new_application, set_status,
 )
+from .bench import Project, rank_bench_for_project
 from .config import settings
+from .consultants import (
+    DATA_ORIGINS, ENGAGEMENT_TYPES, STATUSES as CONSULTANT_STATUSES,
+    Consultant, consultant_from_profile, new_consultant,
+)
+from .house import House
 from .cv_parser import CVProfile, build_profile, default_query, extract_text_from_bytes, looks_empty
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
@@ -192,6 +198,91 @@ class ProfileUpdate(BaseModel):
     location: str | None = None
     seniority: str | None = None
     years_experience: int | None = None
+
+
+class ConsultantCreate(BaseModel):
+    """Onboard a bench member. Provide ``text`` (a CV to parse) OR ``cv_id`` (an already-
+    uploaded profile) to seed skills/raw_text, plus any explicit field overrides; or just a
+    ``name`` for a stub to fill in later."""
+    name: str | None = None
+    text: str | None = None
+    cv_id: str | None = None
+    title: str | None = None
+    skills: list[str] | None = None
+    seniority: str | None = None
+    languages: list[str] | None = None
+    available_from: str | None = None
+    available_until: str | None = None
+    hours_per_week: int | None = None
+    cost_rate: float | None = None
+    sell_rate: float | None = None
+    currency: str | None = None
+    engagement_type: str | None = None
+    right_to_present: bool | None = None
+    data_origin: str | None = None
+    source_detail: str | None = None
+    consent_note: str | None = None
+    clearance: str | None = None
+    certifications: list[str] | None = None
+    location: str | None = None
+    remote_ok: bool | None = None
+    notes: str | None = None
+
+
+class ConsultantUpdate(BaseModel):
+    """Edit a bench member. Only provided (non-None) fields are changed."""
+    name: str | None = None
+    title: str | None = None
+    skills: list[str] | None = None
+    seniority: str | None = None
+    languages: list[str] | None = None
+    available_from: str | None = None
+    available_until: str | None = None
+    hours_per_week: int | None = None
+    cost_rate: float | None = None
+    sell_rate: float | None = None
+    currency: str | None = None
+    engagement_type: str | None = None
+    right_to_present: bool | None = None
+    data_origin: str | None = None
+    source_detail: str | None = None
+    consent_note: str | None = None
+    clearance: str | None = None
+    certifications: list[str] | None = None
+    location: str | None = None
+    remote_ok: bool | None = None
+    status: str | None = None
+    notes: str | None = None
+    raw_text: str | None = None
+
+
+class HouseUpdate(BaseModel):
+    """Edit the single-row house identity. Only provided fields are changed."""
+    name: str | None = None
+    tagline: str | None = None
+    voice: str | None = None
+    signatory: str | None = None
+    boilerplate: str | None = None
+    contact: str | None = None
+    website: str | None = None
+
+
+class BenchRankRequest(BaseModel):
+    """Rank the bench against a project. Supply the fields directly, paste a brief as ``text``
+    (parsed for skills when ``skills`` is empty), or pass a search-result ``job`` card. String
+    fields accept null (the UI sends null for empty inputs); the handler coerces null → ""."""
+    title: str | None = None
+    description: str | None = None
+    text: str | None = None
+    skills: list[str] | None = None
+    location: str | None = None
+    remote: bool = False
+    rate_ceiling: float | None = None
+    currency: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    required_clearance: str | None = None
+    job: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -571,6 +662,177 @@ def export_application(aid: str) -> PlainTextResponse:
 @app.get("/api/insights")
 def insights() -> dict:
     return compute_insights(store.list_applications())
+
+
+# ---------------------------------------------------------------------------
+# Consulting engine — the bench (consultants), the house, and gig→bench matching
+# ---------------------------------------------------------------------------
+
+_CONSULTANT_ENUMS = {
+    "engagement_type": (ENGAGEMENT_TYPES, "associate"),
+    "data_origin": (DATA_ORIGINS, "direct_from_subject"),
+    "status": (CONSULTANT_STATUSES, "active"),
+}
+_CONSULTANT_LIST_FIELDS = {"skills", "languages", "certifications"}
+_CONSULTANT_STR_FIELDS = {
+    "name", "title", "seniority", "available_from", "available_until", "currency",
+    "source_detail", "consent_note", "clearance", "location", "notes", "raw_text",
+}
+
+
+def _apply_consultant_fields(c: Consultant, data: dict) -> None:
+    """Apply provided (non-None) fields from a create/update payload onto a Consultant,
+    coercing types and validating the small enum fields (unknown enum value → ignored)."""
+    for k, v in data.items():
+        if v is None or k in ("text", "cv_id"):
+            continue
+        if k in _CONSULTANT_LIST_FIELDS:
+            setattr(c, k, _clean_list(v, lower=(k == "skills")))
+        elif k in _CONSULTANT_ENUMS:
+            allowed, _default = _CONSULTANT_ENUMS[k]
+            vv = str(v).strip().lower()
+            if vv in allowed:
+                setattr(c, k, vv)
+        elif k in _CONSULTANT_STR_FIELDS:
+            setattr(c, k, str(v).strip())
+        elif k == "hours_per_week":
+            try:
+                c.hours_per_week = max(0, min(int(v), 168))
+            except (TypeError, ValueError):
+                pass
+        elif k in ("cost_rate", "sell_rate"):
+            try:
+                setattr(c, k, float(v))
+            except (TypeError, ValueError):
+                pass
+        elif k in ("right_to_present", "remote_ok"):
+            setattr(c, k, bool(v))
+    c.updated = time.time()
+
+
+@app.post("/api/consultants")
+def create_consultant(req: ConsultantCreate) -> JSONResponse:
+    """Add a bench member — seeded from pasted CV text, an existing cv_id, or just a name."""
+    data = req.model_dump()
+    if req.text and req.text.strip():
+        profile = build_profile(req.text)
+        cv_id = _store_profile(profile)
+        c = consultant_from_profile(profile, cv_id=cv_id)
+    elif req.cv_id:
+        profile = store.get_profile(req.cv_id)
+        if profile is None:
+            raise HTTPException(status_code=404, detail="CV not found — upload it again.")
+        c = consultant_from_profile(profile, cv_id=req.cv_id)
+    else:
+        c = new_consultant((req.name or "").strip() or "Unnamed consultant")
+    _apply_consultant_fields(c, data)             # explicit overrides win over the parsed CV
+    if not (c.name or "").strip():
+        c.name = "Unnamed consultant"
+    store.save_consultant(c)
+    return JSONResponse(c.to_dict())
+
+
+@app.get("/api/consultants")
+def list_consultants() -> dict:
+    return {
+        "consultants": [c.to_dict() for c in store.list_consultants()],
+        "engagement_types": list(ENGAGEMENT_TYPES),
+        "data_origins": list(DATA_ORIGINS),
+        "statuses": list(CONSULTANT_STATUSES),
+    }
+
+
+@app.get("/api/consultants/{cid}")
+def get_consultant(cid: str) -> JSONResponse:
+    c = store.get_consultant(cid)
+    if c is None:
+        raise HTTPException(status_code=404, detail="Consultant not found.")
+    return JSONResponse(c.to_dict())
+
+
+@app.patch("/api/consultants/{cid}")
+def update_consultant(cid: str, upd: ConsultantUpdate) -> JSONResponse:
+    c = store.get_consultant(cid)
+    if c is None:
+        raise HTTPException(status_code=404, detail="Consultant not found.")
+    _apply_consultant_fields(c, upd.model_dump())
+    store.save_consultant(c)
+    return JSONResponse(c.to_dict())
+
+
+@app.delete("/api/consultants/{cid}")
+def delete_consultant(cid: str) -> dict:
+    store.delete_consultant(cid)
+    return {"ok": True}
+
+
+@app.get("/api/house")
+def get_house() -> JSONResponse:
+    h = store.get_house() or House()
+    return JSONResponse(h.to_dict())
+
+
+@app.post("/api/house")
+def update_house(upd: HouseUpdate) -> JSONResponse:
+    h = store.get_house() or House()
+    for k, v in upd.model_dump().items():
+        if v is not None:
+            setattr(h, k, str(v).strip())
+    if not h.created:
+        h.created = time.time()
+    h.updated = time.time()
+    store.save_house(h)
+    return JSONResponse(h.to_dict())
+
+
+def _bench_match_payload(m) -> dict:
+    return {
+        "consultant": m.consultant.to_dict(),
+        "score": m.score,
+        "eligible": m.eligible,
+        "disqualifiers": m.disqualifiers,
+        "matched_skills": m.matched_skills,
+        "missing_skills": m.missing_skills,
+        "reasons": m.reasons,
+        "notes": m.notes,
+    }
+
+
+@app.post("/api/bench/rank")
+def rank_bench(req: BenchRankRequest) -> JSONResponse:
+    """Match the whole bench against one project (an ingested posting or a pasted brief) and
+    return consultants ranked best-first, ineligible ones zeroed with explicit reasons."""
+    job = req.job if isinstance(req.job, dict) else None
+    title = (req.title or (job or {}).get("title") or "").strip()
+    description = (req.description or req.text or (job or {}).get("description") or "").strip()
+    skills = _clean_list(req.skills, lower=True) if req.skills is not None else None
+    if not skills and job and isinstance(job.get("job_skills"), list):
+        skills = _clean_list(job.get("job_skills"), lower=True)
+    if not title and not description:
+        raise HTTPException(status_code=400, detail="Describe the project (a title, brief, or job).")
+    project = Project(
+        title=title or "Untitled project",
+        description=description,
+        skills=skills or [],
+        location=(req.location or (job or {}).get("location") or "").strip(),
+        remote=bool(req.remote or (job or {}).get("remote")),
+        rate_ceiling=req.rate_ceiling,
+        currency=(req.currency or "").strip(),
+        start_date=(req.start_date or "").strip(),
+        end_date=(req.end_date or "").strip(),
+        required_clearance=(req.required_clearance or "").strip(),
+        source=((job or {}).get("source") or "").strip(),
+        url=((job or {}).get("url") or "").strip(),
+    )
+    # Load the bench once (short lock), then score OUTSIDE any store lock (bench.py is pure).
+    consultants = store.list_consultants()
+    ranked = rank_bench_for_project(project, consultants)
+    return JSONResponse({
+        "project": {"title": project.title, "skills": project.skills, "location": project.location,
+                    "remote": project.remote, "source": project.source, "url": project.url},
+        "matches": [_bench_match_payload(m) for m in ranked],
+        "bench_size": len(consultants),
+    })
 
 
 # ---------------------------------------------------------------------------
