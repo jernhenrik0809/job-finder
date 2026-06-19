@@ -464,3 +464,28 @@ def test_new_opportunity_coerces_non_string_description():
     from jobfinder.opportunities import new_opportunity
     opp = new_opportunity({"title": "X", "description": 123})   # must not raise
     assert isinstance(opp.description, str)
+
+
+def test_do_not_bid_client_blocks_generate_and_export_with_audited_override():
+    """A do-not-bid client must block proposal generation AND export (not just show a UI badge);
+    an explicit override proceeds but is recorded in the audit trail."""
+    from fastapi.testclient import TestClient
+    from jobfinder.web import app
+    c = TestClient(app)
+    anna = c.post("/api/consultants", json={"name": "Anna", "text": "Python dev", "skills": ["python"],
+                                            "sell_rate": 900, "currency": "DKK"}).json()
+    cl = c.post("/api/clients", json={"name": "Globex", "do_not_bid": True}).json()
+    opp = c.post("/api/opportunities", json={"title": "Py gig", "description": "python work",
+                                             "consultant_ids": [anna["id"]]}).json()
+    c.patch(f"/api/opportunities/{opp['id']}", json={"client_id": cl["id"]})
+
+    assert c.post(f"/api/opportunities/{opp['id']}/proposal", json={}).status_code == 409
+    g = c.post(f"/api/opportunities/{opp['id']}/proposal", json={"override_do_not_bid": True})
+    assert g.status_code == 200
+    assert any(e["type"] == "do_not_bid_override" for e in g.json()["opportunity"]["events"])
+
+    assert c.get(f"/api/opportunities/{opp['id']}/export").status_code == 409
+    e = c.get(f"/api/opportunities/{opp['id']}/export?override_do_not_bid=true")
+    assert e.status_code == 200 and "attachment" in e.headers.get("content-disposition", "")
+    events = [x["type"] for x in c.get(f"/api/opportunities/{opp['id']}").json()["events"]]
+    assert events.count("do_not_bid_override") == 2 and "exported" in events   # both overrides audited

@@ -2,6 +2,27 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.35.0] — 2026-06-19
+
+### Fixed — `do_not_bid` is now actually enforced (completeness-review finding)
+A proposal-completeness review found that the `do_not_bid` client flag was a UI badge only — it was
+**enforced nowhere**, despite `docs/BUILD_PLAN.md` claiming "do_not_bid clients blocked" as built.
+- `POST /api/opportunities/{id}/proposal` and `GET /api/opportunities/{id}/export` now **block (409)**
+  when the opportunity's linked client is `do_not_bid`, unless an explicit override is passed
+  (`override_do_not_bid` body flag / query param), which is **recorded as a `do_not_bid_override`
+  audit event** on the opportunity's timeline. Regression test added. 378 tests pass.
+
+### Docs — folded the completeness-review must-adds into the Phase-4 brief & playbook
+- **Build brief** (`docs/proposal-doc-engine-brief.md`): the document engine must derive the proposed
+  team from `opp.staffed` (authoritative), never the editable body or caller ids, and re-run the QA
+  gate against that set (closes a stale-team bypass); honour the do-not-bid guardrail; and an
+  acceptance criterion now requires **verified** accessibility (veraPDF / structure-tree assert), not
+  just targeted. Plus a "deferred build decisions" list (versioning, bundling, watermark, signature,
+  output language, fonts, byte-stability).
+- **Playbook** (`docs/proposal-playbook.md`): a new "Open items" section — the put-forward-consent
+  gate, the commercial-terms layer (offer validity, payment, VAT, liability cap + PI-insurance, IP,
+  COI, DPA-readiness), and process/learning items — with what's done vs. pre-Phase-4 vs. later.
+
 ## [1.34.0] — 2026-06-19
 
 ### Fixed — full correctness audit of the consulting engine (15 confirmed findings)

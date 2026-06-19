@@ -90,7 +90,7 @@ These guardrails are **decided** and constrain every ticket below:
 
 | id | title | effort | risk | key files |
 |---|---|---|---|---|
-| **P2-OPPORTUNITY-ENTITY** | Generalize `Application` into `Opportunity` (warm `client_id` OR posting snapshot w/ `source_uid`, staffed consultant ids, economics, bid lifecycle); reuse the event-timeline + validated-status engine; `do_not_bid` clients blocked | L | medium | `opportunities.py`, `applications.py`, `store/base.py`, `store/sqlite.py`, `store/memory.py` |
+| **P2-OPPORTUNITY-ENTITY** | Generalize `Application` into `Opportunity` (warm `client_id` OR posting snapshot w/ `source_uid`, staffed consultant ids, economics, bid lifecycle); reuse the event-timeline + validated-status engine; `do_not_bid` clients blocked at proposal generate/export (v1.35.0, audited override) | L | medium | `opportunities.py`, `applications.py`, `store/base.py`, `store/sqlite.py`, `store/memory.py` |
 | **P2-SCHEMA-V5-MIGRATION** | **The single v5 owner.** Bump `_SCHEMA_VERSION` 4→5 once; register house/consultants/clients/opportunities/credibility tables; add the cross-cutting export/delete completeness test | S | low | `store/sqlite.py`, `store/__init__.py` |
 | **P1-CORPUS-RECORDS** | `CaseStudy`/`Reference`/`Certification`/`Award` dataclasses; `corpus_for_prompt` (attributable-only) + `citable_index` (real clients/metrics) for the QA gate | M | low | `credibility.py`, `applications.py` |
 | **P1-CONSULTANT-PROFILES** | Per-consultant grounding view + `consultant_skill_index` (canonicalized) for per-consultant claim attribution | M | low | `credibility.py`, `skills.py` |

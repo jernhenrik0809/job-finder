@@ -36,7 +36,7 @@ from .engine import SearchSettings, find_jobs
 from .guardrails import check_letter, check_proposal, has_blocking
 from .opportunities import (
     STATUSES as OPP_STATUSES, SUGGESTED_NEXT as OPP_SUGGESTED_NEXT,
-    attach_proposal, margin_of, new_opportunity, record_export, set_staffing,
+    attach_proposal, margin_of, new_opportunity, record_event, record_export, set_staffing,
     set_status as set_opp_status,
 )
 from .proposals import ProposalOptions, generate_proposal
@@ -381,6 +381,7 @@ class OpportunityProposalRequest(BaseModel):
     length: str = "standard"
     use_llm: bool = True
     redact_pii: bool | None = None
+    override_do_not_bid: bool = False      # bid anyway for a do-not-bid client (audited)
 
 
 # ---------------------------------------------------------------------------
@@ -1110,6 +1111,27 @@ def delete_opportunity(oid: str) -> dict:
     return {"ok": True}
 
 
+def _do_not_bid_client(opp):
+    """The linked client if this opportunity is for a do-not-bid account, else None. Enforces the
+    do_not_bid guardrail at the bid-production points (a UI badge alone never blocked anything)."""
+    if getattr(opp, "client_id", ""):
+        c = store.get_client(opp.client_id)
+        if c is not None and c.do_not_bid:
+            return c
+    return None
+
+
+def _block_do_not_bid(opp, override: bool):
+    """Raise 409 for a do-not-bid client unless explicitly overridden. Returns the offending client
+    when overridden (so the caller can audit it on its own persisted save), else None."""
+    dnb = _do_not_bid_client(opp)
+    if dnb is not None and not override:
+        raise HTTPException(status_code=409, detail={
+            "message": f"Client “{dnb.name}” is marked do-not-bid. Re-submit with override to proceed.",
+            "do_not_bid": True, "client": dnb.name})
+    return dnb
+
+
 @app.post("/api/opportunities/{oid}/proposal")
 def generate_opportunity_proposal(oid: str, req: OpportunityProposalRequest) -> JSONResponse:
     """Draft a proposal INTO the opportunity, run the QA gate, and persist the artifact + QA +
@@ -1117,6 +1139,9 @@ def generate_opportunity_proposal(oid: str, req: OpportunityProposalRequest) -> 
     opp = store.get_opportunity(oid)
     if opp is None:
         raise HTTPException(status_code=404, detail="Opportunity not found.")
+    dnb = _block_do_not_bid(opp, req.override_do_not_bid)         # do-not-bid guardrail
+    if dnb is not None:
+        record_event(opp, "do_not_bid_override", f"Drafted despite do-not-bid client “{dnb.name}”")
     ids = req.consultant_ids if req.consultant_ids else [ln.get("consultant_id") for ln in (opp.staffed or [])]
     consultants = _load_consultants(ids)
     if not consultants:
@@ -1139,12 +1164,13 @@ def generate_opportunity_proposal(oid: str, req: OpportunityProposalRequest) -> 
 
 
 @app.get("/api/opportunities/{oid}/export")
-def export_opportunity_proposal(oid: str) -> PlainTextResponse:
-    """Export the opportunity's stored proposal — re-runs the QA gate (409 if blocking) and logs
-    a human-export audit event."""
+def export_opportunity_proposal(oid: str, override_do_not_bid: bool = False) -> PlainTextResponse:
+    """Export the opportunity's stored proposal — enforces the do-not-bid guardrail, re-runs the QA
+    gate (409 if blocking), and logs a human-export audit event."""
     opp = store.get_opportunity(oid)
     if opp is None:
         raise HTTPException(status_code=404, detail="Opportunity not found.")
+    dnb = _block_do_not_bid(opp, override_do_not_bid)         # do-not-bid guardrail
     body = (opp.proposal_body or "").strip()
     if not body:
         raise HTTPException(status_code=400, detail="No proposal drafted yet.")
@@ -1153,7 +1179,12 @@ def export_opportunity_proposal(oid: str) -> PlainTextResponse:
         raise HTTPException(status_code=409, detail={
             "message": "This proposal didn't pass the fabrication check — fix the flagged items before export.",
             "findings": findings})
-    store.update_opportunity(oid, record_export)             # audit: a human took it from here
+
+    def _finish(o):                                          # audit: a human took it from here
+        if dnb is not None:
+            record_event(o, "do_not_bid_override", f"Exported despite do-not-bid client “{dnb.name}”")
+        record_export(o)
+    store.update_opportunity(oid, _finish)
     safe = "".join(c if c.isalnum() or c in " -_" else "" for c in opp.title).strip()
     filename = (safe or "proposal")[:60].replace(" ", "_") + ".txt"
     subject = (opp.proposal_subject or "").strip()

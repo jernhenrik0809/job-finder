@@ -221,6 +221,39 @@ These are not style preferences — most are **export-blocking** (HTTP 409 via `
 
 ---
 
+## 6. Open items (from the completeness review)
+
+A gap hunt (commercial/legal · document-engine · process/trust lenses) confirmed the anatomy above
+is sound but surfaced items the data model doesn't yet carry. Verdict: **close, but address the
+trust gates before Phase 4.**
+
+**Trust gates — do before the document engine ships (the render would inherit them):**
+- **Do-not-bid enforcement — DONE (v1.35.0).** `do_not_bid` is now enforced server-side at proposal
+  *generate* and *export* (409 unless an audited `do_not_bid_override`), not just a UI badge.
+- **Put-forward consent gate.** A consultant with `data_origin` ∈ {`third_party`, `public_source`}
+  and no `consent_note` should not be rendered into a binding client bid without an explicit
+  per-opportunity consent acknowledgement (or a hard human-review warning). This is *put-forward*
+  consent — distinct from the deliberately-deferred GDPR retention/erasure machinery (DECISIONS D5).
+  *Recommended: a non-blocking advisory surfaced in the bid UI + the document engine.*
+- **Authoritative team = `opp.staffed`.** The QA re-check must run against the staffed bid lines,
+  not the editable body or caller-supplied ids (closes a stale-team fabrication bypass). Specced in
+  the build brief §4.9.
+
+**Commercial-terms layer — a bid is the first draft of a contract (add as schema-tolerant fields):**
+- Offer **validity/expiry** (`Opportunity.offer_valid_until`); **payment terms**, **liability cap**
+  + **PI-insurance** cover, and **annual turnover** (on `House` — the last two are TED ESPD
+  *selection* criteria that exclude at selection); **VAT / reverse-charge** convention and an
+  ex-VAT note in §2.7; **IP / work-product ownership** default in §2.8.
+- **Conflict-of-interest** declaration (TED exclusion ground) and a one-line **DPA-readiness** cue
+  ("a standard Art. 28 DPA will be executed before processing") when the engagement processes the
+  client's personal data — document-only, the engine never drafts the DPA.
+
+**Process / learning (later):** capture a structured **won-AND-lost outcome debrief** (reason, final
+rate) on terminal transitions — the positive-label set the deferred win/loss tuning needs; a
+cross-live-bid **double-booking** soft check; **reference-consent** flags on the future `CaseStudy`
+entity. **Out of scope (noted):** consortium / capacity-reliance TED joint bids (single-house,
+single-bench today).
+
 ## Sources
 
 Synthesized from the v1.34.0 research brief (two lenses: the winning-proposal-content lens and the document-generation-architecture lens) and verified against the real code: `jobfinder/proposals.py` (`generate_proposal`, `generate_template`, `_relevant_skills`, `ProposalDraft`, `ProposalOptions`), `jobfinder/house.py` (`House` — no logo/color/font fields), `jobfinder/consultants.py` (`Consultant` — `right_to_present`, `cost_rate`/`sell_rate`, `engagement_type`, `clearance`, `certifications`, provenance fields), `jobfinder/bench.py` (`Project`, `rank_consultants`/`BenchMatch`), `jobfinder/opportunities.py` (`Opportunity`, `staffed[]`, `events[]`, `record_export`), and `jobfinder/guardrails.py` (`check_proposal`, `has_blocking`). Research-attributed claims (the "reads like an agreement" framing, the ~70/30 DK quality/price weighting, three-tier ~1:1.6:2.5 pricing, the EU Accessibility Act / EN 301 549 / PDF/UA gate, "92% trust peer recommendations", "five strong beats twenty-five generic") are drawn from the supplied research and tagged in-line above.
