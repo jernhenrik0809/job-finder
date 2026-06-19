@@ -922,6 +922,43 @@ def test_findwork_requires_token_then_parses():
     assert "Build APIs" in j.description and "Django" in j.description
 
 
+def test_job_id_prefers_source_uid_and_namespaces_by_source():
+    from jobfinder.sources.base import Job
+    a = Job(title="Java Consultant", company="Verama", location="CPH",
+            source="Verama (consulting)", source_uid="1001")
+    b = Job(title="Java Consultant", company="Verama", location="CPH",
+            source="Verama (consulting)", source_uid="1002")
+    c = Job(title="Java Consultant", company="Verama", location="CPH",
+            source="Verama (consulting)", source_uid="1001")
+    assert a.id != b.id          # distinct assignments (same title/company/location) stay distinct
+    assert a.id == c.id          # same source_uid collapses to one
+    d = Job(title="Java Consultant", company="Verama", location="CPH",
+            source="Other Board", source_uid="1001")
+    assert a.id != d.id          # same uid on a different board must not collide (namespaced by source)
+    # legacy: no source_uid -> unchanged company|title|location identity
+    e = Job(title="Dev", company="Acme", location="CPH")
+    f = Job(title="Dev", company="Acme", location="CPH")
+    assert e.id == f.id
+
+
+def test_engine_dedup_keeps_distinct_assignments_with_same_title():
+    from jobfinder.engine import find_jobs, SearchSettings
+    from jobfinder.cv_parser import build_profile
+    from jobfinder.sources.base import Job
+
+    class _GigSrc:
+        def search(self, **k):
+            mk = lambda uid: Job(title="Senior Java Consultant", company="Verama",
+                                 location="Copenhagen", source="Verama (consulting)",
+                                 source_uid=uid, employment_type="contract")
+            return [mk("1001"), mk("1002"), mk("1001")]   # two distinct gigs + an exact duplicate
+
+    prof = build_profile("Jane Doe\nJava Consultant\nSkills: Java")
+    with patch("jobfinder.engine.get_source", return_value=_GigSrc()):
+        res = find_jobs(prof, SearchSettings(sources=["verama"]))
+    assert len({j.id for j in res.jobs}) == 2    # the two systemIds survive; the duplicate collapses
+
+
 def test_engine_gigs_only_warns_when_it_filters_everything():
     from jobfinder.engine import find_jobs, SearchSettings
     from jobfinder.cv_parser import build_profile

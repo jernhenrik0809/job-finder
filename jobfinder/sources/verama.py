@@ -99,6 +99,7 @@ class VeramaSource(JobSource):
                     url=f"https://app.verama.com/en/public/job-requests/{sid}" if sid else "",
                     description=desc,
                     source="Verama (consulting)",
+                    source_uid=sid,                          # every assignment is company="Verama"; sid keeps them distinct
                     posted=iso_date(j.get("createdDate") or j.get("distributionDate") or j.get("publicationDate")),
                     salary=_rate(j),
                     remote=_is_remote(j.get("remoteness")),

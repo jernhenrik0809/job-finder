@@ -69,6 +69,8 @@ class HackerNewsSource(JobSource):
                 url=f"https://news.ycombinator.com/item?id={c['id']}" if c.get("id") else "",
                 description=desc,
                 source="Hacker News (gigs)",
+                source_uid=str(c.get("id") or ""),           # HN comment id is unique per gig
+
                 posted=iso_date(c.get("created_at")),
                 remote="remote" in f"{header} {desc}".lower(),
                 employment_type="freelance",

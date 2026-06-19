@@ -13,6 +13,11 @@ class Job:
     url: str = ""
     description: str = ""
     source: str = ""
+    # A source-provided UNIQUE id for this posting (e.g. Verama systemId, TED publication-number,
+    # HN comment id, Freelancer project id). Used for de-dup so listings from a board that reuses
+    # one company name (Verama: every assignment is "Verama") don't collapse into one. Optional —
+    # sources that don't set it keep the legacy company+title+location identity unchanged.
+    source_uid: str = ""
     posted: str = ""                       # human-readable "posted" string if available
     salary: str = ""
     remote: bool = False
@@ -29,8 +34,13 @@ class Job:
 
     @property
     def id(self) -> str:
-        """Stable id for de-duplication (company+title+location)."""
-        key = f"{self.company}|{self.title}|{self.location}".lower()
+        """Stable id for de-duplication. Prefer a source-provided unique id (namespaced by
+        ``source`` so ids from different boards can't collide); otherwise fall back to the legacy
+        company+title+location hash, so sources that don't set ``source_uid`` are unchanged."""
+        if self.source_uid:
+            key = f"{self.source}|{self.source_uid}".lower()
+        else:
+            key = f"{self.company}|{self.title}|{self.location}".lower()
         return hashlib.md5(key.encode("utf-8")).hexdigest()[:12]
 
     def to_dict(self) -> dict:

@@ -2,6 +2,26 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.26.1] — 2026-06-19
+
+### Fixed — silent de-dup data loss on gig sources (P0-JOBID-SOURCE-UID)
+Distinct postings from sources that reuse one company name were being silently dropped. `Job.id`
+hashed only `company|title|location`, so every Verama assignment (all `company="Verama"`) with the
+same title/location collapsed to one id and `engine.find_jobs` de-dup discarded the rest — verified
+by repro (two distinct assignments → identical id, one survived).
+- Added an optional `source_uid` to `Job`; `Job.id` now prefers it (namespaced by `source` so ids
+  can't collide across boards) and falls back to the legacy `company|title|location` hash when unset.
+- Wired the unique id each source already computed for its URL into `source_uid`: Verama `systemId`,
+  EU TED `publication-number`, Hacker News comment id, Freelancer project id/slug.
+- **Backward-compatible:** sources that don't set `source_uid` keep their exact legacy id, so the
+  job-seeker app, cross-source de-dup, and the calibration/security suites are unchanged.
+- This is the first increment of the consulting-house pursuit engine (see `docs/BUILD_PLAN.md`): a
+  hard prerequisite for the Opportunity/staffing layer and the posting-driven channel.
+
+### Added — `docs/BUILD_PLAN.md`
+Phased, ticket-level build plan for evolving the matcher into a consulting-house opportunity-to-
+proposal engine (auto-generate proposals, human always sends; direct-warm channel first).
+
 ## [1.26.0] — 2026-06-19
 
 ### Added — wired two documented-but-unwired integrable sources (→ 30)

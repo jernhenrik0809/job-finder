@@ -98,6 +98,7 @@ class FreelancerSource(JobSource):
                 url=f"https://www.freelancer.com/projects/{seo}" if seo else "",
                 description=desc,
                 source="Freelancer",
+                source_uid=(str(p.get("id") or "").strip() or seo),   # project id (or slug) — every gig is company=""
                 posted=_posted(p.get("submitdate") or p.get("time_submitted")),
                 salary=_salary(p),
                 remote=True,

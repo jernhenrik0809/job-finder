@@ -92,6 +92,8 @@ class TEDSource(JobSource):
                     url=f"https://ted.europa.eu/en/notice/{pubnum}/html" if pubnum else "",
                     description=desc,
                     source="EU TED (tender)",
+                    source_uid=pubnum,                       # publication-number is the unique notice id
+
                     posted=iso_date(n.get("publication-date")),
                     employment_type="contract",
                 ))
