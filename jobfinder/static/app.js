@@ -28,6 +28,8 @@ const el = {
   tabBench: $('#tabBench'), viewBench: $('#view-bench'),
   consultantForm: $('#consultantForm'), consultantList: $('#consultantList'), benchAddToggle: $('#benchAddToggle'),
   houseForm: $('#houseForm'), gigForm: $('#gigForm'), rankLoading: $('#rankLoading'), rankResults: $('#rankResults'),
+  propBar: $('#propBar'), propSelCount: $('#propSelCount'), propClearSel: $('#propClearSel'), genProposalBtn: $('#genProposalBtn'),
+  propLoading: $('#propLoading'), proposalPanel: $('#proposalPanel'),
   viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'), viewInsights: $('#view-insights'),
   insightsEmpty: $('#insightsEmpty'), insightsBody: $('#insightsBody'),
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
@@ -1070,6 +1072,9 @@ let benchMeta = { engagement_types: ['employee', 'associate', 'subcontractor'], 
 let benchInited = false;          // wire the sub-tabs + house/gig forms once
 let editingConsultantId = null;   // id when the form is editing an existing consultant
 let editingConsultant = null;     // the object being edited (to diff for PATCH)
+const proposalSel = new Set();    // consultant ids ticked for a house proposal
+let lastGigFields = null;         // the project fields from the most recent rank (reused on generate)
+let currentProposal = null;       // the last generated proposal {id, subject, body, project_title, ...}
 
 function loadBench() {
   if (!benchInited) {
@@ -1338,7 +1343,12 @@ async function rankBench() {
     currency: q('#gigCurrency').value.trim(),
     start_date: q('#gigStart').value || null,
   };
+  lastGigFields = body;             // reused verbatim when generating a proposal
   el.rankResults.innerHTML = '';
+  // a fresh rank invalidates any in-progress proposal selection
+  proposalSel.clear(); currentProposal = null;
+  el.proposalPanel.classList.add('hidden'); el.proposalPanel.innerHTML = '';
+  updatePropBar();
   el.rankLoading.classList.remove('hidden');
   const btn = q('#rankBtn'); btn.disabled = true;
   try {
@@ -1360,15 +1370,32 @@ function renderRankResults(data) {
   }
   el.rankResults.innerHTML = `<div class="muted small rank-meta">${esc(meta)}</div>` +
     matches.map(rankCard).join('');
+  // wire the per-card "add to proposal" checkboxes (eligible cards only carry one)
+  el.rankResults.querySelectorAll('.rank-pick input').forEach(cb => {
+    const id = cb.closest('.rank-card').dataset.cid;
+    cb.checked = proposalSel.has(id);
+    cb.addEventListener('change', () => {
+      if (cb.checked) proposalSel.add(id); else proposalSel.delete(id);
+      updatePropBar();
+    });
+  });
+  // show the proposal bar as soon as there's at least one eligible consultant to pick
+  const hasEligible = matches.some(m => m.eligible && m.consultant && m.consultant.id);
+  el.propBar.classList.toggle('hidden', !hasEligible);
+  updatePropBar();
 }
 
 function rankCard(m) {
   const c = m.consultant || {};
+  const cid = c.id || '';
   const score = Math.round(m.score || 0);
   const band = m.eligible ? (score >= 65 ? 'strong' : score >= 40 ? 'good' : 'fair') : 'weak';
   const badge = m.eligible
     ? '<span class="elig-badge ok">eligible</span>'
     : '<span class="elig-badge no">ineligible</span>';
+  // only eligible consultants (with an id) can be added to a proposal
+  const pick = (m.eligible && cid)
+    ? `<label class="rank-pick" title="Add to proposal"><input type="checkbox" aria-label="Add ${esc(c.name || 'consultant')} to proposal" /></label>` : '';
   const dq = (m.disqualifiers || []).length
     ? `<div class="rank-dq"><span class="lbl">✕ disqualifiers</span><ul>${m.disqualifiers.map(d => `<li>${esc(d)}</li>`).join('')}</ul></div>` : '';
   const matched = (m.matched_skills || []).map(s => `<span class="chip matched">${esc(s)}</span>`).join('');
@@ -1380,9 +1407,10 @@ function rankCard(m) {
   const sub = [c.title ? `<b>${esc(c.title)}</b>` : '', c.seniority ? esc(c.seniority) : '', c.engagement_type ? esc(c.engagement_type) : '']
     .filter(Boolean).join('<span> · </span>');
   return `
-    <div class="rank-card${m.eligible ? '' : ' ineligible'}">
+    <div class="rank-card${m.eligible ? '' : ' ineligible'}" data-cid="${esc(cid)}">
       <div class="score-wrap">
         <div class="score ${band}">${score}<small>${m.eligible ? 'fit' : '—'}</small></div>
+        ${pick}
       </div>
       <div class="rank-main">
         <div class="rank-head"><h4>${esc(c.name || 'Unnamed')}</h4>${badge}</div>
@@ -1394,6 +1422,140 @@ function rankCard(m) {
         ${notes}
       </div>
     </div>`;
+}
+
+// ----- C2) house proposal (generate → review/QA → export) -----
+function updatePropBar() {
+  el.propSelCount.textContent = proposalSel.size;
+  el.genProposalBtn.disabled = proposalSel.size === 0;
+}
+
+el.propClearSel.addEventListener('click', () => {
+  proposalSel.clear();
+  el.rankResults.querySelectorAll('.rank-pick input:checked').forEach(cb => { cb.checked = false; });
+  updatePropBar();
+});
+el.genProposalBtn.addEventListener('click', generateProposal);
+
+async function generateProposal() {
+  if (proposalSel.size === 0) return;
+  const ids = [...proposalSel];
+  const g = lastGigFields || {};
+  const body = {
+    title: g.title || '',
+    description: g.description || '',
+    skills: g.skills || [],
+    location: g.location || '',
+    remote: !!g.remote,
+    rate_ceiling: g.rate_ceiling != null ? g.rate_ceiling : null,
+    currency: g.currency || '',
+    start_date: g.start_date || null,
+    consultant_ids: ids,
+  };
+  el.proposalPanel.classList.add('hidden');
+  el.propLoading.classList.remove('hidden');
+  el.genProposalBtn.disabled = true;
+  try {
+    const resp = await fetch('/api/proposals/generate', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Proposal generation failed');
+    currentProposal = data.proposal || {};
+    renderProposal(data);
+  } catch (err) {
+    showWarnings(['Proposal: ' + err.message]);
+  } finally {
+    el.propLoading.classList.add('hidden');
+    el.genProposalBtn.disabled = proposalSel.size === 0;
+  }
+}
+
+// Render the generated proposal into the review panel: editable subject + body,
+// the QA (fabrication) findings, and an Export button gated by the QA result.
+function renderProposal(data) {
+  const p = data.proposal || {};
+  const names = (p.consultant_names || []).map(n => `<span class="chip">${esc(n)}</span>`).join('');
+  el.proposalPanel.innerHTML = `
+    <div class="prop-head">
+      <h3>Proposal${p.project_title ? ` — ${esc(p.project_title)}` : ''}</h3>
+      ${p.generator ? `<span class="prop-gen">${p.generator === 'llm' ? '✨ Claude' : 'template'}</span>` : ''}
+    </div>
+    ${names ? `<div class="prop-team"><span class="lbl">Team</span><span class="chips">${names}</span></div>` : ''}
+    ${p.note ? `<p class="dw-note">⚠ ${esc(p.note)}</p>` : ''}
+    <div id="propQa" class="prop-qa"></div>
+    <label class="prop-field">Subject<input id="propSubject" type="text" value="${esc(p.subject || '')}" placeholder="Subject" /></label>
+    <label class="prop-field">Proposal body<textarea id="propBody" rows="16" placeholder="The generated proposal will appear here…">${esc(p.body || '')}</textarea></label>
+    <div class="prop-actions">
+      <button id="propExportBtn" class="btn primary small" type="button">⬇ Export</button>
+      <span class="msg copied" style="display:none">exported ✓</span>
+    </div>`;
+  el.proposalPanel.classList.remove('hidden');
+  renderProposalQa(data.qa || [], !!data.blocking);
+  el.proposalPanel.querySelector('#propExportBtn').addEventListener('click', exportProposal);
+}
+
+// Shared QA renderer — used after generate and again after a refused (409) export.
+function renderProposalQa(findings, blocking) {
+  const box = el.proposalPanel.querySelector('#propQa');
+  if (!box) return;
+  if (!findings.length) {
+    box.innerHTML = `<div class="prop-qa-ok">✓ Passed fabrication checks — nothing flagged.</div>`;
+    return;
+  }
+  const items = findings.map(f => `
+    <div class="guard guard-${f.blocking ? 'high' : 'medium'}">
+      <span class="guard-msg">${f.blocking ? '⛔' : '⚑'} ${esc(f.message)}</span>
+      ${(f.items && f.items.length) ? `<div class="guard-items">${f.items.map(i => `<code>${esc(i)}</code>`).join(' ')}</div>` : ''}
+    </div>`).join('');
+  box.innerHTML = `
+    <div class="prop-qa-banner ${blocking ? 'blocking' : 'warn'}">
+      ${blocking ? '⛔ Export is blocked until these are resolved' : '⚑ Review these before sending'}
+    </div>
+    <div class="dw-guards">${items}</div>`;
+}
+
+async function exportProposal() {
+  if (!currentProposal) return;
+  const subjectEl = el.proposalPanel.querySelector('#propSubject');
+  const bodyEl = el.proposalPanel.querySelector('#propBody');
+  const body = bodyEl ? bodyEl.value : '';
+  if (!body.trim()) { showWarnings(['Proposal: add some body text before exporting.']); return; }
+  const payload = {
+    subject: subjectEl ? subjectEl.value : (currentProposal.subject || ''),
+    body,
+    project_title: (lastGigFields && lastGigFields.title) || currentProposal.project_title || '',
+    consultant_ids: [...proposalSel],
+  };
+  const btn = el.proposalPanel.querySelector('#propExportBtn'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/proposals/export', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+    });
+    if (r.ok) {
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `proposal-${(payload.project_title || 'house').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) || 'house'}.txt`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      flash('.prop-actions .msg');
+    } else if (r.status === 409) {
+      // QA gate still blocks — surface the blocking findings so the user can fix the text and retry
+      const detail = (await r.json().catch(() => ({}))).detail || {};
+      renderProposalQa(detail.findings || [], true);
+      showWarnings([detail.message || 'Export refused — the proposal still has blocking findings.']);
+      el.proposalPanel.querySelector('#propQa').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.detail || `Export failed (${r.status})`);
+    }
+  } catch (err) {
+    showWarnings(['Export: ' + err.message]);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // ---------- style examples ----------

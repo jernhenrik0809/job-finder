@@ -2,6 +2,47 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.30.0] — 2026-06-19
+
+### Added — consulting engine: proposal generator + fabrication QA gate (Phase 2)
+The house can now auto-**generate a proposal** for a gig and a chosen consultant, and a human
+exports & sends it — never auto-sent, and never a fabrication.
+- **`proposals.py`** — a house-voice proposal generator forked from `drafts.py`: third-person
+  (author = the house, subjects = the proposed consultants), grounded ONLY on the chosen
+  consultants' real CVs + the house identity, structured sections (understanding / proposed team
+  / why-us / next steps). Offline **template** path (grounds bios only in skills a consultant
+  actually has) + optional **Claude** path that falls back to the template on error.
+  `api.anthropic.com` stays the only LLM egress; redaction defaults to `settings.redact_pii_default`.
+- **`guardrails.check_proposal` + `has_blocking`** — the QA gate that turns "never fabricate"
+  into an enforced property: flags a capability claimed for **no** proposed consultant
+  (`unsupported_capability`), one **misattributed** to the wrong named consultant, claims with
+  **no grounding** to verify against (fail-closed), and placeholders — in **English and Danish**.
+  `check_letter` is left untouched.
+- **Endpoints:** `POST /api/proposals/generate` (draft + QA findings + `blocking` flag) and
+  `POST /api/proposals/export` — which **re-runs the QA gate and refuses with 409** if a blocking
+  finding remains, so an edited fabrication can't slip out.
+- **Bench UI:** after ranking, select consultant(s) → Generate proposal → review/edit → see QA
+  findings → Export (download), with export visibly **blocked** while a fabrication is flagged.
+
+Built via two parallel agents on disjoint files (frontend + tests) against the verified backend
+contract; integrated and preview-verified by the main thread (clean export downloads; a
+fabricated body is refused at export).
+
+### Hardened (from adversarial review of the QA gate)
+The fabrication gate is security-critical, so it got its own review pass. Confirmed + fixed:
+- **Action-verb phrasing bypass** — "Anna will **handle** the Kubernetes cluster" slipped past the
+  adjective-only cue check. Added action/assignment cues (EN+DA: handle/implement/architect/
+  deliver/manage/maintain/responsible/lead/…) so it now blocks.
+- **Template self-block** — the offline template echoed the client brief + listed required skills
+  verbatim, so its own output could trip the gate. It now uses neutral framing (grounded team
+  bios carry the skills).
+- **Crash/precision fixes** — a non-list `skills` field now fails closed instead of creating
+  char-skills; consultant-name matching is word-bounded (so "Per" ≠ "performed"); shared first
+  names are handled instead of silently skipped.
+- **Honest limitation documented** — the gate is a high-precision *assist*, not a complete oracle
+  (it can't see capabilities outside the skills dictionary); the real guarantee remains that a
+  human reviews and sends every proposal. 324 tests pass.
+
 ## [1.29.0] — 2026-06-19
 
 ### Added — consulting engine: web wiring + Bench UI (gig → ranked bench, end-to-end)

@@ -596,6 +596,47 @@ input[type=range] { accent-color: var(--accent); }
 .rank-reasons { margin: 8px 0 0; padding-left: 16px; font-size: 12.5px; color: #c3c9e0; line-height: 1.5; }
 .rank-notes { margin-top: 6px; }
 
+/* per-card "add to proposal" pick (sits under the fit score) */
+.rank-pick { display: flex; justify-content: center; margin-top: 8px; }
+.rank-pick input { width: 17px; height: 17px; cursor: pointer; accent-color: var(--accent); }
+
+/* ---------- house proposal (select → generate → review/QA → export) ---------- */
+.prop-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 16px; margin-top: 16px; font-size: 13px; color: var(--text);
+}
+.prop-bar-actions { display: flex; gap: 8px; align-items: center; }
+.prop-bar .btn.small { margin-top: 0; }
+
+.proposal-panel {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px; margin-top: 16px;
+}
+.prop-head { display: flex; align-items: center; gap: 10px; }
+.prop-head h3 { margin: 0; font-size: 16px; }
+.prop-gen { border-radius: 999px; font-size: 11px; font-weight: 700; padding: 1px 9px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+.prop-team { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; flex-wrap: wrap; }
+.prop-team .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+
+.prop-qa { margin: 12px 0; }
+.prop-qa:empty { display: none; }
+.prop-qa-banner { border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
+.prop-qa-banner.blocking { background: rgba(239, 68, 68, .12); border: 1px solid #7f1d1d; color: #f3b8b8; }
+.prop-qa-banner.warn { background: rgba(245, 158, 11, .1); border: 1px solid #78491c; color: #f3d8a8; }
+.prop-qa-banner + .dw-guards { margin-top: 8px; }
+.prop-qa-ok { background: var(--green-dim); border: 1px solid #1f7a52; color: #b8f3d8; border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 600; }
+
+.prop-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); margin-top: 12px; }
+.prop-field input, .prop-field textarea {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 9px 11px; font: inherit; font-size: 13px; width: 100%;
+}
+.prop-field input { font-weight: 600; }
+.prop-field textarea { resize: vertical; min-height: 240px; line-height: 1.55; font-family: inherit; }
+.prop-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+.prop-actions .btn.small { margin-top: 0; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 920px) {
   .layout { grid-template-columns: 1fr; }

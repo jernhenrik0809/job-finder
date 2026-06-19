@@ -32,7 +32,8 @@ from .house import House
 from .cv_parser import CVProfile, build_profile, default_query, extract_text_from_bytes, looks_empty
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
-from .guardrails import check_letter
+from .guardrails import check_letter, check_proposal, has_blocking
+from .proposals import ProposalOptions, generate_proposal
 from .insights import compute_insights
 from .saved_searches import new_saved_search, register_run, mark_seen
 from .security import LocalSecurityMiddleware, build_allowed_hosts
@@ -283,6 +284,37 @@ class BenchRankRequest(BaseModel):
     end_date: str | None = None
     required_clearance: str | None = None
     job: dict | None = None
+
+
+class ProposalGenerateRequest(BaseModel):
+    """Generate a house proposal for a project (same project fields as BenchRankRequest) putting
+    forward the chosen ``consultant_ids``."""
+    title: str | None = None
+    description: str | None = None
+    text: str | None = None
+    skills: list[str] | None = None
+    location: str | None = None
+    remote: bool = False
+    rate_ceiling: float | None = None
+    currency: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    required_clearance: str | None = None
+    job: dict | None = None
+    consultant_ids: list[str] = []
+    tone: str = "professional"
+    length: str = "standard"
+    use_llm: bool = True
+    redact_pii: bool | None = None          # None → fall back to the server's privacy default
+
+
+class ProposalExportRequest(BaseModel):
+    """Export a (possibly human-edited) proposal as text — re-runs the QA gate and refuses
+    (409) if a blocking finding remains, so an edited fabrication can't slip out."""
+    subject: str | None = None
+    body: str = ""
+    project_title: str | None = None
+    consultant_ids: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -798,18 +830,15 @@ def _bench_match_payload(m) -> dict:
     }
 
 
-@app.post("/api/bench/rank")
-def rank_bench(req: BenchRankRequest) -> JSONResponse:
-    """Match the whole bench against one project (an ingested posting or a pasted brief) and
-    return consultants ranked best-first, ineligible ones zeroed with explicit reasons."""
-    job = req.job if isinstance(req.job, dict) else None
+def _project_from_request(req) -> tuple[Project, bool]:
+    """Build a bench ``Project`` from a request (rank or proposal). Accepts explicit fields, a
+    pasted brief (``text``), or a search-result ``job`` card. Returns (project, has_input)."""
+    job = req.job if isinstance(getattr(req, "job", None), dict) else None
     title = (req.title or (job or {}).get("title") or "").strip()
     description = (req.description or req.text or (job or {}).get("description") or "").strip()
     skills = _clean_list(req.skills, lower=True) if req.skills is not None else None
     if not skills and job and isinstance(job.get("job_skills"), list):
         skills = _clean_list(job.get("job_skills"), lower=True)
-    if not title and not description:
-        raise HTTPException(status_code=400, detail="Describe the project (a title, brief, or job).")
     project = Project(
         title=title or "Untitled project",
         description=description,
@@ -824,6 +853,16 @@ def rank_bench(req: BenchRankRequest) -> JSONResponse:
         source=((job or {}).get("source") or "").strip(),
         url=((job or {}).get("url") or "").strip(),
     )
+    return project, bool(title or description)
+
+
+@app.post("/api/bench/rank")
+def rank_bench(req: BenchRankRequest) -> JSONResponse:
+    """Match the whole bench against one project (an ingested posting or a pasted brief) and
+    return consultants ranked best-first, ineligible ones zeroed with explicit reasons."""
+    project, has_input = _project_from_request(req)
+    if not has_input:
+        raise HTTPException(status_code=400, detail="Describe the project (a title, brief, or job).")
     # Load the bench once (short lock), then score OUTSIDE any store lock (bench.py is pure).
     consultants = store.list_consultants()
     ranked = rank_bench_for_project(project, consultants)
@@ -833,6 +872,65 @@ def rank_bench(req: BenchRankRequest) -> JSONResponse:
         "matches": [_bench_match_payload(m) for m in ranked],
         "bench_size": len(consultants),
     })
+
+
+def _load_consultants(ids: list[str]) -> list:
+    """Load proposed consultants by id, preserving the caller's order, skipping any missing."""
+    out = []
+    for cid in ids or []:
+        c = store.get_consultant(cid)
+        if c is not None:
+            out.append(c)
+    return out
+
+
+@app.post("/api/proposals/generate")
+def generate_proposal_endpoint(req: ProposalGenerateRequest) -> JSONResponse:
+    """Draft a house proposal for a project, putting forward the chosen consultants, then run the
+    QA gate. Returns the draft + findings + a ``blocking`` flag (export is refused while blocking).
+    Never sends anything — a human exports and submits."""
+    project, has_input = _project_from_request(req)
+    if not has_input:
+        raise HTTPException(status_code=400, detail="Describe the project (a title, brief, or job).")
+    consultants = _load_consultants(req.consultant_ids)
+    if not consultants:
+        raise HTTPException(status_code=400, detail="Select at least one consultant to put forward.")
+    # Privacy: a proposal carries third-party (consultant) data — default redaction to the
+    # server's privacy setting unless the caller is explicit.
+    redact = settings.redact_pii_default if req.redact_pii is None else bool(req.redact_pii)
+    options = ProposalOptions(tone=req.tone, length=req.length, use_llm=req.use_llm, redact_pii=redact)
+    examples = [e["text"] for e in store.list_examples()]
+    house = store.get_house() or House()
+    draft = generate_proposal(house, project, consultants, options, examples=examples)
+    findings = check_proposal(draft.body, consultants)
+    return JSONResponse({
+        "proposal": draft.to_dict(),
+        "qa": findings,
+        "blocking": has_blocking(findings),
+        "used_llm": options.use_llm and llm_available(),
+    })
+
+
+@app.post("/api/proposals/export")
+def export_proposal_endpoint(req: ProposalExportRequest) -> PlainTextResponse:
+    """Export a (possibly human-edited) proposal as a text file. Re-runs the QA gate against the
+    proposed consultants and REFUSES with 409 if a blocking finding remains — so an edited
+    fabrication can't slip past the gate on the way out."""
+    body = (req.body or "").strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="Nothing to export.")
+    consultants = _load_consultants(req.consultant_ids)
+    findings = check_proposal(body, consultants)
+    if has_blocking(findings):
+        raise HTTPException(status_code=409, detail={
+            "message": "This proposal didn't pass the fabrication check — fix the flagged items before export.",
+            "findings": findings,
+        })
+    safe = "".join(c if c.isalnum() or c in " -_" else "" for c in (req.project_title or "proposal")).strip()
+    filename = (safe or "proposal")[:60].replace(" ", "_") + ".txt"
+    subject = (req.subject or "").strip()
+    content = (f"Subject: {subject}\n\n{body}\n" if subject else f"{body}\n")
+    return PlainTextResponse(content, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
 
 # ---------------------------------------------------------------------------
