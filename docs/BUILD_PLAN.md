@@ -14,11 +14,19 @@ These guardrails are **decided** and constrain every ticket below:
 | Guardrail | What it means in practice |
 |---|---|
 | **No auto-send, ever** | The engine auto-*generates* proposals + supporting docs; a human submits. No `smtplib`/`imaplib`/`selenium`/`playwright` imports, no `.send_keys(`. `test_no_auto_submit_machinery` and the egress allow-list (`tests/test_security_invariants.py`) stay intact. Output is **prepare-and-EXPORT only**. `api.anthropic.com` remains the only LLM host. |
-| **Direct-warm first, both channels covered** | v1 is shaped around manually pasted-in opportunities (email / call / referral) plus a Client/Contact layer — **no scraping needed for warm**. The posting-driven path (Verama-class marketplace replies / EU TED tenders) plugs into the **same** pipeline as a pluggable second mode. |
+| **Posting-driven is PRIMARY; warm is secondary** | The core loop ingests postings across **all platforms** (the ~30 existing sources, focused on consulting/gig/project — Verama, Freelancer, Hacker News, EU TED, Codeur + contract/freelance-tagged aggregators), matches each against the bench, and auto-drafts a proposal a human reviews and sends. Direct-warm (paste-in + Client/Contact CRM) is a secondary add-on on the **same** pipeline, not the v1 spine. *(Corrected 2026-06-19 — the earlier "direct-warm first" was a misunderstanding.)* |
 | **Single-tenant** | Single house, single operator. No auth, no login, no tenancy now. Keep seams clean so a bigger house could run it later, but do **not** build it. |
 | **Credibility data now, PDF design later** | Build the credibility **data** layer now (case studies, references, certifications, consultant profiles as structured, *citable* records that ground proposals). The polished, Claude-designed, layout-preserving **PDF production engine is deferred to Phase 4** and is intentionally **not** specced here. |
 
 **Cross-cutting invariants enforced by the test suite (do not break):** the runtime egress allow-list, the no-auto-submit import ban, the literal-host lint, and `test_calibration.py` (the job-seeker scoring must stay byte-for-byte identical). Every new entity must also be wired into `export_all`/`delete_all` or it is a silent GDPR data-rights regression.
+
+### Owner decisions resolved (2026-06-19)
+
+- **Channel priority CORRECTED — postings are primary.** The posting-path tickets (`P2-BENCH-POSTING-PATH-PLUGGABLE`, `P3-POSTING-PATH`, `P2-POSTING-SWEEP-BENCH`) **move into Phase 1**; the direct-warm tickets (`P1-PASTE-INTAKE`, `P1-CLIENT-CONTACT-ENTITY`, `P1-CLIENT-VIEW-REMINDERS`) **move to Phase 3**. The ticket specs are unchanged — only their order shifts. Posting scope = **all platforms, gig-focused** (default the bench flow to the `gigs_only` set, but allow any ingested posting).
+- **Encryption-at-rest = DEFERRED** until the bench holds real CVs. Build the pluggable cipher seam later; plaintext is acceptable for prototyping. `P0-ENC-REST` **drops off the near-term critical path** (it was already flagged droppable).
+- **GDPR default = legitimate-interest basis, 24-month flag-only retention** (`P0-CONSENT` keeps the consent/retention *fields*; the default `consent_basis` is `legitimate_interest`).
+- **Storage caps sized for a ~100-consultant bench** (`P0-CAPS-WARN`): set `MAX_CONSULTANTS` and the credibility caps comfortably above 100 (e.g. 300), with a near-cap warning.
+- **De-dup field name frozen as `source_uid`** — shipped in v1.26.1.
 
 ---
 
@@ -48,11 +56,11 @@ These guardrails are **decided** and constrain every ticket below:
 
 ---
 
-### Phase 1 — Direct-warm spine
+### Phase 1 — Bench + posting-driven spine
 
-**Goal.** Build the direct-warm channel end-to-end on the unified data model: House identity, the single canonical Consultant entity (extending P0-CONSENT), Client/Contact CRM, the shared bench-match scorer (**one shared TF-IDF space, not `rank_jobs` in a loop**), the eligibility hard-gate (categorically distinct from the never-penalizing nudges), manual paste-in intake, and a prepare-and-export warm proposal flow.
+**Goal.** Build the PRIMARY posting→bench→proposal loop end-to-end on the unified data model: House identity, the single canonical Consultant entity (extending P0-CONSENT), the shared bench-match scorer (**one shared TF-IDF space, not `rank_jobs` in a loop**), the eligibility hard-gate (categorically distinct from the never-penalizing nudges), the posting→bench entrypoint (pulling `P2-BENCH-POSTING-PATH-PLUGGABLE` + `P3-POSTING-PATH` forward — adapt an ingested `Job`/posting into a project and rank the bench against it), and a prepare-and-export proposal flow. *(Manual paste-in / Client-CRM tickets defer to Phase 3.)*
 
-**Shippable outcome.** You paste an email/call/referral lead, see it parsed into an Opportunity, get the bench ranked against it (ineligible consultants dropped to **zero with explicit reasons**, never silently), pick a consultant, generate a grounded proposal from the offline template path, and export it as text for a human to send. A complete warm pursuit loop with zero network egress beyond the optional Claude draft.
+**Shippable outcome.** You run a gig-focused search (the existing ~30 sources), pick an ingested posting, get the bench ranked against it (ineligible consultants dropped to **zero with explicit reasons**, never silently), pick a consultant, generate a grounded proposal from the offline template path, and export it as text for a human to send. A complete posting-driven pursuit loop with zero network egress beyond the optional Claude draft.
 
 | id | title | effort | risk | key files |
 |---|---|---|---|---|
@@ -99,9 +107,9 @@ These guardrails are **decided** and constrain every ticket below:
 
 ---
 
-### Phase 3 — Posting-driven mode + commercials + UI
+### Phase 3 — Direct-warm add-on + commercials + UI
 
-**Goal.** Plug the posting-driven path (Verama / TED) into the **same** pipeline as a second mode (no new egress), add commercial relationship tooling (client reminders, house style-examples), and surface everything in the vanilla-JS UI. The posting path stays prepare-and-export only; the sweep notifies, it never auto-submits.
+**Goal.** Add the SECONDARY direct-warm channel on the same pipeline (manual paste-in intake, Client/Contact CRM, touch-base / similar-gig reminders), the background sweep→bench notifications, commercial relationship tooling (house style-examples), and surface everything in the vanilla-JS UI. *(The posting→bench core moved to Phase 1; what remains here is warm + reminders + UI.)* Everything stays prepare-and-export only; the sweep notifies, it never auto-submits.
 
 **Shippable outcome.** A gigs saved-search sweep can name best-fit consultants in a notification ("new DK project fits Anna + Lars"); you can rank the bench against a chosen posting; client touch-base / similar-gig reminders flow through the existing notification inbox; and the whole warm + posting + bench + client workflow has a UI. Both channels, one pipeline.
 
@@ -134,6 +142,8 @@ These guardrails are **decided** and constrain every ticket below:
 ---
 
 ## 3. Owner decisions needed
+
+> **Resolved 2026-06-19** (see the block in §1): #1 encryption → **deferred**; #2 field name → **`source_uid`** (shipped); #3 GDPR → **legitimate-interest / 24mo**; #4 caps → **~100 bench**; #9 posting sources → **all platforms, gig-focused**. The items below remain for when their ticket comes up.
 
 These block or shape the build. The first two gate Phase 0.
 
