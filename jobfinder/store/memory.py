@@ -9,12 +9,13 @@ from __future__ import annotations
 import threading
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS, MAX_CONSULTANTS)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES)
 from ..applications import Application
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
 from ..house import House, HOUSE_ID
 from ..notifications import Notification
+from ..opportunities import Opportunity
 from ..saved_searches import SavedSearch
 
 
@@ -32,6 +33,7 @@ class MemoryStore(Store):
         self._notes: dict[str, Notification] = {}
         self._consultants: dict[str, Consultant] = {}
         self._house: House | None = None
+        self._opps: dict[str, Opportunity] = {}
         # A single non-reentrant lock guards every dict access, so a background alert sweep
         # writing (save_notification / update_saved_search) can't race a concurrent export_all
         # iteration ("dictionary changed size") or a delete_all clear. No method calls another
@@ -130,6 +132,41 @@ class MemoryStore(Store):
         with self._lock:
             self._house = house
 
+    # --- opportunities (pursued projects + proposal audit trail) ---
+    def save_opportunity(self, opp: Opportunity) -> None:
+        with self._lock:
+            self._opps[opp.id] = opp
+            _evict(self._opps, MAX_OPPORTUNITIES)
+
+    def get_opportunity(self, opp_id: str) -> Opportunity | None:
+        with self._lock:
+            return self._opps.get(opp_id)
+
+    def list_opportunities(self) -> list[Opportunity]:
+        with self._lock:
+            return list(self._opps.values())
+
+    def delete_opportunity(self, opp_id: str) -> None:
+        with self._lock:
+            self._opps.pop(opp_id, None)
+
+    def get_opportunity_by_posting(self, source: str, source_uid: str) -> Opportunity | None:
+        if not source_uid:
+            return None
+        with self._lock:
+            for opp in self._opps.values():
+                if opp.source == source and opp.source_uid == source_uid:
+                    return opp
+        return None
+
+    def update_opportunity(self, opp_id: str, mutator) -> Opportunity | None:
+        with self._lock:
+            opp = self._opps.get(opp_id)
+            if opp is None:
+                return None
+            mutator(opp)
+            return opp
+
     def export_all(self) -> dict:
         with self._lock:
             return {
@@ -140,6 +177,7 @@ class MemoryStore(Store):
                 "notifications": [n.to_dict() for n in self._notes.values()],
                 "consultants": [c.to_dict() for c in self._consultants.values()],
                 "house": self._house.to_dict() if self._house else {},
+                "opportunities": [o.to_dict() for o in self._opps.values()],
             }
 
     def delete_all(self) -> None:
@@ -151,6 +189,7 @@ class MemoryStore(Store):
             self._notes.clear()
             self._consultants.clear()
             self._house = None
+            self._opps.clear()
 
     def save_notification(self, note: Notification) -> None:
         with self._lock:

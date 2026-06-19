@@ -180,6 +180,7 @@ def test_export_delete_all_covers_every_table(tmp_path):
     from jobfinder.notifications import Notification
     from jobfinder.consultants import Consultant
     from jobfinder.house import House
+    from jobfinder.opportunities import new_opportunity
     s = SqliteStore(tmp_path / "jf.db")
     s.save_profile("cv1", build_profile(CV))
     s.save_example({"id": "e1", "name": "ex", "text": "t", "chars": 1})
@@ -188,6 +189,7 @@ def test_export_delete_all_covers_every_table(tmp_path):
     s.save_notification(Notification(kind="reminder", title="T", created=1.0))
     s.save_consultant(Consultant(name="Anna", id="c1", skills=["python"]))
     s.save_house(House(name="Acme Consulting"))
+    s.save_opportunity(new_opportunity({"title": "Gig", "source": "Verama", "source_uid": "V-1"}))
 
     tables = {r["name"] for r in s._conn.execute(
         "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}

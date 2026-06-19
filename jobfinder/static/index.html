@@ -243,6 +243,7 @@
           <button class="bench-subtab active" data-bench="consultants" type="button">Consultants</button>
           <button class="bench-subtab" data-bench="house" type="button">House identity</button>
           <button class="bench-subtab" data-bench="staff" type="button">Staff a gig</button>
+          <button class="bench-subtab" data-bench="pipeline" type="button">Opportunities</button>
         </div>
 
         <!-- ----- A) Consultants (the bench) ----- -->
@@ -274,11 +275,20 @@
             <span><b id="propSelCount">0</b> consultant(s) selected for the proposal</span>
             <div class="prop-bar-actions">
               <button id="propClearSel" class="btn ghost small" type="button">Clear</button>
+              <button id="pursueGigBtn" class="btn ghost small" type="button" title="Track this gig as an opportunity in your pipeline">★ Pursue this gig</button>
               <button id="genProposalBtn" class="btn primary small" type="button" disabled>✍ Generate proposal</button>
             </div>
           </div>
           <div id="propLoading" class="loading hidden"><div class="spinner"></div><p>Drafting the house proposal…</p></div>
           <div id="proposalPanel" class="proposal-panel hidden"></div>
+        </div>
+
+        <!-- ----- D) Opportunities (pipeline) ----- -->
+        <div id="bench-pipeline" class="bench-section hidden">
+          <h3>Opportunities</h3>
+          <p class="muted small">Gigs you're pursuing — each keeps its proposal, status and a full audit trail. Pursue a gig from <b>Staff a gig</b> to add one here.</p>
+          <div id="oppLoading" class="loading hidden"><div class="spinner"></div><p>Loading your pipeline…</p></div>
+          <div id="oppList" class="opp-list"></div>
         </div>
       </div>
 

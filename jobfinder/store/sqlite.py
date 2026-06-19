@@ -18,12 +18,13 @@ import time
 from pathlib import Path
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS, MAX_CONSULTANTS)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES)
 from ..applications import Application
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
 from ..house import House, HOUSE_ID
 from ..notifications import Notification
+from ..opportunities import Opportunity
 from ..saved_searches import SavedSearch
 
 _SCHEMA = """
@@ -34,9 +35,10 @@ CREATE TABLE IF NOT EXISTS saved_searches(id TEXT PRIMARY KEY, created REAL NOT 
 CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS consultants   (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS house         (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS opportunities (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 5
+_SCHEMA_VERSION = 6
 
 
 class SqliteStore(Store):
@@ -258,6 +260,55 @@ class SqliteStore(Store):
                 (HOUSE_ID, time.time(), json.dumps(house.to_dict())),
             )
 
+    # --- opportunities (pursued projects + proposal audit trail) ---
+    def save_opportunity(self, opp: Opportunity) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO opportunities(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (opp.id, time.time(), json.dumps(opp.to_dict())),
+            )
+            self._evict("opportunities", "id", MAX_OPPORTUNITIES)
+
+    def get_opportunity(self, opp_id: str) -> Opportunity | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM opportunities WHERE id=?", (opp_id,)).fetchone()
+        return Opportunity.from_dict(json.loads(row["data"])) if row else None
+
+    def list_opportunities(self) -> list[Opportunity]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM opportunities ORDER BY created ASC").fetchall()
+        return [Opportunity.from_dict(json.loads(r["data"])) for r in rows]
+
+    def delete_opportunity(self, opp_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM opportunities WHERE id=?", (opp_id,))
+
+    def get_opportunity_by_posting(self, source: str, source_uid: str) -> Opportunity | None:
+        if not source_uid:
+            return None
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM opportunities ORDER BY created ASC").fetchall()
+        for r in rows:                            # small table; linear scan over the JSON blobs
+            d = json.loads(r["data"])
+            if d.get("source") == source and d.get("source_uid") == source_uid:
+                return Opportunity.from_dict(d)
+        return None
+
+    def update_opportunity(self, opp_id: str, mutator):
+        with self._lock, self._conn:
+            row = self._conn.execute("SELECT data FROM opportunities WHERE id=?", (opp_id,)).fetchone()
+            if row is None:
+                return None
+            opp = Opportunity.from_dict(json.loads(row["data"]))
+            mutator(opp)
+            self._conn.execute(
+                "INSERT INTO opportunities(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (opp.id, time.time(), json.dumps(opp.to_dict())),
+            )
+        return opp
+
     # --- data rights ---
     def export_all(self) -> dict:
         with self._lock:
@@ -268,6 +319,7 @@ class SqliteStore(Store):
             notes = self._conn.execute("SELECT data FROM notifications ORDER BY created DESC").fetchall()
             cons = self._conn.execute("SELECT data FROM consultants ORDER BY created ASC").fetchall()
             house = self._conn.execute("SELECT data FROM house WHERE id=?", (HOUSE_ID,)).fetchone()
+            opps = self._conn.execute("SELECT data FROM opportunities ORDER BY created ASC").fetchall()
         return {
             "profiles": {r["cv_id"]: json.loads(r["data"]) for r in prof},
             "examples": [dict(r) for r in ex],
@@ -276,6 +328,7 @@ class SqliteStore(Store):
             "notifications": [json.loads(r["data"]) for r in notes],
             "consultants": [json.loads(r["data"]) for r in cons],
             "house": json.loads(house["data"]) if house else {},
+            "opportunities": [json.loads(r["data"]) for r in opps],
         }
 
     def delete_all(self) -> None:
@@ -284,7 +337,7 @@ class SqliteStore(Store):
         # runs in autocommit — still under the lock.
         with self._lock:
             for table in ("profiles", "examples", "applications", "saved_searches",
-                          "notifications", "consultants", "house"):
+                          "notifications", "consultants", "house", "opportunities"):
                 self._conn.execute(f"DELETE FROM {table}")
             self._conn.commit()
             try:

@@ -13,6 +13,7 @@ from ..consultants import Consultant
 from ..cv_parser import CVProfile
 from ..house import House
 from ..notifications import Notification
+from ..opportunities import Opportunity
 from ..saved_searches import SavedSearch
 
 MAX_PROFILES = 50
@@ -21,6 +22,7 @@ MAX_APPLICATIONS = 200
 MAX_SAVED_SEARCHES = 40
 MAX_NOTIFICATIONS = 100
 MAX_CONSULTANTS = 300            # the bench — sized well above a ~100-consultant house
+MAX_OPPORTUNITIES = 500          # pursued projects (postings + warm leads)
 
 
 class Store(ABC):
@@ -79,6 +81,26 @@ class Store(ABC):
     def get_house(self) -> House | None: ...
     @abstractmethod
     def save_house(self, house: House) -> None: ...
+
+    # --- opportunities (pursued projects + the proposal audit trail) ---
+    @abstractmethod
+    def save_opportunity(self, opp: Opportunity) -> None: ...
+    @abstractmethod
+    def get_opportunity(self, opp_id: str) -> Opportunity | None: ...
+    @abstractmethod
+    def list_opportunities(self) -> list[Opportunity]: ...
+    @abstractmethod
+    def delete_opportunity(self, opp_id: str) -> None: ...
+    @abstractmethod
+    def get_opportunity_by_posting(self, source: str, source_uid: str) -> Opportunity | None:
+        """Find an existing opportunity for an ingested posting by (source, source_uid) — the
+        idempotency lookup so a re-surfaced posting updates its row instead of duplicating."""
+        ...
+    @abstractmethod
+    def update_opportunity(self, opp_id: str, mutator) -> Opportunity | None:
+        """Atomically load → ``mutator(opp)`` → save under one lock, so a background sweep and a
+        foreground edit can't clobber each other's events/status. Returns the updated opp or None."""
+        ...
 
     # --- data rights (export / wipe everything) ---
     @abstractmethod

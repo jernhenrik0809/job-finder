@@ -29,7 +29,9 @@ const el = {
   consultantForm: $('#consultantForm'), consultantList: $('#consultantList'), benchAddToggle: $('#benchAddToggle'),
   houseForm: $('#houseForm'), gigForm: $('#gigForm'), rankLoading: $('#rankLoading'), rankResults: $('#rankResults'),
   propBar: $('#propBar'), propSelCount: $('#propSelCount'), propClearSel: $('#propClearSel'), genProposalBtn: $('#genProposalBtn'),
+  pursueGigBtn: $('#pursueGigBtn'),
   propLoading: $('#propLoading'), proposalPanel: $('#proposalPanel'),
+  oppLoading: $('#oppLoading'), oppList: $('#oppList'),
   viewMatches: $('#view-matches'), viewPipeline: $('#view-pipeline'), viewInsights: $('#view-insights'),
   insightsEmpty: $('#insightsEmpty'), insightsBody: $('#insightsBody'),
   selbar: $('#selbar'), selCount: $('#selCount'), clearSel: $('#clearSel'), genDrafts: $('#genDrafts'),
@@ -1094,6 +1096,7 @@ function loadBench() {
 function switchBenchSection(name) {
   el.viewBench.querySelectorAll('.bench-subtab').forEach(b => b.classList.toggle('active', b.dataset.bench === name));
   el.viewBench.querySelectorAll('.bench-section').forEach(s => s.classList.toggle('hidden', s.id !== `bench-${name}`));
+  if (name === 'pipeline') loadOpportunities();
 }
 
 // ----- A) consultants -----
@@ -1436,6 +1439,7 @@ el.propClearSel.addEventListener('click', () => {
   updatePropBar();
 });
 el.genProposalBtn.addEventListener('click', generateProposal);
+if (el.pursueGigBtn) el.pursueGigBtn.addEventListener('click', pursueGig);
 
 async function generateProposal() {
   if (proposalSel.size === 0) return;
@@ -1556,6 +1560,225 @@ async function exportProposal() {
   } finally {
     btn.disabled = false;
   }
+}
+
+// ----- D) opportunities (pipeline: pursue → track status + proposal + audit trail) -----
+let OPP_STATUSES = ['open', 'proposed', 'won', 'lost', 'shelved'];   // replaced by the server's vocabulary
+const oppsById = new Map();          // opportunity id -> OpportunityObj
+const oppExpanded = new Set();       // ids whose audit trail is expanded (survives re-render)
+
+async function loadOpportunities() {
+  el.oppLoading.classList.remove('hidden');
+  try {
+    const data = await (await fetch('/api/opportunities')).json();
+    if (Array.isArray(data.statuses) && data.statuses.length) OPP_STATUSES = data.statuses;
+    oppsById.clear();
+    (data.opportunities || []).forEach(o => oppsById.set(o.id, o));
+    renderOpportunities();
+  } catch { el.oppList.innerHTML = '<p class="muted small">Could not load your pipeline.</p>'; }
+  finally { el.oppLoading.classList.add('hidden'); }
+}
+
+function renderOpportunities() {
+  const opps = [...oppsById.values()];
+  el.oppList.innerHTML = '';
+  if (!opps.length) {
+    el.oppList.innerHTML = '<p class="muted small">No opportunities yet — rank your bench against a gig in <b>Staff a gig</b>, then hit <b>★ Pursue this gig</b>.</p>';
+    return;
+  }
+  opps.forEach(o => el.oppList.appendChild(oppCard(o)));
+}
+
+function oppCard(o) {
+  const card = document.createElement('div');
+  card.className = 'opp-card';
+  card.dataset.id = o.id;
+  const statusOpts = OPP_STATUSES.map(s =>
+    `<option value="${esc(s)}"${s === o.status ? ' selected' : ''}>${esc(s)}</option>`).join('');
+  const url = safeUrl(o.url);
+  const sub = [
+    o.source ? `<span class="src">${esc(o.source)}</span>` : '',
+    o.location ? esc(o.location) : '',
+    o.start_date ? `🗓 ${esc(o.start_date)}` : '',
+    (o.rate_ceiling != null && o.rate_ceiling !== '') ? `💰 ≤ ${esc(o.rate_ceiling)} ${esc(o.currency || '')}`.trim() : '',
+  ].filter(Boolean).join('<span> · </span>');
+  const team = (o.staffed || []).map(s => `<span class="chip">${esc(s.consultant_name || s.consultant_id || '')}</span>`).join('');
+  const hasProposal = !!(o.proposal_body && o.proposal_body.trim());
+  const propTag = hasProposal
+    ? (o.blocking
+      ? '<span class="opp-prop blocking">⛔ proposal blocked by QA</span>'
+      : '<span class="opp-prop ok">✓ proposal drafted</span>')
+    : '<span class="opp-prop none">no proposal yet</span>';
+  const qa = (o.qa || []).length ? oppQaHtml(o.qa, !!o.blocking) : '';
+  const events = (o.events || []).slice().reverse();
+  const expanded = oppExpanded.has(o.id);
+  const trail = events.length
+    ? `<button class="opp-trail-toggle link-btn small" type="button" aria-expanded="${expanded}">${expanded ? 'Hide' : 'Show'} audit trail (${events.length})</button>
+       <ul class="timeline opp-trail"${expanded ? '' : ' hidden'}>${events.map(ev =>
+        `<li><span class="t">${esc(ev.type || '')}</span><span class="opp-ev-detail">${esc(ev.detail || '')}</span><span class="opp-ev-ts">${esc(fmtOppTime(ev.ts))}</span></li>`).join('')}</ul>`
+    : '<p class="muted small">No events yet.</p>';
+  card.innerHTML = `
+    <div class="opp-head">
+      <h4>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(o.title || 'Untitled')}</a>` : esc(o.title || 'Untitled')}</h4>
+      <label class="opp-status"><span class="muted small">Status</span>
+        <select class="opp-status-sel">${statusOpts}</select></label>
+    </div>
+    ${sub ? `<div class="opp-sub">${sub}</div>` : ''}
+    <div class="opp-tags">${propTag}</div>
+    ${team ? `<div class="opp-team"><span class="lbl">Team</span><span class="chips">${team}</span></div>` : ''}
+    ${qa ? `<div class="opp-qa">${qa}</div>` : ''}
+    <div class="opp-actions">
+      <button class="btn mini ghost opp-gen" type="button">${hasProposal ? 'Regenerate proposal' : 'Generate proposal'}</button>
+      <button class="btn mini ghost opp-export" type="button">⬇ Export</button>
+      <span class="spacer"></span>
+      <button class="btn mini danger opp-del" type="button">Delete</button>
+    </div>
+    <div class="opp-trail-wrap">${trail}</div>`;
+
+  card.querySelector('.opp-status-sel').addEventListener('change', (e) => changeOppStatus(o.id, e.target.value));
+  card.querySelector('.opp-gen').addEventListener('click', (e) => generateOppProposal(o.id, e.target));
+  card.querySelector('.opp-export').addEventListener('click', (e) => exportOpportunity(o.id, e.target));
+  card.querySelector('.opp-del').addEventListener('click', () => deleteOpportunity(o.id));
+  const tt = card.querySelector('.opp-trail-toggle');
+  if (tt) tt.addEventListener('click', () => {
+    const open = !oppExpanded.has(o.id);
+    if (open) oppExpanded.add(o.id); else oppExpanded.delete(o.id);
+    const ul = card.querySelector('.opp-trail');
+    if (ul) ul.toggleAttribute('hidden', !open);
+    tt.setAttribute('aria-expanded', String(open));
+    tt.textContent = `${open ? 'Hide' : 'Show'} audit trail (${events.length})`;
+  });
+  return card;
+}
+
+// QA findings rendered inside an opportunity card (reuses the proposal guard styles).
+function oppQaHtml(findings, blocking) {
+  const items = findings.map(f => `
+    <div class="guard guard-${f.blocking ? 'high' : 'medium'}">
+      <span class="guard-msg">${f.blocking ? '⛔' : '⚑'} ${esc(f.message)}</span>
+      ${(f.items && f.items.length) ? `<div class="guard-items">${f.items.map(i => `<code>${esc(i)}</code>`).join(' ')}</div>` : ''}
+    </div>`).join('');
+  return `<div class="prop-qa-banner ${blocking ? 'blocking' : 'warn'}">
+      ${blocking ? '⛔ Export is blocked until these are resolved' : '⚑ Review these before sending'}
+    </div><div class="dw-guards">${items}</div>`;
+}
+
+async function changeOppStatus(id, status) {
+  try {
+    const resp = await fetch(`/api/opportunities/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Update failed');
+    oppsById.set(id, data);
+    renderOpportunities();
+  } catch (err) {
+    showWarnings(['Opportunity: ' + err.message]);
+    renderOpportunities();      // snap the select back to the stored value
+  }
+}
+
+async function generateOppProposal(id, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Drafting…'; }
+  try {
+    const resp = await fetch(`/api/opportunities/${id}/proposal`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tone: el.tone.value, length: el.length.value, use_llm: el.useLlm.checked, redact_pii: !!(el.redactPii && el.redactPii.checked) }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Proposal generation failed');
+    if (data.opportunity) oppsById.set(id, data.opportunity);
+    renderOpportunities();
+    if (data.blocking) showWarnings(['Proposal drafted but blocked by QA — resolve the flagged findings before exporting.']);
+  } catch (err) {
+    showWarnings(['Proposal: ' + err.message]);
+    if (btn) { btn.disabled = false; btn.textContent = 'Retry'; }
+  }
+}
+
+async function exportOpportunity(id, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch(`/api/opportunities/${id}/export`);
+    if (r.ok) {
+      const blob = await r.blob();
+      const o = oppsById.get(id) || {};
+      const name = `opportunity-${(o.title || 'house').replace(/[^a-z0-9]+/gi, '-').toLowerCase().slice(0, 40) || 'house'}.txt`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } else if (r.status === 409) {
+      const detail = (await r.json().catch(() => ({}))).detail || {};
+      // mark the stored opp as blocking + carry the findings so the card shows them
+      const o = oppsById.get(id);
+      if (o) { o.blocking = true; o.qa = detail.findings || o.qa || []; oppsById.set(id, o); renderOpportunities(); }
+      showWarnings([detail.message || 'Export refused — the proposal still has blocking findings.']);
+    } else {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.detail || `Export failed (${r.status})`);
+    }
+  } catch (err) {
+    showWarnings(['Export: ' + err.message]);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function deleteOpportunity(id) {
+  const o = oppsById.get(id) || {};
+  if (!confirm(`Delete the opportunity “${o.title || 'this gig'}” and its audit trail?`)) return;
+  try {
+    const resp = await fetch(`/api/opportunities/${id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('Delete failed');
+    oppsById.delete(id);
+    oppExpanded.delete(id);
+    renderOpportunities();
+  } catch (err) { showWarnings(['Delete: ' + err.message]); }
+}
+
+// "Pursue this gig" — turn the most recent rank (gig fields + selected consultants) into a tracked opportunity.
+// Idempotent on a posting's source uid, so pursuing the same posting twice just surfaces the existing one.
+async function pursueGig() {
+  const g = lastGigFields || {};
+  if (!g.title && !g.description) { showWarnings(['Rank a gig first — pursue needs a title or brief.']); return; }
+  const body = {
+    title: g.title || '',
+    description: g.description || '',
+    skills: g.skills || [],
+    location: g.location || '',
+    remote: !!g.remote,
+    rate_ceiling: g.rate_ceiling != null ? g.rate_ceiling : null,
+    currency: g.currency || '',
+    start_date: g.start_date || null,
+    consultant_ids: [...proposalSel],
+  };
+  if (g.job) { body.job = g.job; body.kind = 'posting'; }    // carries source/source_uid for idempotent create
+  const btn = el.pursueGigBtn; if (btn) btn.disabled = true;
+  try {
+    const resp = await fetch('/api/opportunities', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Could not pursue this gig');
+    if (data.id) { oppsById.set(data.id, data); oppExpanded.add(data.id); }
+    switchBenchSection('pipeline');     // reveal the pipeline (also reloads from the server)
+  } catch (err) {
+    showWarnings(['Pursue: ' + err.message]);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// Audit-trail timestamps: accept epoch seconds (like application events) or an ISO string.
+function fmtOppTime(ts) {
+  if (ts == null || ts === '') return '';
+  try {
+    const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts);
+    if (isNaN(d.getTime())) return String(ts);
+    return d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return String(ts); }
 }
 
 // ---------- style examples ----------

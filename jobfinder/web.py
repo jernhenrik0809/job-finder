@@ -33,6 +33,11 @@ from .cv_parser import CVProfile, build_profile, default_query, extract_text_fro
 from .drafts import DraftOptions, generate_draft, llm_available
 from .engine import SearchSettings, find_jobs
 from .guardrails import check_letter, check_proposal, has_blocking
+from .opportunities import (
+    STATUSES as OPP_STATUSES, SUGGESTED_NEXT as OPP_SUGGESTED_NEXT,
+    attach_proposal, new_opportunity, record_export, set_staffing,
+    set_status as set_opp_status,
+)
 from .proposals import ProposalOptions, generate_proposal
 from .insights import compute_insights
 from .saved_searches import new_saved_search, register_run, mark_seen
@@ -315,6 +320,45 @@ class ProposalExportRequest(BaseModel):
     body: str = ""
     project_title: str | None = None
     consultant_ids: list[str] = []
+
+
+class OpportunityCreate(BaseModel):
+    """Start pursuing a project (a posting or a warm lead). Same project fields as the rank/
+    proposal requests; idempotent on (source, source_uid) for ingested postings."""
+    title: str | None = None
+    description: str | None = None
+    text: str | None = None
+    skills: list[str] | None = None
+    location: str | None = None
+    remote: bool = False
+    rate_ceiling: float | None = None
+    currency: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    required_clearance: str | None = None
+    job: dict | None = None
+    kind: str = "posting"                  # posting | warm
+    consultant_ids: list[str] = []         # optional initial staffing
+
+
+class OpportunityUpdate(BaseModel):
+    """Edit a pursued opportunity. Only provided fields change; ``status`` is validated."""
+    status: str | None = None
+    notes: str | None = None
+    staffed: list[dict] | None = None      # replace the per-consultant bid lines
+    rate_ceiling: float | None = None
+    currency: str | None = None
+    start_date: str | None = None
+
+
+class OpportunityProposalRequest(BaseModel):
+    """Generate a proposal INTO an opportunity. Uses the given consultants, or the opportunity's
+    staffed consultants when omitted; persists the artifact + QA + an audit event."""
+    consultant_ids: list[str] | None = None
+    tone: str = "professional"
+    length: str = "standard"
+    use_llm: bool = True
+    redact_pii: bool | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -929,6 +973,149 @@ def export_proposal_endpoint(req: ProposalExportRequest) -> PlainTextResponse:
     safe = "".join(c if c.isalnum() or c in " -_" else "" for c in (req.project_title or "proposal")).strip()
     filename = (safe or "proposal")[:60].replace(" ", "_") + ".txt"
     subject = (req.subject or "").strip()
+    content = (f"Subject: {subject}\n\n{body}\n" if subject else f"{body}\n")
+    return PlainTextResponse(content, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+# ---------------------------------------------------------------------------
+# Opportunities (pursued projects + the proposal audit trail)
+# ---------------------------------------------------------------------------
+
+def _staff_lines(consultant_ids: list[str]) -> list[dict]:
+    """Build per-consultant bid lines from the bench records (default rates from each consultant)."""
+    lines = []
+    for c in _load_consultants(consultant_ids or []):
+        lines.append({"consultant_id": c.id, "consultant_name": c.name,
+                      "cost_rate": c.cost_rate, "sell_rate": c.sell_rate, "currency": c.currency})
+    return lines
+
+
+def _opp_payload(opp) -> dict:
+    d = opp.to_dict()
+    d["blocking"] = has_blocking(opp.qa)          # is the stored proposal currently export-blocked?
+    return d
+
+
+def _opp_consultants(opp) -> list:
+    return _load_consultants([ln.get("consultant_id") for ln in (opp.staffed or [])])
+
+
+@app.post("/api/opportunities")
+def create_opportunity(req: OpportunityCreate) -> JSONResponse:
+    """Start pursuing a project. Idempotent for ingested postings: a re-surfaced (source,
+    source_uid) returns the existing opportunity instead of duplicating it."""
+    project, has_input = _project_from_request(req)
+    if not has_input:
+        raise HTTPException(status_code=400, detail="Describe the project (a title, brief, or job).")
+    job = req.job if isinstance(req.job, dict) else None
+    source = ((job or {}).get("source") or "").strip()
+    source_uid = ((job or {}).get("source_uid") or (job or {}).get("id") or "").strip()
+    existing = store.get_opportunity_by_posting(source, source_uid) if source_uid else None
+    if existing is not None:
+        return JSONResponse(_opp_payload(existing))     # idempotent: don't duplicate the posting
+    proj = {"title": project.title, "description": project.description, "skills": project.skills,
+            "location": project.location, "source": source, "source_uid": source_uid,
+            "url": project.url, "rate_ceiling": project.rate_ceiling, "currency": project.currency,
+            "start_date": project.start_date}
+    opp = new_opportunity(proj, kind=req.kind if req.kind in ("posting", "warm") else "posting")
+    if req.consultant_ids:
+        set_staffing(opp, _staff_lines(req.consultant_ids))
+    store.save_opportunity(opp)
+    return JSONResponse(_opp_payload(opp))
+
+
+@app.get("/api/opportunities")
+def list_opportunities() -> dict:
+    return {"opportunities": [_opp_payload(o) for o in store.list_opportunities()],
+            "statuses": OPP_STATUSES, "suggested_next": OPP_SUGGESTED_NEXT}
+
+
+@app.get("/api/opportunities/{oid}")
+def get_opportunity(oid: str) -> JSONResponse:
+    opp = store.get_opportunity(oid)
+    if opp is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found.")
+    return JSONResponse(_opp_payload(opp))
+
+
+@app.patch("/api/opportunities/{oid}")
+def update_opportunity(oid: str, upd: OpportunityUpdate) -> JSONResponse:
+    opp = store.get_opportunity(oid)
+    if opp is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found.")
+    if upd.status is not None:
+        try:
+            set_opp_status(opp, upd.status)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    if upd.staffed is not None:
+        set_staffing(opp, upd.staffed)
+    if upd.notes is not None:
+        opp.notes = upd.notes
+    if upd.rate_ceiling is not None:
+        opp.rate_ceiling = upd.rate_ceiling
+    if upd.currency is not None:
+        opp.currency = upd.currency.strip()
+    if upd.start_date is not None:
+        opp.start_date = upd.start_date.strip()
+    opp.updated = time.time()
+    store.save_opportunity(opp)
+    return JSONResponse(_opp_payload(opp))
+
+
+@app.delete("/api/opportunities/{oid}")
+def delete_opportunity(oid: str) -> dict:
+    store.delete_opportunity(oid)
+    return {"ok": True}
+
+
+@app.post("/api/opportunities/{oid}/proposal")
+def generate_opportunity_proposal(oid: str, req: OpportunityProposalRequest) -> JSONResponse:
+    """Draft a proposal INTO the opportunity, run the QA gate, and persist the artifact + QA +
+    an audit event. Never sends — a human exports and submits."""
+    opp = store.get_opportunity(oid)
+    if opp is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found.")
+    ids = req.consultant_ids if req.consultant_ids else [ln.get("consultant_id") for ln in (opp.staffed or [])]
+    consultants = _load_consultants(ids)
+    if not consultants:
+        raise HTTPException(status_code=400, detail="Staff at least one consultant before drafting.")
+    if req.consultant_ids:                                  # explicit selection (re)staffs the bid
+        set_staffing(opp, _staff_lines(req.consultant_ids))
+    project = Project(title=opp.title, description=opp.description, skills=opp.skills,
+                      location=opp.location, rate_ceiling=opp.rate_ceiling, currency=opp.currency,
+                      start_date=opp.start_date, source=opp.source, url=opp.url)
+    redact = settings.redact_pii_default if req.redact_pii is None else bool(req.redact_pii)
+    options = ProposalOptions(tone=req.tone, length=req.length, use_llm=req.use_llm, redact_pii=redact)
+    house = store.get_house() or House()
+    examples = [e["text"] for e in store.list_examples()]
+    draft = generate_proposal(house, project, consultants, options, examples=examples)
+    findings = check_proposal(draft.body, consultants)
+    attach_proposal(opp, draft.subject, draft.body, draft.generator, findings, has_blocking(findings))
+    store.save_opportunity(opp)
+    return JSONResponse({"opportunity": _opp_payload(opp), "qa": findings,
+                         "blocking": has_blocking(findings), "used_llm": options.use_llm and llm_available()})
+
+
+@app.get("/api/opportunities/{oid}/export")
+def export_opportunity_proposal(oid: str) -> PlainTextResponse:
+    """Export the opportunity's stored proposal — re-runs the QA gate (409 if blocking) and logs
+    a human-export audit event."""
+    opp = store.get_opportunity(oid)
+    if opp is None:
+        raise HTTPException(status_code=404, detail="Opportunity not found.")
+    body = (opp.proposal_body or "").strip()
+    if not body:
+        raise HTTPException(status_code=400, detail="No proposal drafted yet.")
+    findings = check_proposal(body, _opp_consultants(opp))
+    if has_blocking(findings):
+        raise HTTPException(status_code=409, detail={
+            "message": "This proposal didn't pass the fabrication check — fix the flagged items before export.",
+            "findings": findings})
+    store.update_opportunity(oid, record_export)             # audit: a human took it from here
+    safe = "".join(c if c.isalnum() or c in " -_" else "" for c in opp.title).strip()
+    filename = (safe or "proposal")[:60].replace(" ", "_") + ".txt"
+    subject = (opp.proposal_subject or "").strip()
     content = (f"Subject: {subject}\n\n{body}\n" if subject else f"{body}\n")
     return PlainTextResponse(content, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 

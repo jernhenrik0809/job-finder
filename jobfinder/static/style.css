@@ -637,6 +637,42 @@ input[type=range] { accent-color: var(--accent); }
 .prop-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
 .prop-actions .btn.small { margin-top: 0; }
 
+/* ---------- opportunities (pipeline) ---------- */
+.opp-list { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+.opp-card {
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 12px;
+  padding: 16px 18px;
+}
+.opp-card:hover { border-color: var(--accent); }
+.opp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.opp-head h4 { margin: 0; font-size: 16px; min-width: 0; }
+.opp-head h4 a { color: var(--text); text-decoration: none; }
+.opp-head h4 a:hover { color: var(--accent); }
+.opp-status { display: flex; flex-direction: column; gap: 4px; flex: none; align-items: flex-end; }
+.opp-status select {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 5px 9px; font: inherit; font-size: 12.5px; text-transform: capitalize;
+}
+.opp-sub { color: var(--muted); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.opp-sub .src { color: var(--accent); }
+.opp-tags { margin-top: 8px; }
+.opp-prop { border-radius: 999px; font-size: 11px; font-weight: 700; padding: 2px 10px; }
+.opp-prop.ok { background: var(--green-dim); color: #b8f3d8; border: 1px solid #1f7a52; }
+.opp-prop.blocking { background: rgba(239, 68, 68, .1); color: #f3b8b8; border: 1px solid #7f1d1d; }
+.opp-prop.none { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+.opp-team { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; flex-wrap: wrap; }
+.opp-team .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.opp-qa { margin-top: 12px; }
+.opp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
+.opp-actions .spacer { flex: 1; }
+.opp-trail-wrap { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.opp-trail-toggle { text-align: left; }
+.opp-trail { margin-top: 8px; }
+.opp-trail li { align-items: baseline; }
+.opp-trail .t { text-transform: capitalize; }
+.opp-ev-detail { flex: 1; color: var(--muted); }
+.opp-ev-ts { flex: none; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 /* ---------- responsive ---------- */
 @media (max-width: 920px) {
   .layout { grid-template-columns: 1fr; }

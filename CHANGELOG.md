@@ -2,6 +2,32 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.31.0] — 2026-06-19
+
+### Added — consulting engine: Opportunity entity + audit trail (Phase 2 finish)
+A pursued project is now a durable, tracked record with a defensible history.
+- **`opportunities.py`** — `Opportunity` generalizes `Application` for the house: project
+  snapshot, per-consultant **bid lines** (cost/sell/currency + `margin_of`, within-currency
+  only), a validated lifecycle (`lead → … → submitted/won/lost/no_bid`), the current proposal
+  artifact + its last QA result, and an **append-only event timeline** — the audit trail that
+  makes "a human reviewed and sent this" durable (`created`/`staffed`/`proposal_generated`/
+  `exported`/`status` events).
+- **Idempotency** — an opportunity from a job board carries `source`+`source_uid`; the store's
+  `get_opportunity_by_posting` means a re-surfaced posting updates its row instead of duplicating.
+  Plus an atomic `update_opportunity(id, mutator)` (lost-update safe, like saved searches).
+- **Store** — schema **v5 → v6** (new `opportunities` table via the ordered-migration path);
+  CRUD + idempotency + atomic update on both backends; wired into export/delete (the reflective
+  data-rights test auto-covers it); cap `MAX_OPPORTUNITIES=500`.
+- **Endpoints** — `POST/GET /api/opportunities`, `GET/PATCH/DELETE /api/opportunities/{id}`,
+  `POST /api/opportunities/{id}/proposal` (draft into the opp, persist artifact + QA + audit
+  event), `GET /api/opportunities/{id}/export` (re-runs QA → 409 if blocking, logs a human-export
+  event).
+- **Pipeline UI** — an Opportunities sub-tab (status board, staffed team, proposal/QA state, an
+  expandable audit trail) and a "Pursue this gig" button in the staff flow.
+
+Built via two parallel agents on disjoint files (frontend + tests); integrated and
+preview-verified by the main thread (pursue → generate → export, full audit trail). 349 tests pass.
+
 ## [1.30.0] — 2026-06-19
 
 ### Added — consulting engine: proposal generator + fabrication QA gate (Phase 2)
