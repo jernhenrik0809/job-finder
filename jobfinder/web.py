@@ -854,6 +854,8 @@ def update_consultant(cid: str, upd: ConsultantUpdate) -> JSONResponse:
     if c is None:
         raise HTTPException(status_code=404, detail="Consultant not found.")
     _apply_consultant_fields(c, upd.model_dump())
+    if not (c.name or "").strip():                # a consultant must keep a non-empty name (as on create)
+        c.name = "Unnamed consultant"
     store.save_consultant(c)
     return JSONResponse(c.to_dict())
 
@@ -1021,11 +1023,12 @@ def _opp_payload(opp) -> dict:
     margins = [margin_of(ln) for ln in lines]
     for ln, m in zip(d.get("staffed", []), margins):
         ln["margin"] = m
-    currencies = {(ln.get("currency") or "").strip().upper() for ln in lines if ln.get("currency")}
-    known = [m for m in margins if m is not None]
-    if len(currencies) == 1 and known and len(known) == len(lines):
-        d["total_margin"] = round(sum(known), 2)
-        d["margin_currency"] = next(iter(currencies))
+    # Total only when EVERY line has a margin AND one shared, non-empty currency (a line with no/
+    # unknown currency taints the sum — never a wrong cross-FX or unit-less total).
+    ccys = {(ln.get("currency") or "").strip().upper() for ln in lines}
+    if lines and "" not in ccys and len(ccys) == 1 and all(m is not None for m in margins):
+        d["total_margin"] = round(sum(margins), 2)
+        d["margin_currency"] = next(iter(ccys))
     else:
         d["total_margin"] = None
         d["margin_currency"] = ""

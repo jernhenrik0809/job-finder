@@ -2,6 +2,40 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.34.0] — 2026-06-19
+
+### Fixed — full correctness audit of the consulting engine (15 confirmed findings)
+A 7-area adversarial audit (find → independently verify) over every new feature surfaced 25
+findings; **15 were confirmed real and are fixed**, each with a regression test (**377 tests**).
+
+**Proposal QA gate (`guardrails.py`) — correctness + a fabrication bypass:**
+- A skill word in a consultant's **title** is now grounded (a "Kubernetes Engineer" with
+  `skills=['python']` no longer self-blocks the offline template).
+- `check_proposal` no longer crashes on a **non-string consultant name**.
+- **Misattribution is now checked on every mention** (was deduped to the first), so a skill
+  correctly credited to one consultant *and* wrongly to another is caught — and it looks **both
+  directions** for the nearest name, so a consultant named just *after* the skill isn't a false hit.
+- Possession/action cues now require a **word boundary** ("controlled" no longer matches "led").
+
+**Proposal generator (`proposals.py`):**
+- The offline template no longer crashes on a **non-string skill** entry, and no longer splices
+  the house **boilerplate** verbatim into the QA-checked body (it described the house, not a named
+  consultant, so it could block the template's own output).
+
+**Opportunities (`opportunities.py`):**
+- `attach_proposal` now **demotes** a `proposal_ready` opportunity back to `proposal_drafting` when
+  a later **blocking** proposal replaces a clean one (a blocking proposal can never be "ready").
+- `new_opportunity` coerces a non-string `description`.
+
+**Store / web / alerts:**
+- `MemoryStore.list_notifications` now matches `SqliteStore`'s newest-by-`created` order (parity
+  after an in-place reminder refresh).
+- `_opp_payload` reports a `total_margin` **only when every staffed line shares one non-empty
+  currency** (a no-currency line no longer taints a single-currency total).
+- `PATCH /api/consultants/{id}` can no longer **blank a consultant's name** (mirrors create).
+- The bench-fit sweep notification build/save is now **inside the try** (a save error can't abort
+  the sweep), and the `bench_fits` summary counts what was actually recorded (capped).
+
 ## [1.33.0] — 2026-06-19
 
 ### Added — consulting engine: Client/Contact CRM + margin surfacing (Phase 3 finish)

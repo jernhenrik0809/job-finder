@@ -252,3 +252,18 @@ def test_factory_and_config_defaults(monkeypatch):
     assert cfg.storage == "memory"
     assert cfg.default_sources == ["remotive", "arbeitnow", "thehub", "themuse", "itjobbank", "hrmanager"]   # no-key DK-relevant
     assert isinstance(get_store(cfg), MemoryStore)
+
+
+def test_notification_order_parity_after_refresh(tmp_path):
+    """MemoryStore and SqliteStore must agree on newest-first-by-created order, even after an
+    in-place refresh bumps a notification's created timestamp."""
+    from jobfinder.notifications import Notification
+    from jobfinder.store.memory import MemoryStore
+    for s in (SqliteStore(tmp_path / "jf.db"), MemoryStore()):
+        s.save_notification(Notification(kind="reminder", title="r1", id="r1", created=100.0))
+        s.save_notification(Notification(kind="reminder", title="r2", id="r2", created=200.0))
+        s.save_notification(Notification(kind="reminder", title="r1", id="r1", created=300.0))  # refresh r1
+        order = [n.id for n in s.list_notifications()]
+        assert order == ["r1", "r2"], f"{type(s).__name__} order {order}"
+        if hasattr(s, "close"):
+            s.close()

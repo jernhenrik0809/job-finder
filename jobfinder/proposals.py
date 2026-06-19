@@ -60,11 +60,12 @@ def _relevant_skills(c: Consultant, project: Project) -> list[str]:
     """The consultant's skills that the project actually asks for (grounded subset). Falls back
     to the consultant's top skills when the project lists none, so a bio is never empty-but-true."""
     want = {canonical(s) for s in (project.skills or []) if isinstance(s, str)}
+    have = [s for s in c.skills if isinstance(s, str)]   # a malformed stored skill must not crash
     if want:
-        rel = [s for s in c.skills if canonical(s) in want]
+        rel = [s for s in have if canonical(s) in want]
         if rel:
             return rel
-    return list(c.skills[:6])
+    return have[:6]
 
 
 # ---------------------------------------------------------------------------
@@ -95,9 +96,12 @@ def generate_template(house: House, project: Project, consultants: list[Consulta
     # required skills here: either would read as a house CLAIM and trip the proposal QA gate on
     # our own output (the grounded team bios below carry the skills we actually bring).
     scope_line = f"We understand the engagement centres on {project.title}."
-    about = (house.boilerplate or "").strip() or (
-        f"{house_name} delivers senior, hands-on consultants who integrate quickly and "
-        f"focus on outcomes.")
+    # Neutral, claim-free "why us" — do NOT splice the user's house boilerplate verbatim into the
+    # QA-checked offline body: it describes the HOUSE (not the named consultants), so a tech name in
+    # it ("deep Kubernetes expertise across our team") can't be attributed and would block our own
+    # output. The LLM path still uses boilerplate as grounding context (its output is gated separately).
+    about = (f"{house_name} delivers senior, hands-on consultants who integrate quickly and "
+             f"focus on outcomes.")
     signoff = (house.signatory or "").strip() or house_name
 
     body = (
@@ -152,7 +156,8 @@ def generate_llm(house: House, project: Project, consultants: list[Consultant],
     parts = [_SYSTEM_PROPOSAL, f"HOUSE: {house_name}\nVoice: {house.voice or 'professional, concrete'}\n"
              f"About: {(house.boilerplate or '').strip()[:1500]}\nSignatory: {house.signatory or house_name}"]
     for c in consultants:
-        rel = ", ".join(_relevant_skills(c, project)) or ", ".join(c.skills[:8])
+        rel = ", ".join(_relevant_skills(c, project)) or ", ".join(
+            s for s in c.skills[:8] if isinstance(s, str))
         cv = scrub((c.raw_text or "").strip()[:4000])
         parts.append(
             f"CONSULTANT — {c.name}"

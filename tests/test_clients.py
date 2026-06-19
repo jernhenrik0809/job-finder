@@ -297,3 +297,29 @@ def test_patch_opportunity_persists_client_id():
     finally:
         _delete_opportunity(opp["id"])
         _delete_client(acc["id"])
+
+
+def test_opp_total_margin_null_when_a_line_has_no_currency():
+    """A staffed line with no currency must NOT be summed into a single-currency total (no
+    unit-less/cross-FX total). Regression for the _opp_payload audit finding."""
+    from jobfinder.web import app
+    from fastapi.testclient import TestClient
+    c = TestClient(app)
+    a = c.post("/api/consultants", json={"name": "A", "text": "py", "skills": ["python"],
+                                         "cost_rate": 600, "sell_rate": 950, "currency": "DKK"}).json()
+    b = c.post("/api/consultants", json={"name": "B", "text": "py", "skills": ["python"],
+                                         "cost_rate": 50, "sell_rate": 90}).json()   # no currency
+    o = c.post("/api/opportunities", json={"title": "Gig", "description": "py",
+                                           "consultant_ids": [a["id"], b["id"]]}).json()
+    assert o["total_margin"] is None and o["margin_currency"] == ""
+    margins = sorted(m for m in (ln.get("margin") for ln in o["staffed"]) if m is not None)
+    assert margins == [40.0, 350.0]                  # per-line margins still present
+
+
+def test_patch_consultant_cannot_blank_the_name():
+    from jobfinder.web import app
+    from fastapi.testclient import TestClient
+    c = TestClient(app)
+    cid = c.post("/api/consultants", json={"name": "Anna", "skills": ["python"]}).json()["id"]
+    r = c.patch(f"/api/consultants/{cid}", json={"name": "   "})
+    assert r.status_code == 200 and r.json()["name"] == "Unnamed consultant"

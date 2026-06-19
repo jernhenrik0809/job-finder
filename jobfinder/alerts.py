@@ -138,8 +138,12 @@ def run_sweep(store, find_jobs, now: float | None = None) -> dict:
                                      "consultants": [{"name": m.consultant.name, "score": m.score}
                                                      for m in top]})
                 if fits:
-                    store.save_notification(bench_fit_notification(updated, fits, now))
-                    bench_fits += len(fits)
+                    try:                              # build+save inside the try too — a save error
+                        note = bench_fit_notification(updated, fits, now)   # must not abort the sweep
+                        store.save_notification(note)
+                        bench_fits += note.count       # count what was actually recorded (capped)
+                    except Exception:
+                        pass
 
     try:
         nudges = compute_insights(store.list_applications(), now).get("nudges", [])

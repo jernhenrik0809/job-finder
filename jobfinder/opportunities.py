@@ -104,7 +104,7 @@ def new_opportunity(project: dict, kind: str = "posting", status: str = "lead") 
         source_uid=(project.get("source_uid") or project.get("id") or ""),
         url=(project.get("url") or ""),
         location=(project.get("location") or ""),
-        description=(project.get("description") or "")[:8000],
+        description=str(project.get("description") or "")[:8000],
         skills=[s for s in (project.get("skills") or []) if isinstance(s, str)],
         rate_ceiling=_to_float(project.get("rate_ceiling")),
         currency=(project.get("currency") or ""),
@@ -155,8 +155,13 @@ def attach_proposal(opp: Opportunity, subject: str, body: str, generator: str,
     opp.proposal_body = body
     opp.proposal_generator = generator
     opp.qa = qa or []
-    if opp.status in ("lead", "qualifying", "proposal_drafting"):
-        opp.status = "proposal_ready" if not blocking else "proposal_drafting"
+    # A blocking proposal must NEVER leave the opportunity at proposal_ready — even if a prior clean
+    # proposal had advanced it there. Demote pre-submit states; promote only when clean.
+    if blocking:
+        if opp.status in ("lead", "qualifying", "proposal_ready"):
+            opp.status = "proposal_drafting"
+    elif opp.status in ("lead", "qualifying", "proposal_drafting"):
+        opp.status = "proposal_ready"
     record_event(opp, "proposal_generated", f"Proposal drafted ({generator})",
                  {"generator": generator, "blocking": bool(blocking),
                   "qa_types": sorted({f.get("type") for f in (qa or []) if f.get("type")})})

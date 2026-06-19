@@ -311,3 +311,72 @@ def test_template_output_passes_its_own_qa_gate():
                    description="We need an expert in Kubernetes and Rust.")
     d = generate_proposal(House(name="Nordic"), proj, [anna], ProposalOptions(use_llm=False))
     assert not has_blocking(check_proposal(d.body, [anna]))
+
+
+# --- regression tests for the correctness-audit fixes -----------------------
+
+def test_template_grounds_a_skill_word_in_the_consultant_title():
+    """A 'Kubernetes Engineer' (skills=['python']) is grounded for kubernetes via their TITLE, so
+    the offline template's title-bearing bio passes its own QA gate."""
+    from jobfinder.guardrails import check_proposal, has_blocking
+    from jobfinder.consultants import Consultant
+    from jobfinder.house import House
+    from jobfinder.bench import Project
+    from jobfinder.proposals import generate_proposal, ProposalOptions
+    c = Consultant(name="Anna", title="Kubernetes Engineer", skills=["python"])
+    d = generate_proposal(House(name="Nordic"), Project(title="Backend", skills=["python"]),
+                          [c], ProposalOptions(use_llm=False))
+    assert not has_blocking(check_proposal(d.body, [c]))
+    # but a genuine fabrication (title 'Backend Engineer', body claims kubernetes) still blocks
+    plain = Consultant(name="Bo", title="Backend Engineer", skills=["python"])
+    assert has_blocking(check_proposal("Bo is an expert in Kubernetes.", [plain]))
+
+
+def test_template_does_not_splice_house_boilerplate_into_qa_body():
+    """House boilerplate (house-level marketing, unattributable) must not trip the offline
+    template's own QA gate."""
+    from jobfinder.guardrails import check_proposal, has_blocking
+    from jobfinder.consultants import Consultant
+    from jobfinder.house import House
+    from jobfinder.bench import Project
+    from jobfinder.proposals import generate_template, ProposalOptions
+    h = House(name="Nordic", boilerplate="We have deep Kubernetes expertise and strong Terraform skills.")
+    d = generate_template(h, Project(title="Role", skills=["python"]),
+                          [Consultant(name="Anna", skills=["python"])], ProposalOptions(use_llm=False))
+    assert not has_blocking(check_proposal(d.body, [Consultant(name="Anna", skills=["python"])]))
+
+
+def test_check_proposal_tolerates_non_string_consultant_name():
+    from jobfinder.guardrails import check_proposal
+    # must not raise on a malformed (non-string) name in a dict consultant
+    check_proposal("Anna is an expert in Python.", [{"name": 123, "skills": ["python"]}])
+
+
+def test_qa_catches_second_differently_attributed_claim():
+    """A skill correctly attributed to one consultant AND wrongly to another (second mention) must
+    flag the wrong attribution — not be hidden by first-mention dedup."""
+    from jobfinder.guardrails import check_proposal, has_blocking
+    from jobfinder.consultants import Consultant
+    anna, bo = Consultant(name="Anna", skills=[]), Consultant(name="Bo", skills=["kubernetes"])
+    f = check_proposal("Bo has deep Kubernetes expertise. Anna is an expert in Kubernetes.", [anna, bo])
+    assert has_blocking(f) and any("anna: kubernetes" in (x.get("items") or []) for x in f)
+    # control: only the consultant who HAS it is credited → clean
+    assert not has_blocking(check_proposal("Bo has deep Kubernetes expertise.", [anna, bo]))
+
+
+def test_qa_no_false_misattribution_when_credited_name_follows_skill():
+    from jobfinder.guardrails import check_proposal, has_blocking
+    from jobfinder.consultants import Consultant
+    anna, bo = Consultant(name="Anna", skills=["python"]), Consultant(name="Bo", skills=["kubernetes"])
+    # kubernetes is credited to Bo (who has it), named just AFTER the skill → must not flag Anna
+    assert not has_blocking(check_proposal(
+        "Kubernetes will be led by Bo on this engagement, with Anna on backend.", [anna, bo]))
+
+
+def test_qa_cue_must_be_a_whole_word():
+    """A possession cue embedded in a larger word ('controlled' contains 'led') must not turn a
+    nearby skill into a fabricated claim."""
+    from jobfinder.guardrails import check_proposal, has_blocking
+    from jobfinder.consultants import Consultant
+    assert not has_blocking(check_proposal(
+        "We controlled the rollout. Kubernetes is the platform.", [Consultant(name="Anna", skills=["python"])]))

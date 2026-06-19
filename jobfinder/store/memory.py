@@ -224,7 +224,9 @@ class MemoryStore(Store):
 
     def list_notifications(self) -> list[Notification]:
         with self._lock:
-            return list(reversed(self._notes.values()))      # newest first
+            # newest-first by ``created`` — matches SqliteStore's "ORDER BY created DESC" even after
+            # an in-place reminder refresh bumps ``created`` (insertion order alone would diverge).
+            return sorted(self._notes.values(), key=lambda n: n.created, reverse=True)
 
     def delete_notification(self, note_id: str) -> None:
         with self._lock:

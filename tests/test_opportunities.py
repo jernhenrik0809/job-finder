@@ -447,3 +447,20 @@ def test_export_blocks_a_fabricated_stored_proposal_with_409():
         if opp:
             _delete_opp(opp["id"])
         _delete_consultant(c["id"])
+
+
+def test_attach_proposal_demotes_ready_when_blocking_replaces_clean():
+    """A blocking proposal must never leave the opp at proposal_ready, even if a prior clean
+    proposal advanced it there."""
+    from jobfinder.opportunities import new_opportunity, attach_proposal
+    opp = new_opportunity({"title": "X"})
+    attach_proposal(opp, "s", "b", "template", [], blocking=False)
+    assert opp.status == "proposal_ready"
+    attach_proposal(opp, "s", "b2", "llm", [{"type": "unsupported_capability", "blocking": True}], blocking=True)
+    assert opp.status == "proposal_drafting"
+
+
+def test_new_opportunity_coerces_non_string_description():
+    from jobfinder.opportunities import new_opportunity
+    opp = new_opportunity({"title": "X", "description": 123})   # must not raise
+    assert isinstance(opp.description, str)

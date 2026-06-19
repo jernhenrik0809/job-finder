@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 
-from .skills import canonical, non_technical_skills, skill_spans
+from .skills import canonical, extract_skills, non_technical_skills, skill_spans
 
 # Matches only bracketed text that carries a placeholder cue word, so legitimate prose
 # like "[top 5%]" or "array[i]" is not flagged. This is the single source of truth for
@@ -122,12 +122,14 @@ def _claimed_gap_skills(body: str, gap_skills: Iterable[str] | None) -> list[str
 # check_letter above is intentionally left untouched (its calibration is English/first-person).
 # ---------------------------------------------------------------------------
 
-# English + Danish possession cues (proposals may be written in either language).
+# English + Danish possession cues (proposals may be written in either language). The leading
+# (?<![A-Za-zæøåÆØÅ]) ensures a cue is a whole word, not an incidental substring of a larger one
+# (so "controlled" doesn't match "led", "consolidated" doesn't match "solid").
 _CLAIM_BEFORE_ML = re.compile(
-    r"(?:experienced?|expert(?:ise)?|proficien\w*|skilled|fluent|master\w*|hands[\s-]?on|versed|"
-    r"seasoned|specialist|specializ\w*|strong|solid|extensive|advanced|deep|competent|adept|"
-    r"years?|knowledge|background|familiar|comfortable|certified|led|delivered|built|"
-    r"erfaren|erfaring|ekspert|kompetent|stærk|dyb|solid|specialist|certificeret|kendskab|"
+    r"(?<![A-Za-zæøåÆØÅ])(?:experienced?|expert(?:ise)?|proficien\w*|skilled|fluent|master\w*|"
+    r"hands[\s-]?on|versed|seasoned|specialist|specializ\w*|strong|solid|extensive|advanced|deep|"
+    r"competent|adept|years?|knowledge|background|familiar|comfortable|certified|led|delivered|built|"
+    r"erfaren|erfaring|ekspert|kompetent|stærk|dyb|specialist|certificeret|kendskab|"
     r"baggrund|fortrolig|års?|leveret|byggede|bygget|kompetencer)"
     r"[A-Za-zæøåÆØÅ\s]{0,16}$",
     re.I,
@@ -138,40 +140,69 @@ _CLAIM_AFTER_ML = re.compile(
 # Action/assignment cues: a bid often states a capability as an action ("Anna will handle the
 # Kubernetes cluster", "leder Rust-teamet") rather than an adjective — treat those as claims too.
 _CLAIM_VERB_ML = re.compile(
-    r"\b(?:handl\w*|own(?:s|ed|ing)?|lead(?:s|ing)?|led|architect\w*|implement\w*|deliver\w*|"
-    r"manage\w*|maintain\w*|responsible|drive[ns]?|driving|set\s+up|st(?:an|oo)d\s+up|"
+    r"(?<![A-Za-zæøåÆØÅ])(?:handl\w*|own(?:s|ed|ing)?|lead(?:s|ing)?|led|architect\w*|implement\w*|"
+    r"deliver\w*|manage\w*|maintain\w*|responsible|drive[ns]?|driving|set\s+up|st(?:an|oo)d\s+up|"
     r"håndter\w*|leder|ledede|ansvarlig|implementer\w*|leverer|leveret|vedligehold\w*|driver)"
     r"[A-Za-zæøåÆØÅ\s,.\-]{0,40}$", re.I)
-_ATTR_WINDOW = 90          # how far back to look for a consultant's name before a skill claim
+_ATTR_WINDOW = 90          # how far either side of a skill to look for a consultant's name
 
 
 def _consultant_view(c) -> tuple[str, set[str]]:
-    """(first_name_lower, canonical_skill_set) from a Consultant object or a plain dict."""
-    name = (getattr(c, "name", None) if not isinstance(c, dict) else c.get("name")) or ""
-    skills = (getattr(c, "skills", None) if not isinstance(c, dict) else c.get("skills"))
+    """(first_name_lower, canonical_skill_set) from a Consultant object or a plain dict. The set
+    also includes skills named in the consultant's own TITLE (a "Kubernetes Engineer" is grounded
+    for Kubernetes), so the offline template's own title-bearing bios pass the gate."""
+    raw_name = (c.get("name") if isinstance(c, dict) else getattr(c, "name", None))
+    name = raw_name if isinstance(raw_name, str) else ("" if raw_name is None else str(raw_name))
+    skills = (c.get("skills") if isinstance(c, dict) else getattr(c, "skills", None))
     if not isinstance(skills, (list, tuple, set)):    # a stray string/None must not become char-skills
         skills = []
     cset = {canonical(s) for s in skills if isinstance(s, str) and s.strip()}
+    title = (c.get("title") if isinstance(c, dict) else getattr(c, "title", None))
+    if isinstance(title, str) and title.strip():
+        cset |= set(extract_skills(title))            # the consultant's own title is part of their record
     first = name.strip().split()[0].lower() if name.strip() else ""
     return first, cset
 
 
 def _claimed_skill_spans(body: str) -> list[tuple[str, int, int]]:
-    """Every (canonical_skill, start, end) named in a possession/claim context (EN or DA),
-    excluding soft skills / human languages. Deduped to first mention per skill."""
+    """EVERY (canonical_skill, start, end) named in a possession/claim context (EN or DA),
+    excluding soft skills / human languages. NOT deduped — the misattribution check needs every
+    mention so a second, differently-attributed claim of the same skill is still inspected."""
     out: list[tuple[str, int, int]] = []
-    seen: set[str] = set()
     soft = non_technical_skills()
     for canon, start, end in skill_spans(body):
-        if canon in seen or canon in soft:
+        if canon in soft:
             continue
         before = body[max(0, start - _BEFORE_WINDOW):start]
         after = body[end:end + _AFTER_WINDOW]
         if (_CLAIM_BEFORE_ML.search(before) or _CLAIM_AFTER_ML.match(after)
                 or _CLAIM_VERB_ML.search(before)):
-            seen.add(canon)
             out.append((canon, start, end))
     return out
+
+
+def _nearest_named(team: list, body: str, start: int, end: int):
+    """The proposed consultant whose first name is NEAREST the skill mention (before OR after),
+    within _ATTR_WINDOW, as (first, skill_set) — or None if no name is in range. Looking both ways
+    avoids a false misattribution when the credited consultant is named just AFTER the skill."""
+    before = body[max(0, start - _ATTR_WINDOW):start]
+    after = body[end:end + _ATTR_WINDOW]
+    best = None  # (distance, first, cset)
+    for first, cset in team:
+        if not first:
+            continue
+        pat = re.compile(r"\b" + re.escape(first) + r"\b", re.I)
+        mb = list(pat.finditer(before))
+        if mb:
+            dist = len(before) - mb[-1].end()         # chars from the (nearest) name to the skill
+            if best is None or dist < best[0]:
+                best = (dist, first, cset)
+        ma = pat.search(after)
+        if ma:
+            dist = ma.start()
+            if best is None or dist < best[0]:
+                best = (dist, first, cset)
+    return (best[1], best[2]) if best else None
 
 
 def check_proposal(body: str, consultants: Iterable | None = None,
@@ -205,35 +236,32 @@ def check_proposal(body: str, consultants: Iterable | None = None,
     claimed = _claimed_skill_spans(body)
 
     if claimed:
+        claimed_canon = {c for c, _, _ in claimed}
         if not union:
             # Fail CLOSED: claims are made but there is nothing to verify them against.
             findings.append({"type": "no_grounding", "severity": "high", "blocking": True,
                              "message": ("The proposal claims capabilities but the proposed "
                                          "consultants have no recorded skills to verify against — "
                                          "add their skills/CV before exporting."),
-                             "items": [c for c, _, _ in claimed][:10]})
+                             "items": sorted(claimed_canon)[:10]})
         else:
-            unsupported = sorted({c for c, _, _ in claimed if c not in union})
+            unsupported = sorted({c for c in claimed_canon if c not in union})
             if unsupported:
                 findings.append({"type": "unsupported_capability", "severity": "high", "blocking": True,
                                  "message": ("The proposal claims capabilities none of the proposed "
                                              "consultants have on record — remove them or add a "
                                              "consultant who has them."),
                                  "items": unsupported[:10]})
-            # Misattribution: a skill claim sits right after a SPECIFIC consultant's name, but that
-            # named person doesn't have it (someone else on the team does). Best-effort, conservative.
+            # Misattribution: a skill mention whose NEAREST named consultant (either side) does not
+            # have it, while it IS on the team (so it's a wrong-person error, not a fabrication).
+            # Every mention is checked, so a second, differently-attributed claim isn't missed.
             misattr: list[str] = []
-            for canon, start, _end in claimed:
+            for canon, start, end in claimed:
                 if canon not in union:
-                    continue
-                before = body[max(0, start - _ATTR_WINDOW):start].lower()
-                # word-boundary name match so "per" doesn't match inside "performed"/"expert"
-                near = [(first, cset) for first, cset in team
-                        if first and re.search(r"\b" + re.escape(first) + r"\b", before)]
-                # flag when a named consultant is nearby and NONE of the matched same-named
-                # candidates has the skill (handles shared first names instead of skipping).
-                if near and all(canon not in cset for _f, cset in near):
-                    item = f"{near[0][0]}: {canon}"
+                    continue                          # a pure fabrication → already in unsupported
+                near = _nearest_named(team, body, start, end)
+                if near is not None and canon not in near[1]:
+                    item = f"{near[0]}: {canon}"
                     if item not in misattr:
                         misattr.append(item)
             if misattr:
