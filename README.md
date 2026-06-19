@@ -7,6 +7,14 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 ![steps](https://img.shields.io/badge/1-Upload%20CV-6c8cff) ![steps](https://img.shields.io/badge/2-Search-8b5cf6) ![steps](https://img.shields.io/badge/3-Ranked%20matches-34d399) ![steps](https://img.shields.io/badge/4-Draft%20Outbox-fbbf24)
 
+> **Two modes, one app.** Beyond the personal job search, Job Finder now also runs as a
+> **consulting-house pursuit engine**: it ingests project/gig postings, matches them against a
+> **bench** of consultants, and drafts grounded **proposals** — which a human always reviews and
+> sends (it **never** auto-submits). See the **Bench** tab in the UI and
+> [`docs/CONSULTING_ENGINE.md`](docs/CONSULTING_ENGINE.md) for the full overview,
+> [`docs/DECISIONS.md`](docs/DECISIONS.md) for the decisions behind it, and
+> [`docs/ANALYSIS.md`](docs/ANALYSIS.md) for the architecture/business review.
+
 > **Where this is headed:** see [`docs/VISION.md`](docs/VISION.md) for the full target-state vision (private local-first career co-pilot) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan (Now → Next → Later → Vision).
 
 ---
