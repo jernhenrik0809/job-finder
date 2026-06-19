@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from ..applications import Application
+from ..clients import Client
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
 from ..house import House
@@ -23,6 +24,7 @@ MAX_SAVED_SEARCHES = 40
 MAX_NOTIFICATIONS = 100
 MAX_CONSULTANTS = 300            # the bench — sized well above a ~100-consultant house
 MAX_OPPORTUNITIES = 500          # pursued projects (postings + warm leads)
+MAX_CLIENTS = 500                # client/account relationships (direct-warm layer)
 
 
 class Store(ABC):
@@ -101,6 +103,16 @@ class Store(ABC):
         """Atomically load → ``mutator(opp)`` → save under one lock, so a background sweep and a
         foreground edit can't clobber each other's events/status. Returns the updated opp or None."""
         ...
+
+    # --- clients (the direct-warm relationship layer) ---
+    @abstractmethod
+    def save_client(self, client: Client) -> None: ...
+    @abstractmethod
+    def get_client(self, client_id: str) -> Client | None: ...
+    @abstractmethod
+    def list_clients(self) -> list[Client]: ...
+    @abstractmethod
+    def delete_client(self, client_id: str) -> None: ...
 
     # --- data rights (export / wipe everything) ---
     @abstractmethod

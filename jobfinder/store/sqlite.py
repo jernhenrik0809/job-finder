@@ -18,8 +18,9 @@ import time
 from pathlib import Path
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES, MAX_CLIENTS)
 from ..applications import Application
+from ..clients import Client
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
 from ..house import House, HOUSE_ID
@@ -36,9 +37,10 @@ CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, created REAL NOT 
 CREATE TABLE IF NOT EXISTS consultants   (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS house         (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS opportunities (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS clients       (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 6
+_SCHEMA_VERSION = 7
 
 
 class SqliteStore(Store):
@@ -309,6 +311,30 @@ class SqliteStore(Store):
             )
         return opp
 
+    # --- clients (direct-warm relationship layer) ---
+    def save_client(self, client: Client) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO clients(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (client.id, time.time(), json.dumps(client.to_dict())),
+            )
+            self._evict("clients", "id", MAX_CLIENTS)
+
+    def get_client(self, client_id: str) -> Client | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM clients WHERE id=?", (client_id,)).fetchone()
+        return Client.from_dict(json.loads(row["data"])) if row else None
+
+    def list_clients(self) -> list[Client]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM clients ORDER BY created ASC").fetchall()
+        return [Client.from_dict(json.loads(r["data"])) for r in rows]
+
+    def delete_client(self, client_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM clients WHERE id=?", (client_id,))
+
     # --- data rights ---
     def export_all(self) -> dict:
         with self._lock:
@@ -320,6 +346,7 @@ class SqliteStore(Store):
             cons = self._conn.execute("SELECT data FROM consultants ORDER BY created ASC").fetchall()
             house = self._conn.execute("SELECT data FROM house WHERE id=?", (HOUSE_ID,)).fetchone()
             opps = self._conn.execute("SELECT data FROM opportunities ORDER BY created ASC").fetchall()
+            clients = self._conn.execute("SELECT data FROM clients ORDER BY created ASC").fetchall()
         return {
             "profiles": {r["cv_id"]: json.loads(r["data"]) for r in prof},
             "examples": [dict(r) for r in ex],
@@ -329,6 +356,7 @@ class SqliteStore(Store):
             "consultants": [json.loads(r["data"]) for r in cons],
             "house": json.loads(house["data"]) if house else {},
             "opportunities": [json.loads(r["data"]) for r in opps],
+            "clients": [json.loads(r["data"]) for r in clients],
         }
 
     def delete_all(self) -> None:
@@ -337,7 +365,7 @@ class SqliteStore(Store):
         # runs in autocommit — still under the lock.
         with self._lock:
             for table in ("profiles", "examples", "applications", "saved_searches",
-                          "notifications", "consultants", "house", "opportunities"):
+                          "notifications", "consultants", "house", "opportunities", "clients"):
                 self._conn.execute(f"DELETE FROM {table}")
             self._conn.commit()
             try:

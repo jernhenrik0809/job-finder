@@ -9,8 +9,9 @@ from __future__ import annotations
 import threading
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES, MAX_CLIENTS)
 from ..applications import Application
+from ..clients import Client
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
 from ..house import House, HOUSE_ID
@@ -34,6 +35,7 @@ class MemoryStore(Store):
         self._consultants: dict[str, Consultant] = {}
         self._house: House | None = None
         self._opps: dict[str, Opportunity] = {}
+        self._clients: dict[str, Client] = {}
         # A single non-reentrant lock guards every dict access, so a background alert sweep
         # writing (save_notification / update_saved_search) can't race a concurrent export_all
         # iteration ("dictionary changed size") or a delete_all clear. No method calls another
@@ -167,6 +169,24 @@ class MemoryStore(Store):
             mutator(opp)
             return opp
 
+    # --- clients (direct-warm relationship layer) ---
+    def save_client(self, client: Client) -> None:
+        with self._lock:
+            self._clients[client.id] = client
+            _evict(self._clients, MAX_CLIENTS)
+
+    def get_client(self, client_id: str) -> Client | None:
+        with self._lock:
+            return self._clients.get(client_id)
+
+    def list_clients(self) -> list[Client]:
+        with self._lock:
+            return list(self._clients.values())
+
+    def delete_client(self, client_id: str) -> None:
+        with self._lock:
+            self._clients.pop(client_id, None)
+
     def export_all(self) -> dict:
         with self._lock:
             return {
@@ -178,6 +198,7 @@ class MemoryStore(Store):
                 "consultants": [c.to_dict() for c in self._consultants.values()],
                 "house": self._house.to_dict() if self._house else {},
                 "opportunities": [o.to_dict() for o in self._opps.values()],
+                "clients": [c.to_dict() for c in self._clients.values()],
             }
 
     def delete_all(self) -> None:
@@ -190,6 +211,7 @@ class MemoryStore(Store):
             self._consultants.clear()
             self._house = None
             self._opps.clear()
+            self._clients.clear()
 
     def save_notification(self, note: Notification) -> None:
         with self._lock:

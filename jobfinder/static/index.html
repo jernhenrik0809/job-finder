@@ -241,6 +241,7 @@
       <div id="view-bench" class="hidden">
         <div class="bench-tabs">
           <button class="bench-subtab active" data-bench="consultants" type="button">Consultants</button>
+          <button class="bench-subtab" data-bench="clients" type="button">Clients</button>
           <button class="bench-subtab" data-bench="house" type="button">House identity</button>
           <button class="bench-subtab" data-bench="staff" type="button">Staff a gig</button>
           <button class="bench-subtab" data-bench="pipeline" type="button">Opportunities</button>
@@ -254,6 +255,17 @@
           </div>
           <div id="consultantForm" class="bench-form hidden"></div>
           <div id="consultantList" class="bench-list"></div>
+        </div>
+
+        <!-- ----- A2) Clients (the direct/warm relationship layer) ----- -->
+        <div id="bench-clients" class="bench-section hidden">
+          <div class="bench-head">
+            <h3>Clients</h3>
+            <button id="clientAddToggle" class="btn ghost small" type="button">＋ Add client</button>
+          </div>
+          <p class="muted small">Direct, warm relationships — the companies you bid into. Flag a client as <b>do not bid</b> to warn yourself off it on opportunities.</p>
+          <div id="clientForm" class="bench-form hidden"></div>
+          <div id="clientList" class="bench-list"></div>
         </div>
 
         <!-- ----- B) House identity ----- -->

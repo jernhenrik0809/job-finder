@@ -27,6 +27,7 @@ const el = {
   tabSettings: $('#tabSettings'), viewSettings: $('#view-settings'), settingsBody: $('#settingsBody'),
   tabBench: $('#tabBench'), viewBench: $('#view-bench'),
   consultantForm: $('#consultantForm'), consultantList: $('#consultantList'), benchAddToggle: $('#benchAddToggle'),
+  clientForm: $('#clientForm'), clientList: $('#clientList'), clientAddToggle: $('#clientAddToggle'),
   houseForm: $('#houseForm'), gigForm: $('#gigForm'), rankLoading: $('#rankLoading'), rankResults: $('#rankResults'),
   propBar: $('#propBar'), propSelCount: $('#propSelCount'), propClearSel: $('#propClearSel'), genProposalBtn: $('#genProposalBtn'),
   pursueGigBtn: $('#pursueGigBtn'),
@@ -1089,16 +1090,21 @@ function loadBench() {
     el.benchAddToggle.addEventListener('click', () => {
       if (el.consultantForm.classList.contains('hidden')) openConsultantForm(); else closeConsultantForm();
     });
+    el.clientAddToggle.addEventListener('click', () => {
+      if (el.clientForm.classList.contains('hidden')) openClientForm(); else closeClientForm();
+    });
     renderHouseForm();
     renderGigForm();
   }
   loadConsultants();
+  loadClients();
   loadHouse();
 }
 
 function switchBenchSection(name) {
   el.viewBench.querySelectorAll('.bench-subtab').forEach(b => b.classList.toggle('active', b.dataset.bench === name));
   el.viewBench.querySelectorAll('.bench-section').forEach(s => s.classList.toggle('hidden', s.id !== `bench-${name}`));
+  if (name === 'clients') loadClients();
   if (name === 'pipeline') loadOpportunities();
 }
 
@@ -1262,6 +1268,189 @@ async function deleteConsultant(c) {
     const resp = await fetch(`/api/consultants/${c.id}`, { method: 'DELETE' });
     if (!resp.ok) throw new Error('Delete failed');
     loadConsultants();
+  } catch (err) { showWarnings(['Delete: ' + err.message]); }
+}
+
+// ----- A2) clients (direct/warm relationships) -----
+const clientsById = new Map();        // client id -> ClientObj (also used by opp cards for do_not_bid)
+let editingClientId = null;
+let editingClient = null;
+
+async function loadClients() {
+  try {
+    const data = await (await fetch('/api/clients')).json();
+    const list = data.clients || [];
+    clientsById.clear();
+    list.forEach(c => clientsById.set(c.id, c));
+    renderClients(list);
+    // keep any visible opportunity cards' do-not-bid warnings + selects in sync
+    if (oppsById.size && !document.getElementById('bench-pipeline').classList.contains('hidden')) renderOpportunities();
+  } catch { el.clientList.innerHTML = '<p class="muted small">Could not load your clients.</p>'; }
+}
+
+function renderClients(list) {
+  el.clientList.innerHTML = '';
+  if (!list.length) {
+    el.clientList.innerHTML = '<p class="muted small">No clients yet — add one to track your direct relationships and link them to opportunities.</p>';
+    return;
+  }
+  list.forEach(c => el.clientList.appendChild(clientCard(c)));
+}
+
+function clientCard(c) {
+  const card = document.createElement('div');
+  card.className = 'consultant';        // reuse the bench-list card styling
+  card.dataset.id = c.id;
+  const contacts = Array.isArray(c.contacts) ? c.contacts : [];
+  const projects = Array.isArray(c.past_projects) ? c.past_projects : [];
+  const sub = [
+    c.sector ? esc(c.sector) : '',
+    `${contacts.length} contact${contacts.length === 1 ? '' : 's'}`,
+  ].filter(Boolean).join('<span> · </span>');
+  const projChips = projects.slice(0, 8).map(p => `<span class="chip">${esc(p)}</span>`).join('');
+  const contactLines = contacts.map(ct => {
+    const bits = [
+      ct.name ? `<b>${esc(ct.name)}</b>` : '',
+      ct.role ? esc(ct.role) : '',
+      ct.email ? esc(ct.email) : '',
+      ct.phone ? esc(ct.phone) : '',
+    ].filter(Boolean).join(' · ');
+    return bits ? `<div class="client-contact muted small">${bits}</div>` : '';
+  }).filter(Boolean).join('');
+  card.innerHTML = `
+    <div class="consultant-main">
+      <div class="consultant-head">
+        <h4>${esc(c.name || 'Unnamed client')}</h4>
+        ${c.do_not_bid ? '<span class="cstatus dnb-badge">⛔ do not bid</span>' : ''}
+      </div>
+      ${sub ? `<div class="consultant-sub">${sub}</div>` : ''}
+      ${contactLines ? `<div class="client-contacts">${contactLines}</div>` : ''}
+      ${projChips ? `<div class="chips" style="margin-top:8px">${projChips}</div>` : ''}
+      ${c.notes ? `<div class="muted small" style="margin-top:8px">${esc(c.notes)}</div>` : ''}
+    </div>
+    <div class="consultant-actions">
+      <button class="btn mini ghost cl-edit" type="button">Edit</button>
+      <button class="btn mini danger cl-del" type="button">Delete</button>
+    </div>`;
+  card.querySelector('.cl-edit').addEventListener('click', () => openClientForm(c));
+  card.querySelector('.cl-del').addEventListener('click', () => deleteClient(c));
+  return card;
+}
+
+// One contact row (name / role / email / phone). Used both for existing contacts and blank rows.
+function clientContactRow(ct) {
+  ct = ct || {};
+  return `<div class="client-contact-row">
+      <input class="ccName" type="text" placeholder="Contact name" value="${esc(ct.name || '')}" />
+      <input class="ccRole" type="text" placeholder="Role" value="${esc(ct.role || '')}" />
+      <input class="ccEmail" type="text" placeholder="Email" value="${esc(ct.email || '')}" />
+      <input class="ccPhone" type="text" placeholder="Phone" value="${esc(ct.phone || '')}" />
+    </div>`;
+}
+
+// Build the add/edit form. Pass a client to edit (PATCH only changed fields), or nothing to add.
+function openClientForm(c) {
+  editingClientId = c ? c.id : null;
+  editingClient = c || null;
+  const v = c || {};
+  const contacts = (Array.isArray(v.contacts) && v.contacts.length) ? v.contacts : [{}];
+  el.clientForm.innerHTML = `
+    <div class="bf-grid">
+      <label class="full">Name<input id="clName" type="text" placeholder="e.g. Novo Nordisk" /></label>
+      <label class="full">Sector<input id="clSector" type="text" placeholder="e.g. Pharma" /></label>
+      <label class="chk full"><input id="clDnb" type="checkbox" /> Do not bid <i class="muted small">(warn me off this client on opportunities)</i></label>
+      <div class="full">
+        <span class="bf-sublabel">Contacts <i class="muted small">(name / role / email / phone)</i></span>
+        <div id="clContacts">${contacts.map(clientContactRow).join('')}</div>
+        <button id="clAddContact" class="link-btn small" type="button">+ add contact</button>
+      </div>
+      <label class="full">Past projects <i class="muted small">(comma-separated)</i><input id="clProjects" type="text" placeholder="e.g. Cloud migration, Data platform" /></label>
+      <label class="full">Notes<textarea id="clNotes" rows="3" placeholder="Anything worth remembering about this relationship…"></textarea></label>
+    </div>
+    <div class="bf-actions">
+      <button id="clSave" class="btn primary small" type="button">${c ? 'Save changes' : 'Add client'}</button>
+      <button id="clCancel" class="btn ghost small" type="button">Cancel</button>
+      <span class="msg copied" style="display:none">saved ✓</span>
+    </div>`;
+  el.clientForm.classList.remove('hidden');
+  const q = (s) => el.clientForm.querySelector(s);
+  q('#clName').value = v.name || '';
+  q('#clSector').value = v.sector || '';
+  q('#clDnb').checked = !!v.do_not_bid;
+  q('#clProjects').value = (Array.isArray(v.past_projects) ? v.past_projects : []).join(', ');
+  q('#clNotes').value = v.notes || '';
+  q('#clAddContact').addEventListener('click', () => {
+    q('#clContacts').insertAdjacentHTML('beforeend', clientContactRow());
+  });
+  q('#clCancel').addEventListener('click', closeClientForm);
+  q('#clSave').addEventListener('click', saveClient);
+}
+
+function closeClientForm() {
+  el.clientForm.classList.add('hidden');
+  el.clientForm.innerHTML = '';
+  editingClientId = null;
+  editingClient = null;
+}
+
+// Read contact rows → drop fully-empty rows.
+function readClientContacts() {
+  const rows = [...el.clientForm.querySelectorAll('.client-contact-row')];
+  return rows.map(r => ({
+    name: r.querySelector('.ccName').value.trim(),
+    role: r.querySelector('.ccRole').value.trim(),
+    email: r.querySelector('.ccEmail').value.trim(),
+    phone: r.querySelector('.ccPhone').value.trim(),
+  })).filter(ct => ct.name || ct.role || ct.email || ct.phone);
+}
+
+async function saveClient() {
+  const q = (s) => el.clientForm.querySelector(s);
+  const fields = {
+    name: q('#clName').value.trim(),
+    sector: q('#clSector').value.trim(),
+    do_not_bid: q('#clDnb').checked,
+    contacts: readClientContacts(),
+    past_projects: splitCsv(q('#clProjects').value),
+    notes: q('#clNotes').value.trim(),
+  };
+  if (!fields.name) { showWarnings(['Client: a name is required.']); return; }
+  const btn = q('#clSave'); btn.disabled = true;
+  try {
+    if (editingClientId) {
+      // PATCH only the fields that actually changed.
+      const before = editingClient || {};
+      const patch = {};
+      for (const [k, val] of Object.entries(fields)) {
+        let old, now;
+        if (k === 'past_projects') { old = (before.past_projects || []).join('|'); now = val.join('|'); }
+        else if (k === 'contacts') { old = JSON.stringify(before.contacts || []); now = JSON.stringify(val); }
+        else if (k === 'do_not_bid') { old = !!before.do_not_bid; now = !!val; }
+        else { old = before[k] == null ? '' : before[k]; now = val == null ? '' : val; }
+        if (String(old) !== String(now)) patch[k] = val;
+      }
+      if (Object.keys(patch).length === 0) { closeClientForm(); return; }
+      const resp = await fetch(`/api/clients/${editingClientId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Save failed'); }
+    } else {
+      const resp = await fetch('/api/clients', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields),
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Add failed'); }
+    }
+    closeClientForm();
+    loadClients();
+  } catch (err) { showWarnings(['Client: ' + err.message]); btn.disabled = false; }
+}
+
+async function deleteClient(c) {
+  if (!confirm(`Delete the client “${c.name || 'this client'}”?`)) return;
+  try {
+    const resp = await fetch(`/api/clients/${c.id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('Delete failed');
+    loadClients();
   } catch (err) { showWarnings(['Delete: ' + err.message]); }
 }
 
@@ -1572,6 +1761,7 @@ const oppExpanded = new Set();       // ids whose audit trail is expanded (survi
 
 async function loadOpportunities() {
   el.oppLoading.classList.remove('hidden');
+  if (!clientsById.size) loadClients();   // populate the client select + do-not-bid warnings (re-renders on arrival)
   try {
     const data = await (await fetch('/api/opportunities')).json();
     if (Array.isArray(data.statuses) && data.statuses.length) OPP_STATUSES = data.statuses;
@@ -1605,7 +1795,15 @@ function oppCard(o) {
     o.start_date ? `🗓 ${esc(o.start_date)}` : '',
     (o.rate_ceiling != null && o.rate_ceiling !== '') ? `💰 ≤ ${esc(o.rate_ceiling)} ${esc(o.currency || '')}`.trim() : '',
   ].filter(Boolean).join('<span> · </span>');
-  const team = (o.staffed || []).map(s => `<span class="chip">${esc(s.consultant_name || s.consultant_id || '')}</span>`).join('');
+  const cur = o.margin_currency || '';
+  const team = (o.staffed || []).map(s => {
+    const nm = s.consultant_name || s.consultant_id || '';
+    const m = (s.margin != null && s.margin !== '') ? ` <span class="opp-margin">margin ${esc(fmtNum(s.margin))} ${esc(cur)}</span>`.trimEnd() : '';
+    return `<span class="chip">${esc(nm)}${m}</span>`;
+  }).join('');
+  const totalMargin = (o.total_margin != null && o.total_margin !== '')
+    ? `<div class="opp-total-margin">Total margin: <b>${esc(fmtNum(o.total_margin))} ${esc(cur)}</b></div>`.trimEnd()
+    : ((o.staffed || []).some(s => s.margin != null) ? '<div class="opp-total-margin muted">Total margin: —</div>' : '');
   const hasProposal = !!(o.proposal_body && o.proposal_body.trim());
   const propTag = hasProposal
     ? (o.blocking
@@ -1613,6 +1811,19 @@ function oppCard(o) {
       : '<span class="opp-prop ok">✓ proposal drafted</span>')
     : '<span class="opp-prop none">no proposal yet</span>';
   const qa = (o.qa || []).length ? oppQaHtml(o.qa, !!o.blocking) : '';
+  // Client link: a lightweight select populated from the loaded clients, plus a do-not-bid warning.
+  const clientList = [...clientsById.values()];
+  const linkedClient = o.client_id ? clientsById.get(o.client_id) : null;
+  const clientOpts = ['<option value="">— no client —</option>']
+    .concat(clientList.map(cl =>
+      `<option value="${esc(cl.id)}"${cl.id === o.client_id ? ' selected' : ''}>${esc(cl.name || 'Unnamed')}${cl.do_not_bid ? ' ⛔' : ''}</option>`))
+    .join('');
+  const clientRow = `
+    <div class="opp-client">
+      <label class="opp-client-pick"><span class="lbl">Client</span>
+        <select class="opp-client-sel">${clientOpts}</select></label>
+      ${linkedClient && linkedClient.do_not_bid ? '<span class="opp-dnb-warn">⛔ This client is flagged <b>do not bid</b>.</span>' : ''}
+    </div>`;
   const events = (o.events || []).slice().reverse();
   const expanded = oppExpanded.has(o.id);
   const trail = events.length
@@ -1629,6 +1840,8 @@ function oppCard(o) {
     ${sub ? `<div class="opp-sub">${sub}</div>` : ''}
     <div class="opp-tags">${propTag}</div>
     ${team ? `<div class="opp-team"><span class="lbl">Team</span><span class="chips">${team}</span></div>` : ''}
+    ${totalMargin}
+    ${clientRow}
     ${qa ? `<div class="opp-qa">${qa}</div>` : ''}
     <div class="opp-actions">
       <button class="btn mini ghost opp-gen" type="button">${hasProposal ? 'Regenerate proposal' : 'Generate proposal'}</button>
@@ -1639,6 +1852,7 @@ function oppCard(o) {
     <div class="opp-trail-wrap">${trail}</div>`;
 
   card.querySelector('.opp-status-sel').addEventListener('change', (e) => changeOppStatus(o.id, e.target.value));
+  card.querySelector('.opp-client-sel').addEventListener('change', (e) => linkOppClient(o.id, e.target.value));
   card.querySelector('.opp-gen').addEventListener('click', (e) => generateOppProposal(o.id, e.target));
   card.querySelector('.opp-export').addEventListener('click', (e) => exportOpportunity(o.id, e.target));
   card.querySelector('.opp-del').addEventListener('click', () => deleteOpportunity(o.id));
@@ -1675,6 +1889,22 @@ async function changeOppStatus(id, status) {
     if (!resp.ok) throw new Error(data.detail || 'Update failed');
     oppsById.set(id, data);
     renderOpportunities();
+  } catch (err) {
+    showWarnings(['Opportunity: ' + err.message]);
+    renderOpportunities();      // snap the select back to the stored value
+  }
+}
+
+async function linkOppClient(id, clientId) {
+  try {
+    const resp = await fetch(`/api/opportunities/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_id: clientId || null }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || 'Update failed');
+    oppsById.set(id, data);
+    renderOpportunities();      // re-renders the card → shows/hides the do-not-bid warning
   } catch (err) {
     showWarnings(['Opportunity: ' + err.message]);
     renderOpportunities();      // snap the select back to the stored value
@@ -1832,6 +2062,12 @@ function fmtTime(ts) {
 }
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// Format a margin/number for display: thousands-separated, no trailing ".00", falls back to raw on non-numeric.
+function fmtNum(n) {
+  const x = Number(n);
+  if (!isFinite(x)) return String(n == null ? '' : n);
+  return x.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 function safeUrl(u) {
   if (!u) return '';

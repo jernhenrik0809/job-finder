@@ -2,6 +2,26 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.33.0] — 2026-06-19
+
+### Added — consulting engine: Client/Contact CRM + margin surfacing (Phase 3 finish)
+- **`clients.py`** — a `Client` entity (the direct-warm relationship layer): name, sector,
+  **embedded contacts** (name/role/email/phone), a `do_not_bid` account guardrail, past projects,
+  notes. Store CRUD on both backends; schema **v6 → v7** (new `clients` table via the
+  ordered-migration path); export/delete wired (reflective data-rights test auto-covers); cap
+  `MAX_CLIENTS=500`.
+- **Endpoints** — `POST/GET /api/clients`, `GET/PATCH/DELETE /api/clients/{id}`; opportunities can
+  be linked to a client (`PATCH /api/opportunities/{id}` now accepts `client_id`).
+- **Margin surfacing** — `_opp_payload` now computes each bid line's `margin` (sell − cost) and a
+  `total_margin` + `margin_currency`, but **only within a single currency** (never a wrong
+  cross-FX sum; null otherwise). Shown per-line and as a total on the pipeline cards.
+- **Clients UI** — a Clients sub-tab (CRUD with repeatable contact rows + a do-not-bid badge),
+  margin on opportunity cards, and a client selector on each opportunity (with a do-not-bid
+  warning when linked).
+
+Built via two parallel agents on disjoint files (frontend + tests); integrated and
+preview-verified by the main thread. 366 tests pass. **Phases 0–3 complete.**
+
 ## [1.32.0] — 2026-06-19
 
 ### Added — consulting engine: posting-sweep → bench notifications + bid/no-bid (Phase 3)

@@ -23,6 +23,7 @@ from .applications import (
     STATUSES, SUGGESTED_NEXT, attach_letter, job_snapshot, new_application, set_status,
 )
 from .bench import Project, rank_bench_for_project
+from .clients import Client, new_client
 from .config import settings
 from .consultants import (
     DATA_ORIGINS, ENGAGEMENT_TYPES, STATUSES as CONSULTANT_STATUSES,
@@ -35,7 +36,7 @@ from .engine import SearchSettings, find_jobs
 from .guardrails import check_letter, check_proposal, has_blocking
 from .opportunities import (
     STATUSES as OPP_STATUSES, SUGGESTED_NEXT as OPP_SUGGESTED_NEXT,
-    attach_proposal, new_opportunity, record_export, set_staffing,
+    attach_proposal, margin_of, new_opportunity, record_export, set_staffing,
     set_status as set_opp_status,
 )
 from .proposals import ProposalOptions, generate_proposal
@@ -349,6 +350,27 @@ class OpportunityUpdate(BaseModel):
     rate_ceiling: float | None = None
     currency: str | None = None
     start_date: str | None = None
+    client_id: str | None = None           # link this opportunity to a client/account
+
+
+class ClientCreate(BaseModel):
+    """Create a client/account (the direct-warm relationship layer)."""
+    name: str = ""
+    sector: str = ""
+    contacts: list[dict] | None = None     # [{name, role, email, phone}]
+    do_not_bid: bool = False
+    past_projects: list[str] | None = None
+    notes: str = ""
+
+
+class ClientUpdate(BaseModel):
+    """Edit a client. Only provided fields change."""
+    name: str | None = None
+    sector: str | None = None
+    contacts: list[dict] | None = None
+    do_not_bid: bool | None = None
+    past_projects: list[str] | None = None
+    notes: str | None = None
 
 
 class OpportunityProposalRequest(BaseModel):
@@ -993,6 +1015,20 @@ def _staff_lines(consultant_ids: list[str]) -> list[dict]:
 def _opp_payload(opp) -> dict:
     d = opp.to_dict()
     d["blocking"] = has_blocking(opp.qa)          # is the stored proposal currently export-blocked?
+    # Commercials: per-line margin + a total when every staffed line shares one currency (never a
+    # wrong cross-FX sum). margins[i] is None when a rate is missing or currencies differ.
+    lines = opp.staffed or []
+    margins = [margin_of(ln) for ln in lines]
+    for ln, m in zip(d.get("staffed", []), margins):
+        ln["margin"] = m
+    currencies = {(ln.get("currency") or "").strip().upper() for ln in lines if ln.get("currency")}
+    known = [m for m in margins if m is not None]
+    if len(currencies) == 1 and known and len(known) == len(lines):
+        d["total_margin"] = round(sum(known), 2)
+        d["margin_currency"] = next(iter(currencies))
+    else:
+        d["total_margin"] = None
+        d["margin_currency"] = ""
     return d
 
 
@@ -1058,6 +1094,8 @@ def update_opportunity(oid: str, upd: OpportunityUpdate) -> JSONResponse:
         opp.currency = upd.currency.strip()
     if upd.start_date is not None:
         opp.start_date = upd.start_date.strip()
+    if upd.client_id is not None:
+        opp.client_id = upd.client_id.strip()
     opp.updated = time.time()
     store.save_opportunity(opp)
     return JSONResponse(_opp_payload(opp))
@@ -1118,6 +1156,62 @@ def export_opportunity_proposal(oid: str) -> PlainTextResponse:
     subject = (opp.proposal_subject or "").strip()
     content = (f"Subject: {subject}\n\n{body}\n" if subject else f"{body}\n")
     return PlainTextResponse(content, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+
+
+# ---------------------------------------------------------------------------
+# Clients (the direct-warm relationship layer)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/clients")
+def create_client(req: ClientCreate) -> JSONResponse:
+    c = new_client(req.name or "", sector=req.sector or "", contacts=req.contacts or [],
+                   do_not_bid=bool(req.do_not_bid),
+                   past_projects=_clean_list(req.past_projects, cap=50) if req.past_projects else [],
+                   notes=req.notes or "")
+    store.save_client(c)
+    return JSONResponse(c.to_dict())
+
+
+@app.get("/api/clients")
+def list_clients() -> dict:
+    return {"clients": [c.to_dict() for c in store.list_clients()]}
+
+
+@app.get("/api/clients/{cid}")
+def get_client(cid: str) -> JSONResponse:
+    c = store.get_client(cid)
+    if c is None:
+        raise HTTPException(status_code=404, detail="Client not found.")
+    return JSONResponse(c.to_dict())
+
+
+@app.patch("/api/clients/{cid}")
+def update_client(cid: str, upd: ClientUpdate) -> JSONResponse:
+    from .clients import _clean_contacts
+    c = store.get_client(cid)
+    if c is None:
+        raise HTTPException(status_code=404, detail="Client not found.")
+    if upd.name is not None:
+        c.name = upd.name.strip() or c.name
+    if upd.sector is not None:
+        c.sector = upd.sector.strip()
+    if upd.contacts is not None:
+        c.contacts = _clean_contacts(upd.contacts)
+    if upd.do_not_bid is not None:
+        c.do_not_bid = bool(upd.do_not_bid)
+    if upd.past_projects is not None:
+        c.past_projects = _clean_list(upd.past_projects, cap=50)
+    if upd.notes is not None:
+        c.notes = upd.notes
+    c.updated = time.time()
+    store.save_client(c)
+    return JSONResponse(c.to_dict())
+
+
+@app.delete("/api/clients/{cid}")
+def delete_client(cid: str) -> dict:
+    store.delete_client(cid)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

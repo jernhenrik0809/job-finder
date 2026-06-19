@@ -576,6 +576,19 @@ input[type=range] { accent-color: var(--accent); }
 .st-inactive { --st: #6b7280; }
 .consultant-actions { display: flex; flex-direction: column; gap: 6px; flex: none; }
 
+/* clients */
+.cstatus.dnb-badge { --st: #f87171; background: rgba(239, 68, 68, .1); }
+.client-contacts { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.client-contact { font-size: 12.5px; }
+.bf-sublabel { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+#clContacts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.client-contact-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.client-contact-row input {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; width: 100%;
+}
+@media (max-width: 700px) { .client-contact-row { grid-template-columns: 1fr 1fr; } }
+
 /* rank results */
 .rank-results { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
 .rank-meta { margin-bottom: 2px; }
@@ -662,6 +675,20 @@ input[type=range] { accent-color: var(--accent); }
 .opp-prop.none { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
 .opp-team { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; flex-wrap: wrap; }
 .opp-team .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.opp-margin { color: var(--muted); font-weight: 600; }
+.opp-total-margin { margin-top: 8px; font-size: 13px; color: var(--text); }
+.opp-total-margin.muted { color: var(--muted); }
+.opp-client { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.opp-client-pick { display: flex; align-items: center; gap: 8px; }
+.opp-client-pick .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.opp-client-sel {
+  background: var(--bg); border: 1px solid var(--line); color: var(--text);
+  border-radius: 8px; padding: 5px 9px; font: inherit; font-size: 12.5px;
+}
+.opp-dnb-warn {
+  font-size: 12.5px; font-weight: 600; color: #f3b8b8;
+  background: rgba(239, 68, 68, .1); border: 1px solid #7f1d1d; border-radius: 8px; padding: 4px 10px;
+}
 .opp-qa { margin-top: 12px; }
 .opp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; }
 .opp-actions .spacer { flex: 1; }
