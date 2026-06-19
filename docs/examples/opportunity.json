@@ -1,0 +1,31 @@
+{
+  "id": "opp-fintech-cloud",
+  "kind": "posting",
+  "source": "Verama (consulting)",
+  "source_uid": "VER-2026-0481",
+  "url": "https://app.verama.com/en/public/job-requests/VER-2026-0481",
+  "title": "Cloud migration & data platform — Danish fintech",
+  "location": "København (hybrid, 2 days on-site)",
+  "description": "A Copenhagen fintech needs to migrate its on-prem data stack to AWS and stand up a reliable, GDPR-compliant data platform: containerised services on Kubernetes, infrastructure-as-code, and resilient ingestion pipelines feeding analytics. A later phase adds a document-classification capability. 6-month engagement, start August 2026, possible extension. Strong preference for Danish-speaking senior consultants who can work hybrid from Copenhagen.",
+  "skills": ["python", "aws", "kubernetes", "terraform", "kafka", "airflow", "postgresql", "machine learning", "nlp"],
+  "rate_ceiling": 1200.0,
+  "currency": "DKK",
+  "start_date": "2026-08-01",
+  "status": "proposal_ready",
+  "client_id": "",
+  "staffed": [
+    {"consultant_id": "c-anna", "consultant_name": "Anna Berg", "cost_rate": 700.0, "sell_rate": 1150.0, "currency": "DKK"},
+    {"consultant_id": "c-mette", "consultant_name": "Mette Nielsen", "cost_rate": 650.0, "sell_rate": 1100.0, "currency": "DKK"}
+  ],
+  "proposal_subject": "Proposal: Cloud migration & data platform — Nordlys Consulting",
+  "proposal_body": "Dear hiring team,\n\nNordlys Consulting is pleased to submit this proposal for your cloud migration and data platform engagement.\n\nUnderstanding of the engagement\nYou are moving an on-prem data stack to AWS and need a dependable, GDPR-compliant platform — containerised services on Kubernetes, infrastructure-as-code, and resilient ingestion pipelines feeding analytics — with a later document-classification phase. You want senior, Danish-speaking consultants who integrate with your team and work hybrid from Copenhagen.\n\nProposed team\n- Anna Berg, Senior Cloud & Data Engineer (9 years). Relevant experience with AWS, Kubernetes, Terraform, Python, Kafka and Airflow. At Danske Pension she built a GDPR-compliant data platform on AWS (EKS + Terraform) ingesting 2M+ events/day and cut nightly batch runtime from 6h to 40min. Available from 1 August 2026.\n- Mette Nielsen, Data Scientist / ML Engineer (7 years), for the document-classification phase. Relevant experience with Python, NLP and MLOps; at Saxo Bank she built a document-classification service that cut manual triage by ~60%. Available from 1 September 2026, aligned with the later phase.\n\nApproach\nWe propose a two-phase delivery: (1) migrate and harden the platform — infrastructure-as-code on AWS, Kubernetes for the services, and resilient ingestion — with security review built into each milestone; (2) add the document-classification capability once the platform is stable. We work in two-week iterations with a demo at the end of each, and integrate directly with your engineers so the capability stays in-house after we leave.\n\nCommercials & availability\nAnna Berg: DKK 1,150/day, available from 1 August 2026. Mette Nielsen: DKK 1,100/day, available from 1 September 2026 (phase 2). Both rates are within your stated ceiling. Estimated effort and a milestone plan to be agreed at kick-off.\n\nNext steps\nWe would welcome a short call to align on scope, timeline and on-site days. We can share Anna's and Mette's full CVs and client references on request.\n\nKind regards,\nSøren Dahl, Partner\nNordlys Consulting",
+  "proposal_generator": "template",
+  "qa": [],
+  "events": [
+    {"ts": 0, "type": "created", "detail": "Opportunity added as “lead”", "meta": {"source": "Verama (consulting)", "source_uid": "VER-2026-0481"}},
+    {"ts": 0, "type": "staffed", "detail": "Staffed: Anna Berg, Mette Nielsen", "meta": {"consultant_ids": ["c-anna", "c-mette"]}},
+    {"ts": 0, "type": "proposal_generated", "detail": "Proposal drafted (template)", "meta": {"generator": "template", "blocking": false, "qa_types": []}}
+  ],
+  "notes": "Example opportunity. The proposal_body above is grounded ONLY in Anna's and Mette's real CVs and passes guardrails.check_proposal (no blocking findings) — render it as-is; do NOT add claims at render time.",
+  "_note": "FICTIONAL example data for the document-engine build brief."
+}

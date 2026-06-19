@@ -1,0 +1,13 @@
+{
+  "id": "house",
+  "name": "Nordlys Consulting",
+  "tagline": "Senior Nordic engineering consultants, delivered hands-on.",
+  "voice": "Pragmatic, concrete, understated — Danish business tone. Lead with outcomes, avoid hype and superlatives, write in plain language.",
+  "signatory": "Søren Dahl, Partner",
+  "boilerplate": "Nordlys Consulting is a Copenhagen-based boutique of senior software and data consultants. We field small, accountable teams that integrate into your organisation and ship working software — most of our work comes from repeat clients and referrals. Every consultant we put forward is a named individual whose CV we stand behind.",
+  "contact": "kontakt@nordlys-consulting.example | +45 12 34 56 78 | Refshalevej 100, 1432 København K",
+  "website": "https://nordlys-consulting.example",
+  "created": 0,
+  "updated": 0,
+  "_note": "FICTIONAL example data for the document-engine build brief. Not a real company."
+}
