@@ -2,6 +2,32 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.28.0] — 2026-06-19
+
+### Added — consulting engine: bench matcher (gig → ranked bench)
+The core matching step of the consulting-house pipeline, in a new `bench.py` module that leaves
+`matcher.py` (and its calibration) untouched.
+- **`rank_consultants(project, consultants)`** — the inverse of `rank_jobs`: scores many
+  consultants against one `Project` in **one shared TF-IDF space**, so cross-consultant scores
+  are comparable (reuses `matcher._tfidf_similarities`, which is already one-to-many — no risky
+  refactor). Blend mirrors `rank_jobs` (text + title + recall-oriented skill coverage).
+- **Pre-rank eligibility hard-gate** — categorically separate from `matcher.py`'s never-penalizing
+  nudges: a consultant who is inactive, not cleared to present, unavailable for the project
+  window, or over a same-currency rate ceiling is forced to score **0 with an explicit reason**
+  and sorted last. **Fails open** on unknown data (owner steer) and **never** compares rates
+  across currencies (surfaces a note instead of a wrong number).
+- **`Project`** + **`project_from_job()`** adapt an ingested posting (any of the ~30 sources)
+  into a unit of work to staff. **`rank_bench_for_project()`** is a pure function that takes an
+  already-loaded bench and never touches the store, so TF-IDF never runs under the store lock.
+
+### Fixed (from adversarial review of the eligibility gate)
+- **Availability dates are now parsed, not string-compared.** A non-zero-padded (`2026-7-01`),
+  datetime-form (`2026-07-01T09:00`), or free-text availability value was mis-sorted by raw
+  string comparison and could **hard-exclude a consultant who is actually free**. Now parsed via
+  `date.fromisoformat` (with a `[:10]` slice), failing **open** on anything unparseable.
+- **Status + currency comparisons are case/whitespace-normalized**, so `" Active "` isn't read as
+  inactive and a same-currency over-ceiling rate in `dkk` vs `DKK` is still correctly excluded.
+
 ## [1.27.0] — 2026-06-19
 
 ### Added — consulting engine: bench data model + store (Phase 1 foundation)

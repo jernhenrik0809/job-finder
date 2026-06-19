@@ -177,3 +177,30 @@ This is the single safest, highest-value first increment:
 - **It is a hard prerequisite for everything downstream** — colliding postings would corrupt the Opportunity/staffing/bid records, and the posting-driven second channel can't staff a listing that got silently dropped.
 
 Build it once (covering Verama + TED + HackerNews + Freelancer), immediately lock it with **`P0-VERAMA-DEDUP-TEST`**, collapse the four duplicate de-dup tickets into it, and **freeze the field name as `source_uid`** before any Opportunity or posting ticket depends on the snapshot shape.
+
+---
+
+## 5. Completeness pass (six-lens gap analysis, 2026-06-19)
+
+A parallel gap hunt (legal, consulting-domain, data/architecture, security/privacy, product/ops, and a 3-month adversarial lens) confirmed the plan is sound and surfaced the items below. The GDPR-flavoured findings were **re-scoped to correctness/leak only** per the owner steer (no compliance machinery).
+
+**Must hold before each table/endpoint (mostly landed):**
+- **Freeze the bid-relevant field shapes up front** — done for `Consultant`/`House` in v1.27.0 (`engagement_type`, `right_to_present`, `data_origin`, cost/sell/currency, availability). When `Opportunity` is created it **must** use a `source`+`source_uid` idempotency key with a `get_opportunity_by_posting()` upsert (never a fresh id per ingest), and carry per-staffed-consultant bid lines `{consultant_id, cost_rate, bid_sell_rate, currency}` with derived margin.
+- **Reflective export/delete completeness test** — done in v1.27.0 (reflects over `sqlite_master`).
+- **Versioned migration restructure** — done in v1.27.0 (ordered backfill steps vs idempotent schema).
+- **Bench match must not hold the store lock during TF-IDF** — done: `rank_bench_for_project` takes already-loaded objects, no store handle (v1.28.0).
+- **Proposal egress/redaction posture (when proposals land):** the proposal endpoint must default redaction to `settings.redact_pii_default` (not the bare dataclass `False`), strip consultant contact/clearance/home-location before the Claude call (send skills/role/availability only), with a test asserting redaction-on when unset.
+
+**Add to later phases:**
+- Posting `closes_at`/`ingested_at` + "closes in N days / CLOSED / snapshot N days old" (feeds bid/no-bid).
+- Confidentiality/citability flag on credibility records (`public`|`anonymized_only`|`confidential`, default confidential) — the owner's NDA/past-client business concern; excluded from prompt grounding and blocked from literal citation.
+- `check_proposal` is a near-rewrite, not a rename: per-consultant claim attribution (a skill claim must trace to *that* named consultant), invented-client/metric detection, EN+DA, **fail-closed on a thin corpus**, with an adversarial test corpus; export blocked on any blocking finding (a hard invariant like `test_no_auto_submit`).
+- Persisted append-only proposal audit trail (generate / QA / export events, model id, cited source ids, human-export ack).
+- Staffing-conflict / "already-proposed-this-consultant-to-this-client" check; bid/no-bid triage as the primary-path volume control; multi-consultant bid teams; win/loss capture; bulk bench onboarding.
+- Cross-language DK/EN matching mitigation, gated to the bench path only (don't disturb job-seeker calibration).
+
+**Deferred / documented (no build):**
+- Full GDPR transparency/consent/retention machinery and DPA gating — **not built** (owner steer); keep only `consent_note` + `data_origin`; note the accepted risk in `PRIVACY.md`.
+- Encryption-at-rest stays deferred; add a visible warning when the `consultants` table is non-empty and `JOBFINDER_ENCRYPTION` is off, plus a `PRIVACY.md` line that third-party CVs sit in plaintext.
+- Cross-currency rate normalization: compare margins within one currency only; surface "currency mismatch — can't compute" rather than a wrong number (already enforced in the eligibility gate). Optional static FX table later.
+- Per-source ToS / database-rights review: position is internal-matching-only, human-always-sends covers the outbound side; a per-source `reuse_posture` classification is a later refinement, not a blocker.
