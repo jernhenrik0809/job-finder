@@ -880,6 +880,48 @@ def test_ted_handles_list_wrapped_dates():
     assert jobs[0].posted == "2026-04-20" and jobs[0].title == "Cloud-migration"   # not "['2026-04-"
 
 
+def test_landingjobs_parses_list_salary_company_from_url():
+    from jobfinder.sources.landingjobs import LandingJobsSource
+    payload = [
+        "not-a-dict",                                       # one bad record must not drop the batch
+        {"title": "DevOps Engineer", "type": "Contract", "remote": True,
+         "url": "https://landing.jobs/at/acme-corp/devops-engineer-1",
+         "tags": ["Python", "AWS"], "locations": [{"city": "Lisbon", "country_code": "pt"}],
+         "currency_code": "EUR", "gross_salary_low": 50000, "gross_salary_high": 73000,
+         "relocation_paid": True, "published_at": "2026-03-03T11:55:01.551Z",
+         "role_description": "<p>Run the pipelines.</p>"},
+    ]
+    with patch("jobfinder.sources.landingjobs.requests.get", return_value=_FakeResp(payload)):
+        jobs = LandingJobsSource().search("devops", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "DevOps Engineer" and j.company == "Acme Corp"   # recovered from /at/<slug>
+    assert j.location == "Lisbon, PT" and j.remote is True and j.employment_type == "contract"
+    assert j.posted == "2026-03-03" and j.source == "Landing.jobs"
+    assert "EUR 50,000" in j.salary and "73,000" in j.salary
+    assert "Run the pipelines" in j.description and "Relocation paid" in j.description
+
+
+def test_findwork_requires_token_then_parses():
+    from jobfinder.sources.findwork import FindworkSource
+    with pytest.raises(RuntimeError):
+        FindworkSource(token=None).search("python", limit=5)   # no token → clear skip error
+    payload = {"results": [
+        "not-a-dict",                                       # one bad record must not drop the batch
+        {"role": "Backend Engineer", "company_name": "Globex", "employment_type": "Full Time",
+         "location": "Copenhagen", "remote": False, "url": "https://example.com/job/9",
+         "text": "<p>Build APIs.</p>", "keywords": ["Python", "Django"],
+         "date_posted": "2026-05-20T09:00:00Z"},
+    ]}
+    with patch("jobfinder.sources.findwork.requests.get", return_value=_FakeResp(payload)):
+        jobs = FindworkSource(token="x").search("python", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Backend Engineer" and j.company == "Globex" and j.source == "Findwork"
+    assert j.location == "Copenhagen" and j.posted == "2026-05-20" and j.employment_type == "full_time"
+    assert "Build APIs" in j.description and "Django" in j.description
+
+
 def test_engine_gigs_only_warns_when_it_filters_everything():
     from jobfinder.engine import find_jobs, SearchSettings
     from jobfinder.cv_parser import build_profile

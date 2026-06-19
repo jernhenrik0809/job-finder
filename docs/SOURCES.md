@@ -23,13 +23,13 @@ ethically ingestible (login/paid/ToS/scrape).
 
 ---
 
-## At a glance — 28 integrated sources
+## At a glance — 30 integrated sources
 
 | Group | Sources |
 |---|---|
 | **DK (default on)** | The Hub · The Muse · it-jobbank · HR-Manager/SRL (state + Region Syddanmark + Region Hovedstaden) · Remotive · Arbeitnow |
 | **DK (opt-in)** | StepStone.dk · Jobindex · **Universities — DTU/SDU (Oracle ORC)** · Adzuna* · Jooble* · Careerjet* |
-| **Remote / EU / global (opt-in)** | Jobicy · RemoteOK · We Work Remotely · Working Nomads · Jobspresso · Authentic Jobs · **EU Remote Jobs** · **WeAreDevelopers** (DACH/pan-EU) · LinkedIn (guest) · JSearch* |
+| **Remote / EU / global (opt-in)** | Jobicy · RemoteOK · We Work Remotely · Working Nomads · Jobspresso · Authentic Jobs · **EU Remote Jobs** · **WeAreDevelopers** (DACH/pan-EU) · **Landing.jobs** (EU tech, salary) · **Findwork*** (tech/remote) · LinkedIn (guest) · JSearch* |
 | **Consulting / gigs (opt-in)** | Verama · Hacker News · EU TED (tenders) · **Codeur** (FR projects) · Freelancer.com* |
 | **Company boards (opt-in)** | ATS — Greenhouse/Lever/Ashby (Trustpilot, Too Good To Go, Veo, Corti, Pleo, Lunar, Planday, Netlight) |
 
@@ -68,9 +68,9 @@ Public RSS/JSON feeds, usable without any credential.
 | Authentic Jobs | Remote design/dev board (WP `job_feed`) | Remote, contract mix | **Integrated** (opt-in) | `wpjobs.py` |
 | **EU Remote Jobs** | EU-wide remote board (WP Job Manager `?feed=job_feed`) | EU remote | **Integrated** (opt-in) | `wpjobs.py` |
 | **WeAreDevelopers** | Vienna/DACH/pan-EU tech board, public JSON API (~hundreds of thousands of listings) | EU tech, remote-filterable | **Integrated** (opt-in) | `wearedevelopers.py` |
+| **Landing.jobs** | EU tech board, JSON `api/v1/jobs` (salary, relocation, country_code) | EU; remote/relocation | **Integrated** (opt-in) | `landingjobs.py` — company recovered from `/at/<slug>` URL; HTML blocks → `strip_html` |
 | LinkedIn (guest) | Public `jobs-guest` search (no login) | Strong (geoId) | **Integrated** (opt-in) | `linkedin.py` — polite/low-volume |
-| **Landing.jobs** | EU tech board, JSON `api/v1/jobs` (salary, relocation, country_code) | EU; remote/relocation | **Integrable (no-key)** | best DK-adjacency of the unwired no-key finds; HTML in descriptions → `strip_html` |
-| **4dayweek.io** | ~18k 4-day-week roles, JSON `api/jobs` (rich: salary, stack, lat/lon) | Global, EU coverage | **Integrable (no-key)** | undocumented internal feed — poll politely; niche (4-day-week only) |
+| **4dayweek.io** | ~18k 4-day-week roles, JSON `api/jobs` (rich: salary, stack, lat/lon) | Global, EU coverage | **Integrable (no-key)** | undocumented internal feed; listings carry no canonical `url` (slug only) + niche (4-day-week) — left documented |
 
 ### Consulting / freelance gigs & tenders
 
@@ -100,8 +100,8 @@ Public RSS/JSON feeds, usable without any credential.
 | Careerjet | Aggregator, Danish portal (`da_DK`) | Strong | **Integrated** | `careerjet.py` · free affiliate id |
 | JSearch (RapidAPI) | Aggregates Google for Jobs (LinkedIn/Indeed/Glassdoor) | Query-scoped | **Integrated** | `jsearch.py` · `RAPIDAPI_KEY` (~200 free/mo) |
 | Freelancer.com | Active short-term **gig** projects (official REST API) | Global gigs | **Integrated** | `freelancer.py` · free `FREELANCER_TOKEN` |
-| Findwork.dev | Tech-jobs search engine, clean REST API | Moderate (remote/EU tech) | **Integrable** | `GET /api/jobs/` `Authorization: Token` · free token · re-verified live |
-| apijobs.dev | Global aggregator with `country=Denmark` filter | Potentially DK | **Integrable** | free key (monthly quota); re-test live before shipping (TLS-unverified in probe) |
+| Findwork.dev | Tech-jobs search engine, clean REST API | Moderate (remote/EU tech) | **Integrated** | `findwork.py` · `GET /api/jobs/` `Authorization: Token` · free `FINDWORK_TOKEN` |
+| apijobs.dev | Global aggregator with `country=Denmark` filter | Potentially DK | **Blocked** | free key, but `api.apijobs.dev` serves a **self-signed TLS cert** — would require disabling cert verification (against egress posture). Re-check if they fix the cert |
 | web3.career | Crypto/web3 jobs, single-endpoint API | Low (crypto niche) | **Integrable** | free token + attribution backlink required |
 | Reed.co.uk | UK board, search API (Basic-auth key) | Low (UK-centric) | **Integrable** | free key; skip unless UK in scope |
 | USAJobs.gov | US federal positions | None for DK | **Integrable** | free key; US-only — out of scope |
@@ -178,10 +178,9 @@ These are real & relevant but expose no public RSS/JSON (HTML-only, SPA, Cloudfl
    the public alias is confirmed; `regionh` just landed this way).
 2. **More Oracle-ORC tenants** — other DK orgs on Oracle (the `oracle.py` class already parameterises
    host + siteNumber); confirm each tenant's host/`siteNumber`.
-3. **Findwork.dev** / **Landing.jobs** — easy remote/EU-tech complements (free token / no key); off by default.
-4. **University of Copenhagen (KU)** — needs an `employment.ku.dk/all-vacancies` scraper (no working
+3. **University of Copenhagen (KU)** — needs an `employment.ku.dk/all-vacancies` scraper (no working
    HR-Manager alias).
-5. **Brainville** — best DK consulting-gig source, but only if the user obtains a paid, approved account
+4. **Brainville** — best DK consulting-gig source, but only if the user obtains a paid, approved account
    (spec recorded above).
 
 Everything in Part 2b–2e is document-only by nature — kept here as the manual where-to-look list.

@@ -55,7 +55,7 @@ def test_file_persists_and_empty_clears(tmp_secrets):
 def test_model_default_and_present(tmp_secrets):
     assert ss.model()                      # falls back to the configured default
     assert ss.present() == {"jsearch": False, "adzuna": False, "jooble": False,
-                            "careerjet": False, "freelancer": False}
+                            "careerjet": False, "freelancer": False, "findwork": False}
     ss.set_many({"adzuna_app_id": "id", "adzuna_app_key": "key"})
     assert ss.present()["adzuna"] is True
 

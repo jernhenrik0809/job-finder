@@ -2,6 +2,30 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.26.0] — 2026-06-19
+
+### Added — wired two documented-but-unwired integrable sources (→ 30)
+A pass through `docs/SOURCES.md` to wire the integrable backlog. The two clean candidates went in:
+- **Landing.jobs** (`landingjobs.py`) — large EU tech board (Lisbon-based), public **no-key** JSON
+  API (`/api/v1/jobs`) with structured salary (currency + gross range), a per-listing `remote`
+  flag, relocation support and country-coded locations. The feed carries no company field, so the
+  employer is recovered from the listing URL (`/at/<company>/<slug>`).
+- **Findwork** (`findwork.py`) — curated tech board, clean REST API gated by a **free** token
+  (`FINDWORK_TOKEN` / Settings → findwork.dev/account). Token rides in the `Authorization`
+  header (never the URL); `remote` / `location` are honoured server-side.
+
+### Researched but NOT wired (documented in `docs/SOURCES.md`)
+- **apijobs.dev** — global aggregator with a `country=Denmark` filter, but its API host
+  (`api.apijobs.dev`) presents a **self-signed TLS certificate**. Connecting would require
+  disabling certificate verification, which violates the app's egress posture — left document-only.
+- **4dayweek.io** — no-key JSON feed, but listings carry no canonical `url` field (only a slug) and
+  the niche (4-day-week roles only) is marginal for a DK consulting/remote search — left documented.
+
+### Security
+- Allow-list + runtime egress test extended to `landing.jobs` and `findwork.dev`.
+- `findwork_token` added to `config.SECRET_FIELDS`, so it is automatically swept by the
+  no-secret-leak regression tests.
+
 ## [1.25.0] — 2026-06-19
 
 ### Added — European (non-DK) remote / freelance sources (→ 28)

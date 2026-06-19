@@ -49,6 +49,8 @@ from jobfinder.sources.wpjobs import JobspressoSource, AuthenticJobsSource, EURe
 from jobfinder.sources.oracle import OracleORCSource
 from jobfinder.sources.codeur import CodeurSource
 from jobfinder.sources.wearedevelopers import WeAreDevelopersSource
+from jobfinder.sources.landingjobs import LandingJobsSource
+from jobfinder.sources.findwork import FindworkSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -93,6 +95,8 @@ _ALLOWED_HOSTS = {
     "www.codeur.com",                               # Codeur (FR gigs) RSS
     "wad-api.wearedevelopers.com",                  # WeAreDevelopers API
     "www.wearedevelopers.com",                      # WeAreDevelopers job links (built, not fetched)
+    "landing.jobs",                                 # Landing.jobs EU tech board (no-key)
+    "findwork.dev",                                 # Findwork source + signup-doc URL
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -190,7 +194,7 @@ def test_runtime_egress_allowlist(monkeypatch):
         StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
         FreelancerSource(token="x"), ATSSource(), VeramaSource(), HackerNewsSource(), TEDSource(),
         JobspressoSource(), AuthenticJobsSource(), EURemoteJobsSource(), OracleORCSource(),
-        CodeurSource(), WeAreDevelopersSource(),
+        CodeurSource(), WeAreDevelopersSource(), LandingJobsSource(), FindworkSource(token="x"),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

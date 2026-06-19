@@ -862,6 +862,7 @@ const _KEY_FIELDS = [
   { id: 'jooble_key', group: 'jooble', env: 'JOOBLE_API_KEY', label: 'Jooble API key', hint: 'Enables the Jooble source', ph: '…' },
   { id: 'careerjet_affid', group: 'careerjet', env: 'CAREERJET_AFFID', label: 'Careerjet affiliate id', hint: 'Enables the Careerjet (da_DK) source — free at careerjet.com/partners/api', ph: '…' },
   { id: 'freelancer_token', group: 'freelancer', env: 'FREELANCER_TOKEN', label: 'Freelancer.com token', hint: 'Enables the Freelancer.com gigs source — free OAuth token at freelancer.com/api/docs', ph: '…' },
+  { id: 'findwork_token', group: 'findwork', env: 'FINDWORK_TOKEN', label: 'Findwork API token', hint: 'Enables the Findwork (tech/remote) source — free at findwork.dev/account', ph: '…' },
 ];
 
 async function loadSettings() {

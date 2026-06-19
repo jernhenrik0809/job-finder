@@ -15,7 +15,7 @@ from pathlib import Path
 # secret". The security-regression suite derives its no-leak sweep from this, so adding a
 # new key here automatically forces it into the test.
 SECRET_FIELDS = ("anthropic_key", "rapidapi_key", "adzuna_app_id", "adzuna_app_key", "jooble_key",
-                 "careerjet_affid", "freelancer_token")
+                 "careerjet_affid", "freelancer_token", "findwork_token")
 
 
 def _default_data_dir() -> Path:

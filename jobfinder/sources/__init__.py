@@ -51,6 +51,8 @@ _SOURCES: tuple[SourceMeta, ...] = (
     SourceMeta("codeur", "codeur", "CodeurSource"),
     SourceMeta("wearedevelopers", "wearedevelopers", "WeAreDevelopersSource", ("wad",)),
     SourceMeta("oracle", "oracle", "OracleORCSource", ("dtu", "sdu", "universities")),
+    SourceMeta("landingjobs", "landingjobs", "LandingJobsSource", ("landing", "landing.jobs")),
+    SourceMeta("findwork", "findwork", "FindworkSource"),
     SourceMeta("jsearch", "jsearch", "JSearchSource"),
 )
 

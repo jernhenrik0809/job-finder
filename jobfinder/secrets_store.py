@@ -30,6 +30,7 @@ _ENV = {
     "jooble_key": ("JOOBLE_API_KEY",),
     "careerjet_affid": ("CAREERJET_AFFID",),
     "freelancer_token": ("FREELANCER_TOKEN",),
+    "findwork_token": ("FINDWORK_TOKEN",),
     "model": ("JOBFINDER_MODEL",),
 }
 
@@ -109,6 +110,7 @@ def present() -> dict:
         "jooble": bool(get("jooble_key")),
         "careerjet": bool(get("careerjet_affid")),
         "freelancer": bool(get("freelancer_token")),
+        "findwork": bool(get("findwork_token")),
     }
 
 
