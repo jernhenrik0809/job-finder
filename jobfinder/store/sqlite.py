@@ -18,8 +18,10 @@ import time
 from pathlib import Path
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES, MAX_CLIENTS)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES, MAX_CLIENTS,
+                   MAX_CASE_STUDIES)
 from ..applications import Application
+from ..case_studies import CaseStudy
 from ..clients import Client
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
@@ -38,9 +40,10 @@ CREATE TABLE IF NOT EXISTS consultants   (id TEXT PRIMARY KEY, created REAL NOT 
 CREATE TABLE IF NOT EXISTS house         (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS opportunities (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS clients       (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS case_studies  (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 7
+_SCHEMA_VERSION = 8
 
 
 class SqliteStore(Store):
@@ -335,6 +338,30 @@ class SqliteStore(Store):
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM clients WHERE id=?", (client_id,))
 
+    # --- case studies (grounded proof) ---
+    def save_case_study(self, case_study: CaseStudy) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO case_studies(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (case_study.id, time.time(), json.dumps(case_study.to_dict())),
+            )
+            self._evict("case_studies", "id", MAX_CASE_STUDIES)
+
+    def get_case_study(self, case_study_id: str) -> CaseStudy | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM case_studies WHERE id=?", (case_study_id,)).fetchone()
+        return CaseStudy.from_dict(json.loads(row["data"])) if row else None
+
+    def list_case_studies(self) -> list[CaseStudy]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM case_studies ORDER BY created ASC").fetchall()
+        return [CaseStudy.from_dict(json.loads(r["data"])) for r in rows]
+
+    def delete_case_study(self, case_study_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM case_studies WHERE id=?", (case_study_id,))
+
     # --- data rights ---
     def export_all(self) -> dict:
         with self._lock:
@@ -347,6 +374,7 @@ class SqliteStore(Store):
             house = self._conn.execute("SELECT data FROM house WHERE id=?", (HOUSE_ID,)).fetchone()
             opps = self._conn.execute("SELECT data FROM opportunities ORDER BY created ASC").fetchall()
             clients = self._conn.execute("SELECT data FROM clients ORDER BY created ASC").fetchall()
+            cstud = self._conn.execute("SELECT data FROM case_studies ORDER BY created ASC").fetchall()
         return {
             "profiles": {r["cv_id"]: json.loads(r["data"]) for r in prof},
             "examples": [dict(r) for r in ex],
@@ -357,6 +385,7 @@ class SqliteStore(Store):
             "house": json.loads(house["data"]) if house else {},
             "opportunities": [json.loads(r["data"]) for r in opps],
             "clients": [json.loads(r["data"]) for r in clients],
+            "case_studies": [json.loads(r["data"]) for r in cstud],
         }
 
     def delete_all(self) -> None:
@@ -365,7 +394,8 @@ class SqliteStore(Store):
         # runs in autocommit — still under the lock.
         with self._lock:
             for table in ("profiles", "examples", "applications", "saved_searches",
-                          "notifications", "consultants", "house", "opportunities", "clients"):
+                          "notifications", "consultants", "house", "opportunities", "clients",
+                          "case_studies"):
                 self._conn.execute(f"DELETE FROM {table}")
             self._conn.commit()
             try:

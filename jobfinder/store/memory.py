@@ -9,8 +9,10 @@ from __future__ import annotations
 import threading
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES, MAX_CLIENTS)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS, MAX_OPPORTUNITIES, MAX_CLIENTS,
+                   MAX_CASE_STUDIES)
 from ..applications import Application
+from ..case_studies import CaseStudy
 from ..clients import Client
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
@@ -36,6 +38,7 @@ class MemoryStore(Store):
         self._house: House | None = None
         self._opps: dict[str, Opportunity] = {}
         self._clients: dict[str, Client] = {}
+        self._case_studies: dict[str, CaseStudy] = {}
         # A single non-reentrant lock guards every dict access, so a background alert sweep
         # writing (save_notification / update_saved_search) can't race a concurrent export_all
         # iteration ("dictionary changed size") or a delete_all clear. No method calls another
@@ -187,6 +190,24 @@ class MemoryStore(Store):
         with self._lock:
             self._clients.pop(client_id, None)
 
+    # --- case studies (grounded proof) ---
+    def save_case_study(self, case_study: CaseStudy) -> None:
+        with self._lock:
+            self._case_studies[case_study.id] = case_study
+            _evict(self._case_studies, MAX_CASE_STUDIES)
+
+    def get_case_study(self, case_study_id: str) -> CaseStudy | None:
+        with self._lock:
+            return self._case_studies.get(case_study_id)
+
+    def list_case_studies(self) -> list[CaseStudy]:
+        with self._lock:
+            return list(self._case_studies.values())
+
+    def delete_case_study(self, case_study_id: str) -> None:
+        with self._lock:
+            self._case_studies.pop(case_study_id, None)
+
     def export_all(self) -> dict:
         with self._lock:
             return {
@@ -199,6 +220,7 @@ class MemoryStore(Store):
                 "house": self._house.to_dict() if self._house else {},
                 "opportunities": [o.to_dict() for o in self._opps.values()],
                 "clients": [c.to_dict() for c in self._clients.values()],
+                "case_studies": [cs.to_dict() for cs in self._case_studies.values()],
             }
 
     def delete_all(self) -> None:
@@ -212,6 +234,7 @@ class MemoryStore(Store):
             self._house = None
             self._opps.clear()
             self._clients.clear()
+            self._case_studies.clear()
 
     def save_notification(self, note: Notification) -> None:
         with self._lock:

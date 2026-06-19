@@ -2,6 +2,28 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.36.0] — 2026-06-19
+
+### Added — Phase 4 foundation: `CaseStudy` entity (grounded proof) — no PDF yet
+Starting the document engine (PDF rendering itself stays deferred). First prerequisite: the
+grounded proof source the playbook flagged as missing (§2.4), so a proposal's quantified outcomes
+can be rendered **without fabricating**.
+- **`case_studies.py`** — a `CaseStudy` record (a delivered engagement): title, client (with a
+  separate anonymized descriptor), sector, summary, **per-metric `outcomes`** ({metric, value,
+  unit}), `skills`, `consultant_ids` (attribution to who delivered it), and **disclosure controls**
+  — `disclosure` (public / anonymized_only / confidential, default safest) + `reference_consent`.
+  `display_client()` never reveals the real client name unless `disclosure == "public"`;
+  `is_renderable()` is False for confidential (never client-facing).
+- **Store** — CRUD on both backends; schema **v7 → v8** (new `case_studies` table via the ordered
+  migration path); export/delete wired (reflective data-rights test auto-covers); cap 500.
+- **Endpoints** — `POST/GET /api/case-studies`, `GET/PATCH/DELETE /api/case-studies/{id}`
+  (`disclosure_levels` surfaced; unknown disclosure coerced to the safe default).
+- **UI** — a Case studies sub-tab (CRUD with repeatable metric/value/unit outcome rows, consultant
+  attribution, disclosure badge). Preview-verified that an anonymized study does **not** leak the
+  real client name.
+
+Built via two parallel agents on disjoint files (frontend + tests); 397 tests pass.
+
 ## [1.35.0] — 2026-06-19
 
 ### Fixed — `do_not_bid` is now actually enforced (completeness-review finding)

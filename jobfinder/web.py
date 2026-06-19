@@ -23,6 +23,7 @@ from .applications import (
     STATUSES, SUGGESTED_NEXT, attach_letter, job_snapshot, new_application, set_status,
 )
 from .bench import Project, rank_bench_for_project
+from .case_studies import DISCLOSURE, CaseStudy, new_case_study
 from .clients import Client, new_client
 from .config import settings
 from .consultants import (
@@ -370,6 +371,42 @@ class ClientUpdate(BaseModel):
     contacts: list[dict] | None = None
     do_not_bid: bool | None = None
     past_projects: list[str] | None = None
+    notes: str | None = None
+
+
+class CaseStudyCreate(BaseModel):
+    """Create a grounded proof record (a delivered engagement)."""
+    title: str = ""
+    client_name: str = ""
+    client_anonymized: str = ""
+    sector: str = ""
+    summary: str = ""
+    outcomes: list[dict] | None = None     # [{metric, value, unit}]
+    skills: list[str] | None = None
+    consultant_ids: list[str] | None = None
+    disclosure: str = "confidential"       # public | anonymized_only | confidential
+    reference_contact: str = ""
+    reference_consent: bool = False
+    start_date: str = ""
+    end_date: str = ""
+    notes: str = ""
+
+
+class CaseStudyUpdate(BaseModel):
+    """Edit a case study. Only provided fields change."""
+    title: str | None = None
+    client_name: str | None = None
+    client_anonymized: str | None = None
+    sector: str | None = None
+    summary: str | None = None
+    outcomes: list[dict] | None = None
+    skills: list[str] | None = None
+    consultant_ids: list[str] | None = None
+    disclosure: str | None = None
+    reference_contact: str | None = None
+    reference_consent: bool | None = None
+    start_date: str | None = None
+    end_date: str | None = None
     notes: str | None = None
 
 
@@ -1245,6 +1282,72 @@ def update_client(cid: str, upd: ClientUpdate) -> JSONResponse:
 @app.delete("/api/clients/{cid}")
 def delete_client(cid: str) -> dict:
     store.delete_client(cid)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Case studies (grounded proof / delivered engagements)
+# ---------------------------------------------------------------------------
+
+def _apply_case_study_fields(cs: CaseStudy, data: dict) -> None:
+    from .case_studies import _clean_outcomes
+    str_fields = {"title", "client_name", "client_anonymized", "sector", "summary",
+                  "reference_contact", "start_date", "end_date", "notes"}
+    for k, v in data.items():
+        if v is None:
+            continue
+        if k in str_fields:
+            setattr(cs, k, str(v).strip())
+        elif k == "outcomes":
+            cs.outcomes = _clean_outcomes(v)
+        elif k in ("skills", "consultant_ids"):
+            setattr(cs, k, _clean_list(v, lower=(k == "skills")))
+        elif k == "disclosure":
+            vv = str(v).strip().lower()
+            if vv in DISCLOSURE:
+                cs.disclosure = vv
+        elif k == "reference_consent":
+            cs.reference_consent = bool(v)
+    if not (cs.title or "").strip():
+        cs.title = "Untitled engagement"
+    cs.updated = time.time()
+
+
+@app.post("/api/case-studies")
+def create_case_study(req: CaseStudyCreate) -> JSONResponse:
+    cs = new_case_study(req.title or "")
+    _apply_case_study_fields(cs, req.model_dump())
+    store.save_case_study(cs)
+    return JSONResponse(cs.to_dict())
+
+
+@app.get("/api/case-studies")
+def list_case_studies() -> dict:
+    return {"case_studies": [cs.to_dict() for cs in store.list_case_studies()],
+            "disclosure_levels": list(DISCLOSURE)}
+
+
+@app.get("/api/case-studies/{csid}")
+def get_case_study(csid: str) -> JSONResponse:
+    cs = store.get_case_study(csid)
+    if cs is None:
+        raise HTTPException(status_code=404, detail="Case study not found.")
+    return JSONResponse(cs.to_dict())
+
+
+@app.patch("/api/case-studies/{csid}")
+def update_case_study(csid: str, upd: CaseStudyUpdate) -> JSONResponse:
+    cs = store.get_case_study(csid)
+    if cs is None:
+        raise HTTPException(status_code=404, detail="Case study not found.")
+    _apply_case_study_fields(cs, upd.model_dump())
+    store.save_case_study(cs)
+    return JSONResponse(cs.to_dict())
+
+
+@app.delete("/api/case-studies/{csid}")
+def delete_case_study(csid: str) -> dict:
+    store.delete_case_study(csid)
     return {"ok": True}
 
 

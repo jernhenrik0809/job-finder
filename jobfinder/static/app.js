@@ -28,6 +28,7 @@ const el = {
   tabBench: $('#tabBench'), viewBench: $('#view-bench'),
   consultantForm: $('#consultantForm'), consultantList: $('#consultantList'), benchAddToggle: $('#benchAddToggle'),
   clientForm: $('#clientForm'), clientList: $('#clientList'), clientAddToggle: $('#clientAddToggle'),
+  caseForm: $('#caseForm'), caseList: $('#caseList'), caseAddToggle: $('#caseAddToggle'),
   houseForm: $('#houseForm'), gigForm: $('#gigForm'), rankLoading: $('#rankLoading'), rankResults: $('#rankResults'),
   propBar: $('#propBar'), propSelCount: $('#propSelCount'), propClearSel: $('#propClearSel'), genProposalBtn: $('#genProposalBtn'),
   pursueGigBtn: $('#pursueGigBtn'),
@@ -1093,6 +1094,9 @@ function loadBench() {
     el.clientAddToggle.addEventListener('click', () => {
       if (el.clientForm.classList.contains('hidden')) openClientForm(); else closeClientForm();
     });
+    el.caseAddToggle.addEventListener('click', () => {
+      if (el.caseForm.classList.contains('hidden')) openCaseForm(); else closeCaseForm();
+    });
     renderHouseForm();
     renderGigForm();
   }
@@ -1105,6 +1109,7 @@ function switchBenchSection(name) {
   el.viewBench.querySelectorAll('.bench-subtab').forEach(b => b.classList.toggle('active', b.dataset.bench === name));
   el.viewBench.querySelectorAll('.bench-section').forEach(s => s.classList.toggle('hidden', s.id !== `bench-${name}`));
   if (name === 'clients') loadClients();
+  if (name === 'casestudies') loadCaseStudies();
   if (name === 'pipeline') loadOpportunities();
 }
 
@@ -1115,6 +1120,8 @@ async function loadConsultants() {
     if (Array.isArray(data.engagement_types) && data.engagement_types.length) benchMeta.engagement_types = data.engagement_types;
     if (Array.isArray(data.data_origins) && data.data_origins.length) benchMeta.data_origins = data.data_origins;
     if (Array.isArray(data.statuses) && data.statuses.length) benchMeta.statuses = data.statuses;
+    // keep a lightweight {id,name} list so the case-study form can attribute proof to real bench members
+    caseConsultants = (data.consultants || []).map(c => ({ id: c.id, name: c.name }));
     renderConsultants(data.consultants || []);
   } catch { el.consultantList.innerHTML = '<p class="muted small">Could not load the bench.</p>'; }
 }
@@ -1451,6 +1458,225 @@ async function deleteClient(c) {
     const resp = await fetch(`/api/clients/${c.id}`, { method: 'DELETE' });
     if (!resp.ok) throw new Error('Delete failed');
     loadClients();
+  } catch (err) { showWarnings(['Delete: ' + err.message]); }
+}
+
+// ----- A3) case studies (grounded proof for proposals) -----
+let caseMeta = { disclosure_levels: ['public', 'anonymized_only', 'confidential'] };
+let caseConsultants = [];          // [{id, name}] from GET /api/consultants — to attribute proof to real members
+let editingCaseId = null;
+let editingCase = null;
+
+const _DISCLOSURE_LABELS = { public: 'public', anonymized_only: 'anonymized-only', confidential: 'confidential' };
+
+async function loadCaseStudies() {
+  try {
+    const data = await (await fetch('/api/case-studies')).json();
+    if (Array.isArray(data.disclosure_levels) && data.disclosure_levels.length) caseMeta.disclosure_levels = data.disclosure_levels;
+    renderCaseStudies(data.case_studies || []);
+  } catch { el.caseList.innerHTML = '<p class="muted small">Could not load your case studies.</p>'; }
+}
+
+function renderCaseStudies(list) {
+  el.caseList.innerHTML = '';
+  if (!list.length) {
+    el.caseList.innerHTML = '<p class="muted small">No case studies yet — add a delivered engagement with quantified outcomes to build proof for proposals.</p>';
+    return;
+  }
+  list.forEach(cs => el.caseList.appendChild(caseCard(cs)));
+}
+
+// The client shown on a card depends on disclosure: the real name is only ever revealed when "public".
+function displayedCaseClient(cs) {
+  if (cs.disclosure === 'public' && cs.client_name) return cs.client_name;
+  return cs.client_anonymized || 'a client';
+}
+
+function caseCard(cs) {
+  const card = document.createElement('div');
+  card.className = 'consultant';        // reuse the bench-list card styling
+  card.dataset.id = cs.id;
+  const outcomes = Array.isArray(cs.outcomes) ? cs.outcomes : [];
+  const skills = (Array.isArray(cs.skills) ? cs.skills : []).slice(0, 12).map(s => `<span class="chip">${esc(s)}</span>`).join('');
+  const dis = cs.disclosure || 'public';
+  const disLabel = _DISCLOSURE_LABELS[dis] || dis;
+  // confidential is never client-facing → make it visually distinct (red).
+  const disBadge = `<span class="cstatus case-disclosure dis-${esc(dis)}">${esc(disLabel)}</span>`;
+  const refConsent = cs.reference_consent
+    ? '<span class="case-ref ok">reference: consented</span>'
+    : '<span class="case-ref no">reference: not</span>';
+  const sub = [
+    `<b>${esc(displayedCaseClient(cs))}</b>`,
+    cs.sector ? esc(cs.sector) : '',
+    `${outcomes.length} outcome${outcomes.length === 1 ? '' : 's'}`,
+  ].filter(Boolean).join('<span> · </span>');
+  card.innerHTML = `
+    <div class="consultant-main">
+      <div class="consultant-head">
+        <h4>${esc(cs.title || 'Untitled case study')}</h4>
+        ${disBadge}
+      </div>
+      <div class="consultant-sub">${sub}</div>
+      ${cs.summary ? `<div class="muted small" style="margin-top:6px">${esc(cs.summary)}</div>` : ''}
+      ${skills ? `<div class="chips" style="margin-top:8px">${skills}</div>` : ''}
+      <div class="case-meta muted small" style="margin-top:8px">${refConsent}</div>
+    </div>
+    <div class="consultant-actions">
+      <button class="btn mini ghost cs-edit" type="button">Edit</button>
+      <button class="btn mini danger cs-del" type="button">Delete</button>
+    </div>`;
+  card.querySelector('.cs-edit').addEventListener('click', () => openCaseForm(cs));
+  card.querySelector('.cs-del').addEventListener('click', () => deleteCaseStudy(cs));
+  return card;
+}
+
+// One outcome row (metric / value / unit). Used for existing outcomes and blank rows.
+function caseOutcomeRow(o) {
+  o = o || {};
+  return `<div class="case-outcome-row">
+      <input class="coMetric" type="text" placeholder="Metric (e.g. Deploy time)" value="${esc(o.metric || '')}" />
+      <input class="coValue" type="text" placeholder="Value (e.g. 70)" value="${esc(o.value == null ? '' : o.value)}" />
+      <input class="coUnit" type="text" placeholder="Unit (e.g. % faster)" value="${esc(o.unit || '')}" />
+    </div>`;
+}
+
+// Build the add/edit form. Pass a case study to edit (PATCH only changed fields), or nothing to add.
+function openCaseForm(cs) {
+  editingCaseId = cs ? cs.id : null;
+  editingCase = cs || null;
+  const v = cs || {};
+  const outcomes = (Array.isArray(v.outcomes) && v.outcomes.length) ? v.outcomes : [{}];
+  const curDis = v.disclosure || (caseMeta.disclosure_levels[0] || 'public');
+  const disOpts = caseMeta.disclosure_levels.map(o =>
+    `<option value="${esc(o)}"${o === curDis ? ' selected' : ''}>${esc(_DISCLOSURE_LABELS[o] || o)}</option>`).join('');
+  const selIds = new Set(Array.isArray(v.consultant_ids) ? v.consultant_ids : []);
+  const consultantBoxes = caseConsultants.length
+    ? caseConsultants.map(c =>
+      `<label class="chk"><input type="checkbox" class="csConsultant" value="${esc(c.id)}"${selIds.has(c.id) ? ' checked' : ''} /> ${esc(c.name || 'Unnamed')}</label>`).join('')
+    : '<span class="muted small">No consultants on the bench yet — add some to attribute proof to real members.</span>';
+  el.caseForm.innerHTML = `
+    <div class="bf-grid">
+      <label class="full">Title<input id="csTitle" type="text" placeholder="e.g. Cloud migration for a Nordic bank" /></label>
+      <label>Client name <i class="muted small">(real — only shown when public)</i><input id="csClientName" type="text" placeholder="e.g. Nordea" /></label>
+      <label>Client (anonymized) <i class="muted small">(neutral descriptor)</i><input id="csClientAnon" type="text" placeholder="e.g. a Nordic retail bank" /></label>
+      <label>Sector<input id="csSector" type="text" placeholder="e.g. Banking" /></label>
+      <label>Disclosure<select id="csDisclosure">${disOpts}</select></label>
+      <label class="full">Summary<textarea id="csSummary" rows="3" placeholder="What was delivered and the impact…"></textarea></label>
+      <div class="full">
+        <span class="bf-sublabel">Outcomes <i class="muted small">(metric / value / unit)</i></span>
+        <div id="csOutcomes">${outcomes.map(caseOutcomeRow).join('')}</div>
+        <button id="csAddOutcome" class="link-btn small" type="button">+ add outcome</button>
+      </div>
+      <label class="full">Skills <i class="muted small">(comma-separated)</i><input id="csSkills" type="text" placeholder="e.g. AWS, Terraform, Kubernetes" /></label>
+      <div class="full">
+        <span class="bf-sublabel">Consultants <i class="muted small">(attribute this proof to bench members)</i></span>
+        <div id="csConsultants" class="case-consultants">${consultantBoxes}</div>
+      </div>
+      <label class="full">Reference contact<input id="csRefContact" type="text" placeholder="e.g. Jane Doe, CTO · jane@…" /></label>
+      <label class="chk full"><input id="csRefConsent" type="checkbox" /> Reference has consented to being contacted</label>
+      <label>Start date<input id="csStart" type="date" /></label>
+      <label>End date<input id="csEnd" type="date" /></label>
+      <label class="full">Notes<textarea id="csNotes" rows="3" placeholder="Anything worth remembering about this engagement…"></textarea></label>
+    </div>
+    <div class="bf-actions">
+      <button id="csSave" class="btn primary small" type="button">${cs ? 'Save changes' : 'Add case study'}</button>
+      <button id="csCancel" class="btn ghost small" type="button">Cancel</button>
+      <span class="msg copied" style="display:none">saved ✓</span>
+    </div>`;
+  el.caseForm.classList.remove('hidden');
+  const q = (s) => el.caseForm.querySelector(s);
+  q('#csTitle').value = v.title || '';
+  q('#csClientName').value = v.client_name || '';
+  q('#csClientAnon').value = v.client_anonymized || '';
+  q('#csSector').value = v.sector || '';
+  q('#csSummary').value = v.summary || '';
+  q('#csSkills').value = (Array.isArray(v.skills) ? v.skills : []).join(', ');
+  q('#csRefContact').value = v.reference_contact || '';
+  q('#csRefConsent').checked = !!v.reference_consent;
+  q('#csStart').value = v.start_date || '';
+  q('#csEnd').value = v.end_date || '';
+  q('#csNotes').value = v.notes || '';
+  q('#csAddOutcome').addEventListener('click', () => {
+    q('#csOutcomes').insertAdjacentHTML('beforeend', caseOutcomeRow());
+  });
+  q('#csCancel').addEventListener('click', closeCaseForm);
+  q('#csSave').addEventListener('click', saveCaseStudy);
+}
+
+function closeCaseForm() {
+  el.caseForm.classList.add('hidden');
+  el.caseForm.innerHTML = '';
+  editingCaseId = null;
+  editingCase = null;
+}
+
+// Read outcome rows → drop fully-empty rows.
+function readCaseOutcomes() {
+  const rows = [...el.caseForm.querySelectorAll('.case-outcome-row')];
+  return rows.map(r => ({
+    metric: r.querySelector('.coMetric').value.trim(),
+    value: r.querySelector('.coValue').value.trim(),
+    unit: r.querySelector('.coUnit').value.trim(),
+  })).filter(o => o.metric || o.value || o.unit);
+}
+
+async function saveCaseStudy() {
+  const q = (s) => el.caseForm.querySelector(s);
+  const consultantIds = [...el.caseForm.querySelectorAll('.csConsultant:checked')].map(cb => cb.value);
+  const fields = {
+    title: q('#csTitle').value.trim(),
+    client_name: q('#csClientName').value.trim(),
+    client_anonymized: q('#csClientAnon').value.trim(),
+    sector: q('#csSector').value.trim(),
+    summary: q('#csSummary').value.trim(),
+    outcomes: readCaseOutcomes(),
+    skills: splitCsv(q('#csSkills').value),
+    consultant_ids: consultantIds,
+    disclosure: q('#csDisclosure').value,
+    reference_contact: q('#csRefContact').value.trim(),
+    reference_consent: q('#csRefConsent').checked,
+    start_date: q('#csStart').value || null,
+    end_date: q('#csEnd').value || null,
+    notes: q('#csNotes').value.trim(),
+  };
+  if (!fields.title) { showWarnings(['Case study: a title is required.']); return; }
+  const btn = q('#csSave'); btn.disabled = true;
+  try {
+    if (editingCaseId) {
+      // PATCH only the fields that actually changed.
+      const before = editingCase || {};
+      const patch = {};
+      for (const [k, val] of Object.entries(fields)) {
+        let old, now;
+        if (k === 'skills') { old = (before.skills || []).join('|'); now = val.join('|'); }
+        else if (k === 'consultant_ids') { old = (before.consultant_ids || []).join('|'); now = val.join('|'); }
+        else if (k === 'outcomes') { old = JSON.stringify(before.outcomes || []); now = JSON.stringify(val); }
+        else if (k === 'reference_consent') { old = !!before.reference_consent; now = !!val; }
+        else { old = before[k] == null ? '' : before[k]; now = val == null ? '' : val; }
+        if (String(old) !== String(now)) patch[k] = val;
+      }
+      if (Object.keys(patch).length === 0) { closeCaseForm(); return; }
+      const resp = await fetch(`/api/case-studies/${editingCaseId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Save failed'); }
+    } else {
+      const resp = await fetch('/api/case-studies', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields),
+      });
+      if (!resp.ok) { const e = await resp.json().catch(() => ({})); throw new Error(e.detail || 'Add failed'); }
+    }
+    closeCaseForm();
+    loadCaseStudies();
+  } catch (err) { showWarnings(['Case study: ' + err.message]); btn.disabled = false; }
+}
+
+async function deleteCaseStudy(cs) {
+  if (!confirm(`Delete the case study “${cs.title || 'this case study'}”?`)) return;
+  try {
+    const resp = await fetch(`/api/case-studies/${cs.id}`, { method: 'DELETE' });
+    if (!resp.ok) throw new Error('Delete failed');
+    loadCaseStudies();
   } catch (err) { showWarnings(['Delete: ' + err.message]); }
 }
 

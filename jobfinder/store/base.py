@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from ..applications import Application
+from ..case_studies import CaseStudy
 from ..clients import Client
 from ..consultants import Consultant
 from ..cv_parser import CVProfile
@@ -25,6 +26,7 @@ MAX_NOTIFICATIONS = 100
 MAX_CONSULTANTS = 300            # the bench — sized well above a ~100-consultant house
 MAX_OPPORTUNITIES = 500          # pursued projects (postings + warm leads)
 MAX_CLIENTS = 500                # client/account relationships (direct-warm layer)
+MAX_CASE_STUDIES = 500           # grounded proof / delivered-engagement records
 
 
 class Store(ABC):
@@ -113,6 +115,16 @@ class Store(ABC):
     def list_clients(self) -> list[Client]: ...
     @abstractmethod
     def delete_client(self, client_id: str) -> None: ...
+
+    # --- case studies (grounded proof / delivered engagements) ---
+    @abstractmethod
+    def save_case_study(self, case_study: CaseStudy) -> None: ...
+    @abstractmethod
+    def get_case_study(self, case_study_id: str) -> CaseStudy | None: ...
+    @abstractmethod
+    def list_case_studies(self) -> list[CaseStudy]: ...
+    @abstractmethod
+    def delete_case_study(self, case_study_id: str) -> None: ...
 
     # --- data rights (export / wipe everything) ---
     @abstractmethod
