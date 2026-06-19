@@ -2,6 +2,25 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.32.0] — 2026-06-19
+
+### Added — consulting engine: posting-sweep → bench notifications + bid/no-bid (Phase 3)
+The posting-driven automation: the opt-in background sweep now tells the house which **new gigs
+fit the bench**, without anyone running a manual rank.
+- **Bid/no-bid volume control** (`bench.py`) — `qualify_fits` / `bench_fit_for_job` surface a gig
+  only when an eligible consultant clears the "good match" band (`BENCH_FIT_MIN=40`); an empty
+  result is the no-bid signal, so the operator isn't drowned in irrelevant gigs.
+- **Bench-fit sweep overlay** (`alerts.py`) — after a saved search finds new postings, the sweep
+  bench-matches each one (bench loaded once, scored **outside the store lock**) and raises a
+  `bench_fit` notification naming the best-fit consultants ("Senior Python Consultant → Anna
+  (78)"). Resilient (a match failure never aborts the sweep), idempotent (a re-surfaced posting
+  isn't re-notified), and skipped entirely when the bench is empty.
+- **`bench_fit` notification** (`notifications.py`) + inbox rendering (🎯 icon, "N fits", click →
+  Bench tab to staff/pursue).
+
+Backend + tests written and preview-verified by the main thread (sweep raises the right
+notification with bid/no-bid applied; the bell renders it). 351 tests pass.
+
 ## [1.31.0] — 2026-06-19
 
 ### Added — consulting engine: Opportunity entity + audit trail (Phase 2 finish)

@@ -14,10 +14,11 @@ import os
 import threading
 import time
 
+from .bench import bench_fit_for_job
 from .config import settings
 from .engine import SearchSettings
 from .insights import compute_insights
-from .notifications import new_matches_notification, reminder_notification
+from .notifications import bench_fit_notification, new_matches_notification, reminder_notification
 from .saved_searches import register_run
 from .sources import available_sources
 
@@ -83,7 +84,11 @@ def run_sweep(store, find_jobs, now: float | None = None) -> dict:
     ids it hasn't seen, and raise/refresh follow-up reminders from the pipeline. Resilient:
     one failing search or source never aborts the sweep."""
     now = now if now is not None else time.time()
-    searches_run = new_matches = reminders = 0
+    searches_run = new_matches = reminders = bench_fits = 0
+
+    # The house's bench, loaded ONCE (short lock); bench-matching then runs OUTSIDE the lock
+    # (bench.py is pure). Empty bench → the consulting overlay is simply skipped.
+    bench = store.list_consultants()
 
     # Reminder dedupe over EVERY existing reminder (read and unread). A dismissed reminder is
     # deleted from the store, so it's absent here and re-creates legitimately; a kept reminder
@@ -116,6 +121,26 @@ def run_sweep(store, find_jobs, now: float | None = None) -> dict:
             store.save_notification(new_matches_notification(updated, new_jobs, now))
             new_matches += len(new_ids)
 
+            # Consulting overlay: which NEW postings does the house's bench fit? (bid/no-bid
+            # applied — only gigs with a qualifying consultant are surfaced.) Resilient: a
+            # bench-match failure never aborts the sweep.
+            if bench:
+                fits = []
+                for j in result.jobs:
+                    if j.id not in idset:
+                        continue
+                    try:
+                        top = bench_fit_for_job(j, bench)
+                    except Exception:
+                        continue
+                    if top:
+                        fits.append({"title": j.title, "url": j.url, "source": j.source,
+                                     "consultants": [{"name": m.consultant.name, "score": m.score}
+                                                     for m in top]})
+                if fits:
+                    store.save_notification(bench_fit_notification(updated, fits, now))
+                    bench_fits += len(fits)
+
     try:
         nudges = compute_insights(store.list_applications(), now).get("nudges", [])
     except Exception:
@@ -135,7 +160,7 @@ def run_sweep(store, find_jobs, now: float | None = None) -> dict:
             reminders += 1
 
     return {"searches_run": searches_run, "new_matches": new_matches,
-            "reminders": reminders, "ran_at": now}
+            "reminders": reminders, "bench_fits": bench_fits, "ran_at": now}
 
 
 # --- the background scheduler (opt-in) ------------------------------------

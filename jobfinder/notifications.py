@@ -16,7 +16,7 @@ _MAX_JOBS = 12   # bound the job snapshot list stored on a new-matches notificat
 
 @dataclass
 class Notification:
-    kind: str                                    # "new_matches" | "reminder"
+    kind: str                                    # "new_matches" | "reminder" | "bench_fit"
     title: str
     body: str = ""
     ref_id: str = ""                             # saved-search id (new_matches) | application id (reminder)
@@ -53,6 +53,29 @@ def new_matches_notification(search, new_jobs: list[dict], now: float | None = N
         dedupe=f"new:{search.id}:{now:.0f}",     # each batch is its own item (history kept)
         created=now,
         body=f"{n} new match{'es' if n != 1 else ''} for “{search.name}”.",
+    )
+
+
+def bench_fit_notification(search, fits: list[dict], now: float | None = None) -> Notification:
+    """A 'N new gigs fit your bench' inbox item for the consulting house. ``fits`` is a list of
+    ``{title, url, source, consultants:[{name, score}]}`` — which new postings fit whom."""
+    now = now if now is not None else time.time()
+    fits = [f for f in fits if isinstance(f, dict)][:_MAX_JOBS]
+    parts = []
+    for f in fits:
+        who = ", ".join(f"{c.get('name', '?')} ({c.get('score', 0):g})"
+                        for c in (f.get("consultants") or [])[:3])
+        parts.append(f"{f.get('title', 'A gig')} → {who}" if who else f.get("title", "A gig"))
+    n = len(fits)
+    return Notification(
+        kind="bench_fit",
+        title=f"Bench fits: {search.name}",
+        ref_id=search.id,
+        count=n,
+        jobs=fits,
+        dedupe=f"benchfit:{search.id}:{now:.0f}",   # each batch is its own item (history kept)
+        created=now,
+        body=f"{n} new gig{'s' if n != 1 else ''} fit your bench — " + "; ".join(parts),
     )
 
 

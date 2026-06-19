@@ -162,6 +162,28 @@ def rank_bench_for_project(project: Project, consultants: list[Consultant],
     return rank_consultants(project, consultants, config)
 
 
+# --- bid / no-bid qualification (volume control) --------------------------
+# A gig is only worth surfacing (a "bid") if someone on the bench is BOTH eligible AND a
+# reasonable fit. The threshold mirrors the matcher's "good match" band (matcher.SCORE_BANDS):
+# below it, nobody on the bench is a credible fit, so it's a "no-bid" and we stay silent.
+BENCH_FIT_MIN = 40.0
+
+
+def qualify_fits(matches: list[BenchMatch], min_score: float = BENCH_FIT_MIN,
+                 limit: int = 3) -> list[BenchMatch]:
+    """The eligible consultants who clear ``min_score``, best-first (matches are already sorted).
+    An EMPTY result is the 'no-bid' signal — nobody on the bench credibly fits this gig."""
+    return [m for m in matches if m.eligible and m.score >= min_score][:limit]
+
+
+def bench_fit_for_job(job, consultants: list[Consultant], config: MatchConfig | None = None,
+                      min_score: float = BENCH_FIT_MIN, limit: int = 3) -> list[BenchMatch]:
+    """Bench-match an ingested posting and return only the qualifying fits (bid/no-bid applied).
+    Pure: takes an already-loaded bench, never touches the store."""
+    return qualify_fits(rank_consultants(project_from_job(job), consultants, config),
+                        min_score, limit)
+
+
 def _bench_reasons(text_sim: float, matched: list[str], proj_skills: list[str],
                    title_sim: float, project: Project) -> list[str]:
     reasons: list[str] = []

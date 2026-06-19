@@ -102,8 +102,9 @@ function renderNotifPanel() {
     return;
   }
   const items = _notifs.map(n => {
-    const icon = n.kind === 'new_matches' ? '🔎' : '⏰';
-    const meta = n.kind === 'new_matches' ? `${n.count} new` : 'reminder';
+    const icon = n.kind === 'new_matches' ? '🔎' : n.kind === 'bench_fit' ? '🎯' : '⏰';
+    const meta = n.kind === 'new_matches' ? `${n.count} new`
+      : n.kind === 'bench_fit' ? `${n.count} fit${n.count === 1 ? '' : 's'}` : 'reminder';
     return `<div class="notif-item${n.read ? '' : ' unread'}" data-id="${esc(n.id)}" data-kind="${esc(n.kind)}" data-ref="${esc(n.ref_id)}">
         <span class="notif-ic">${icon}</span>
         <div class="notif-bd"><div class="notif-title">${esc(n.title)} <i class="muted small">${esc(meta)}</i></div>
@@ -126,6 +127,8 @@ async function openNotif(kind, ref, id) {
   await fetch(`/api/notifications/${id}/read`, { method: 'POST' }).catch(() => {});
   if (kind === 'new_matches' && ref) {
     runSavedSearch(ref);
+  } else if (kind === 'bench_fit') {
+    switchTab('bench');                 // take the operator to the bench to staff/pursue the fit
   } else if (kind === 'reminder' && ref) {
     switchTab('pipeline');
     await loadPipeline();

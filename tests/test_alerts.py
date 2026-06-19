@@ -62,6 +62,52 @@ def test_sweep_raises_new_matches_then_is_idempotent():
     assert len(store.list_notifications()) == 1
 
 
+# --- sweep: consulting bench-fit overlay ----------------------------------
+
+class _GigJob:
+    def __init__(self):
+        self.id = "g1"
+        self.title = "Senior Python Consultant"
+        self.description = "Build Django REST APIs on AWS"
+        self.job_skills = ["python", "django", "aws"]
+        self.location = "Copenhagen"
+        self.remote = False
+        self.source = "Verama"
+        self.url = "https://x/g1"
+
+    def to_dict(self):
+        return {"id": self.id, "title": self.title, "company": "Verama", "location": self.location,
+                "url": self.url, "source": self.source, "posted": "2026-06-17", "score": 70}
+
+
+def test_sweep_raises_bench_fit_with_bid_no_bid():
+    from jobfinder.consultants import new_consultant
+    store = MemoryStore()
+    store.save_profile("cv1", build_profile(CV))
+    store.save_saved_search(new_saved_search("DK gigs", {"cv_id": "cv1", "keywords": "python",
+                                                         "sources": ["remotive"], "gigs_only": True}))
+    store.save_consultant(new_consultant("Anna Berg", skills=["python", "django", "aws"],
+                                         raw_text="Senior Python, Django and AWS engineer, 8 years."))
+    store.save_consultant(new_consultant("Bo Java", skills=["java"], raw_text="Java developer."))
+    fake = lambda p, s: _Result([_GigJob()])
+
+    summary = alerts.run_sweep(store, fake, now=1000.0)
+    assert summary["bench_fits"] == 1
+    bf = [n for n in store.list_notifications() if n.kind == "bench_fit"]
+    assert len(bf) == 1
+    assert "Anna Berg" in bf[0].body and "Bo Java" not in bf[0].body   # bid/no-bid excludes the non-fit
+    assert bf[0].jobs and bf[0].jobs[0]["title"] == "Senior Python Consultant"
+    # idempotent: the same posting on a later sweep is already seen → no new bench_fit
+    assert alerts.run_sweep(store, fake, now=2000.0)["bench_fits"] == 0
+
+
+def test_sweep_no_bench_means_no_bench_fit():
+    store, s, fake = _store_with_search()      # no consultants on the bench
+    summary = alerts.run_sweep(store, fake, now=1000.0)
+    assert summary["bench_fits"] == 0
+    assert not [n for n in store.list_notifications() if n.kind == "bench_fit"]
+
+
 def test_sweep_skips_search_with_missing_profile():
     store = MemoryStore()
     s = new_saved_search("No CV", {"cv_id": "gone", "keywords": "python", "sources": ["remotive"]})
