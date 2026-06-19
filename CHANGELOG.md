@@ -2,6 +2,45 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.24.0] — 2026-06-19
+
+### Added — Danish universities + a fuller catalog (→ 25)
+- **Universities (DTU, SDU)** — a new `oracle.py` source over the public, no-key **Oracle Recruiting
+  Cloud** REST endpoint (`recruitingCEJobRequisitions`) that backs both universities' careers sites.
+  Generic over a list of `(host, siteNumber, label)` boards, so more DK orgs on Oracle drop in.
+  Live-verified (~100 DTU + ~94 SDU current roles). Opt-in.
+- **HR-Manager `regionh` alias** — **Region Hovedstaden** (largest Danish region, Copenhagen
+  hospitals + admin) now flows through the existing public-sector source (verified 25 live jobs via
+  the JSON `PositionList` API), joining Statens Rekrutteringsløsning + Region Syddanmark.
+
+### Docs — full source catalog, reorganised by access
+- **[`docs/SOURCES.md`](docs/SOURCES.md) rewritten** as the complete map of every researched site,
+  split into **Part 1 — Non-gated** (no API key, no login) and **Part 2 — Gated** (free API key /
+  login / approval-paid / ToS-restricted / scrape-only), per request. Covers ~70 sites incl. a final
+  research pass: DK sector/union/official boards (Workindenmark, Sundhedsjobs, Lærerjob, PROSA, IDA,
+  HK, Akademikernes, AU/AAU), remote/aggregator APIs (Landing.jobs + 4dayweek = no-key integrable;
+  Findwork/apijobs.dev/web3.career/Reed/USAJobs = free-key integrable), and the gated/defunct
+  long-tail (Otta/WTTJ, Honeypot, builtin, GitHub/SO Jobs, …).
+
+### Researched but not added
+- Most DK niche boards have no machine-readable feed (Sundhedsjobs/Lærerjob/PROSA/IDA/HK/Børsen/
+  TechJob — scrape or member-only); KU/RUC are on HR-Manager but their JSON alias returns empty; AU/
+  AAU are Emply-tenant-key / CMS-403. Documented as where-to-look entries, not integration targets.
+
+### Security
+- Allow-list + runtime egress test extended to the DTU & SDU Oracle pod hosts.
+
+### Fixed (from adversarial review)
+- **HR-Manager alias starvation** (latent since v1.17, exposed by adding `regionh`): the broad state
+  feed ran first and filled the whole `limit`, so Region Syddanmark/Hovedstaden contributed nothing.
+  Each alias now gets a fair share of the budget (`ceil(limit / n_aliases)`), merged and capped.
+- **Oracle** with an empty board list now returns `[]` instead of a misleading "all boards
+  unavailable" error (mirrors the ATS guard).
+
+### Tests
+- 261 → 265 (Oracle ORC parsing incl. non-dict-record tolerance; HR-Manager fair-share-across-aliases
+  regression; the `regionh` alias rides the existing HR-Manager tests).
+
 ## [1.23.0] — 2026-06-18
 
 ### Added — more consultant / freelance / limited-time sources (→ 24)

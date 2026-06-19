@@ -15,13 +15,14 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles — **24 sources**, the no-key Danish ones
+2. **Searches live job boards** for matching roles — **25 sources**, the no-key Danish ones
    **on by default**, broadening to remote / short-term / consulting work:
    - **Denmark:** **it-jobbank** & **Public sector (HR-Manager / SRL)** (default) — DK's leading IT
      board plus the public-sector backbone: one feed spans ~140 Danish **state** institutions
-     (Statens Rekrutteringsløsning) + Region Syddanmark; **The Hub** & **The Muse** (default; DK
-     startups / Denmark-located roles); **StepStone.dk** & **Jobindex** (opt-in RSS — Jobindex is
-     DK's largest, also covers Ofir); **Adzuna**, **Jooble** & **Careerjet** (free-key, strong DK).
+     (Statens Rekrutteringsløsning) + Region Syddanmark + Region Hovedstaden; **The Hub** & **The
+     Muse** (default; DK startups / Denmark-located roles); **StepStone.dk** & **Jobindex** (opt-in
+     RSS — Jobindex is DK's largest, also covers Ofir); **Universities** (opt-in; DTU & SDU via their
+     public Oracle Recruiting Cloud APIs); **Adzuna**, **Jooble** & **Careerjet** (free-key, strong DK).
    - **Remote / global:** **Remotive** & **Arbeitnow** (default), plus **Jobicy**, **RemoteOK**,
      **We Work Remotely** & **Working Nomads** (opt-in, no-key remote boards).
    - **Company boards (ATS):** **Greenhouse / Lever / Ashby** — the public, no-key APIs behind
@@ -337,7 +338,7 @@ Job finder/
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)
-│  └─ sources/            # 24 sources + normalize.py (see docs/SOURCES.md for the full catalog)
+│  └─ sources/            # 25 sources + normalize.py (see docs/SOURCES.md for the full catalog)
 └─ tests/                 # pytest unit tests + sample CV
 ```
 

@@ -46,6 +46,7 @@ from jobfinder.sources.verama import VeramaSource
 from jobfinder.sources.hackernews import HackerNewsSource
 from jobfinder.sources.ted import TEDSource
 from jobfinder.sources.wpjobs import JobspressoSource, AuthenticJobsSource
+from jobfinder.sources.oracle import OracleORCSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -84,6 +85,8 @@ _ALLOWED_HOSTS = {
     "ted.europa.eu",                                # TED notice links (built, not fetched)
     "jobspresso.co",                                # Jobspresso WP job_feed
     "authenticjobs.com",                            # Authentic Jobs WP job_feed
+    "efzu.fa.em2.oraclecloud.com",                  # DTU — Oracle Recruiting Cloud
+    "fa-eosd-saasfaprod1.fa.ocs.oraclecloud.com",   # SDU — Oracle Recruiting Cloud
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -180,7 +183,7 @@ def test_runtime_egress_allowlist(monkeypatch):
         ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
         StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
         FreelancerSource(token="x"), ATSSource(), VeramaSource(), HackerNewsSource(), TEDSource(),
-        JobspressoSource(), AuthenticJobsSource(),
+        JobspressoSource(), AuthenticJobsSource(), OracleORCSource(),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

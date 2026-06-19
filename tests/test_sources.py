@@ -294,6 +294,23 @@ def test_hrmanager_survives_one_failing_alias():
     assert len(jobs) == 1                        # the second alias still produced a job
 
 
+def test_hrmanager_fair_share_across_aliases():
+    # the broad first alias must NOT starve later aliases (regionsyddanmark/regionh) of the budget
+    def payload(prefix):
+        return {"Items": [{"Name": f"{prefix} role {i}", "Department": {"Name": "Dept"},
+                           "Advertisements": [{"Content": "x"}], "Published": "/Date(1780396745000)/"}
+                          for i in range(10)]}
+    calls = {"n": 0}
+    def per_alias(*a, **k):
+        calls["n"] += 1
+        return _FakeResp(payload("A" if calls["n"] == 1 else "B"))
+    src = HRManagerSource(aliases=("a", "b"))
+    with patch("jobfinder.sources.hrmanager.requests.get", side_effect=per_alias):
+        jobs = src.search("role", limit=6)
+    prefixes = {j.title.split()[0] for j in jobs}
+    assert prefixes == {"A", "B"} and len(jobs) <= 6      # both aliases represented, capped
+
+
 def test_jobicy_parses_json():
     payload = {"jobs": [{
         "jobTitle": "Backend Developer", "companyName": "Synthesia", "jobGeo": "Europe",
@@ -754,6 +771,24 @@ def test_wpjobs_multiple_job_types_resolve_to_gig():
         with patch("jobfinder.sources.wpjobs.requests.get", return_value=_FakeRssResp(feed(*order))):
             jobs = JobspressoSource().search("dev", limit=5)
         assert jobs[0].employment_type == "freelance"     # not lost to last-wins
+
+
+def test_oracle_orc_parses_university_jobs():
+    from jobfinder.sources.oracle import OracleORCSource
+    payload = {"items": [{"TotalJobsCount": 1, "requisitionList": [
+        {"Id": "7515", "Title": "Softwareudvikler til DTU Findit",
+         "PrimaryLocation": "Kgs. Lyngby, Denmark", "PostedDate": "2026-06-18",
+         "ShortDescriptionStr": "Build search systems.", "WorkplaceTypeCode": "ORA_ONSITE"},
+        "not-a-dict",                                       # one bad record must not drop the batch
+    ]}]}
+    with patch("jobfinder.sources.oracle.requests.get", return_value=_FakeResp(payload)):
+        jobs = OracleORCSource(boards=(("h", "CX_1", "DTU"),)).search("software", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Softwareudvikler til DTU Findit" and j.company == "DTU"
+    assert j.location == "Kgs. Lyngby, Denmark" and j.posted == "2026-06-18"
+    assert j.source == "DTU (Oracle ORC)" and j.url.endswith("/sites/CX_1/job/7515")
+    assert j.remote is False and "search systems" in j.description
 
 
 def test_ted_handles_list_wrapped_dates():

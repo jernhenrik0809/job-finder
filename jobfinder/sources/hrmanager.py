@@ -22,7 +22,7 @@ _HEADERS = {"User-Agent": "JobFinder/1.0 (personal job search)"}
 
 # Curated, verified customer aliases. SRL gives broad Danish *state* coverage from one call;
 # regionsyddanmark adds regional health/hospital jobs. More can be added over time.
-_ALIASES = ("statensrekrutteringsloesning_tr", "regionsyddanmark")
+_ALIASES = ("statensrekrutteringsloesning_tr", "regionsyddanmark", "regionh")
 
 
 from .normalize import strip_html as _strip_html   # shared (was a local copy)
@@ -51,9 +51,11 @@ class HRManagerSource(JobSource):
         loc = (location or "").lower().strip()
         jobs: list[Job] = []
         errors = 0
+        # Give each alias a fair share of the limit, so the broad state feed (first alias) can't
+        # starve the regional ones (regionsyddanmark / regionh) of the whole budget.
+        per_alias = max(1, -(-limit // len(self.aliases))) if self.aliases else limit
         for alias in self.aliases:
-            if len(jobs) >= limit:
-                break
+            added = 0
             try:
                 resp = requests.get(_API.format(alias=alias),
                                     params={"protype": "RecruitmentProject", "incads": "true"},
@@ -92,10 +94,11 @@ class HRManagerSource(JobSource):
                     source="HR-Manager (DK public sector)",
                     posted=_msdate(it.get("Published") or it.get("Created")),
                 ))
-                if len(jobs) >= limit:
+                added += 1
+                if added >= per_alias:                  # fair per-alias cap, not a global one
                     break
 
         # only error out if every alias failed and nothing was collected
         if errors == len(self.aliases) and not jobs:
             raise RuntimeError("HR-Manager request failed (all feeds unavailable).")
-        return jobs
+        return jobs[:limit]                             # ceil per-alias caps can sum slightly over

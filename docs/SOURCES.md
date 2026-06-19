@@ -1,209 +1,183 @@
-# Job & consulting sources for Denmark (and remote / short-term)
+# Job, consulting & freelance sources — full catalog
 
-The definitive catalog of every researched job, freelance and consulting source relevant to a
-Denmark-based search — **including ones not (yet) integrated**, so this doubles as a manual
-where-to-look list. The app's actually-wired sources live in
-[`jobfinder/sources/`](../jobfinder/sources/); this document is the map around them.
+The definitive map of **every** job / freelance / consulting source researched for a Denmark-based
+search (employee roles + remote + short-term/contract/tender work), whether or not it's wired into
+the app. The live, wired sources are in [`jobfinder/sources/`](../jobfinder/sources/).
 
-Scope: **Denmark-relevant** roles first, broadened to **remote / short-term (freelance, contract,
-gig)** sources that a Denmark-based person can take. Local job boards stay Denmark-scoped; the
-remote and gig sources are global by nature.
+The catalog is organised by **access**, as requested:
 
-**Status legend**
+- **[Part 1 — Non-gated](#part-1--non-gated-sources-no-api-key-no-login)** — usable with **no API key
+  and no login** (a public RSS/JSON feed, ToS-permitting). The app's defaults live here.
+- **[Part 2 — Gated](#part-2--gated-sources-api-key-login-approval-paid-or-scrape-only)** — everything
+  that needs **an API key**, **a login/account**, **approval/payment**, is **ToS-restricted**, or is
+  **scrape-only** (no machine-readable feed).
 
-- **Integrated** — wired as a live source in the app (a class in `jobfinder/sources/`).
-- **Integrable** — free + public API/RSS (no key, or a free self-signup key) + relevant +
-  ToS-friendly; buildable with the existing patterns. Marked *(now)* if ready today or
-  *(optional key)* if it needs a free self-signup credential.
-- **Document-only** — exists and is relevant, but cannot be cleanly/ethically ingested
-  (login / partner / paid, ToS forbids automated use, wrong shape, or scrape-fragile). Listed for
-  completeness and as places to keep a profile or apply manually.
+**Status:** **Integrated** = wired (a class in `jobfinder/sources/`) · **Integrable** = a clean
+feed/key exists, buildable, not yet wired · **Document-only** = exists & relevant but not cleanly/
+ethically ingestible (login/paid/ToS/scrape).
 
-**Access types** — *no-key API/RSS* = public, anonymous · *free-key* = free self-signup credential
-(env var / ⚙ Settings) · *partner/paid* = manual onboarding or CPC contract · *scrape* = HTML-only,
-no machine feed · *login* = gated behind an account.
-
-> **Ground rules this catalog respects:** relevant sources only; nothing requiring login
-> impersonation or violating a board's ToS is integrated (this is why Himalayas and EURES are
-> document-only despite working technically); keyed sources resolve their credential from the
-> secrets overlay and are skipped (not failed) when unset; and a keyed source's errors never echo
-> its key. See [`docs/SECURITY.md`](SECURITY.md) and [`docs/ETHICS.md`](ETHICS.md).
+> **Ground rules:** Denmark-relevant first; nothing requiring login impersonation or violating a
+> board's ToS is integrated (why Himalayas/EURES are document-only despite working); keyed sources
+> resolve credentials from the secrets overlay, are skipped when unset, and never echo a key in an
+> error. See [`SECURITY.md`](SECURITY.md) and [`ETHICS.md`](ETHICS.md).
 
 ---
 
-## Integrated (24 live sources)
+## At a glance — 25 integrated sources
 
-Wired and tested. The **default** no-key set runs unless you pick others; **opt-in** sources are
-unticked by default; **keyed** sources light up once their free credential is set in ⚙ Settings.
+| Group | Sources |
+|---|---|
+| **DK (default on)** | The Hub · The Muse · it-jobbank · HR-Manager/SRL (state + Region Syddanmark + Region Hovedstaden) · Remotive · Arbeitnow |
+| **DK (opt-in)** | StepStone.dk · Jobindex · **Universities — DTU/SDU (Oracle ORC)** · Adzuna* · Jooble* · Careerjet* |
+| **Remote / global (opt-in)** | Jobicy · RemoteOK · We Work Remotely · Working Nomads · Jobspresso · Authentic Jobs · LinkedIn (guest) · JSearch* |
+| **Consulting / gigs (opt-in)** | Verama · Hacker News · EU TED (tenders) · Freelancer.com* |
+| **Company boards (opt-in)** | ATS — Greenhouse/Lever/Ashby (Trustpilot, Too Good To Go, Veo, Corti, Pleo, Lunar, Planday, Netlight) |
 
-### Denmark
+`*` = needs a free API key. A **"Consulting / contract only"** search toggle filters every source
+that exposes an employment type down to contract/freelance work.
 
-| Name | What | DK relevance | Access | Default? | Module |
-|---|---|---|---|---|---|
-| The Hub (`thehub.io`) | Nordic startup/scale-up jobs (`countryCode=DK`) | Strong | no-key API | ✅ default | `thehub.py` |
-| The Muse | Curated company/job listings, filtered to DK cities | Some | no-key API | ✅ default | `themuse.py` |
-| **it-jobbank.dk** | Denmark's leading IT/tech board (StepStone family) | Strong | no-key RSS | ✅ default | `itjobbank.py` |
-| **HR-Manager / SRL** | DK public-sector ATS — state (Statens Rekrutteringsløsning) + Region Syddanmark | Strong | no-key JSON | ✅ default | `hrmanager.py` |
-| **StepStone.dk** | Major Danish general/professional board (StepStone family) | Strong | no-key RSS | opt-in | `stepstonedk.py` |
-| Jobindex (RSS) | Denmark's **largest** job board (absorbed Ofir) | Strong | no-key RSS | opt-in | `jobindex.py` |
-| Adzuna (dk) | Aggregator with a dedicated Denmark endpoint + structured salary | Strong (`/jobs/dk/`) | free-key | keyed | `adzuna.py` |
-| Jooble (dk) | Job-search API covering Denmark | Strong | free-key | keyed | `jooble.py` |
-| Careerjet | Aggregator with a Danish portal (`da_DK`, `careerjet.dk`) | Strong | free affiliate id | keyed | `careerjet.py` |
+---
+
+## Part 1 — Non-gated sources (no API key, no login)
+
+Public RSS/JSON feeds, usable without any credential.
+
+### Denmark & Nordic
+
+| Name | What | DK relevance | Status | Module / notes |
+|---|---|---|---|---|
+| The Hub (`thehub.io`) | Nordic startup/scale-up jobs (`countryCode=DK`) | Strong | **Integrated** (default) | `thehub.py` |
+| The Muse | Curated listings filtered to DK cities | Some | **Integrated** (default) | `themuse.py` |
+| it-jobbank.dk | DK's leading IT/tech board (StepStone family) | Strong | **Integrated** (default) | `itjobbank.py` |
+| HR-Manager / SRL | DK public-sector ATS — Statens Rekrutteringsløsning (~140 state institutions) + **Region Syddanmark** + **Region Hovedstaden** | Strong | **Integrated** (default) | `hrmanager.py` — add more regions/kommuner as `customer=` aliases |
+| StepStone.dk | Major DK general/professional board (StepStone/Jobindex RSS family) | Strong | **Integrated** (opt-in) | `stepstonedk.py` |
+| Jobindex | DK's **largest** board (absorbed Ofir) | Strong | **Integrated** (opt-in) | `jobindex.py` |
+| **DK universities — DTU, SDU** | Oracle Recruiting Cloud public REST (`recruitingCEJobRequisitions`) — academic/IT/admin, full descriptions | Strong | **Integrated** (opt-in) | `oracle.py` — generic over (host, siteNumber); add more DK orgs on Oracle |
 
 ### Remote / global
 
-| Name | What | Relevance | Access | Default? | Module |
-|---|---|---|---|---|---|
-| Remotive | Free remote-jobs JSON API | Remote, DK-eligible | no-key API | ✅ default | `remotive.py` |
-| Arbeitnow | Free European job-board JSON API | EU incl. DK | no-key API | ✅ default | `arbeitnow.py` |
-| Jobicy | Free remote-jobs board, `geo=denmark` scope | Remote, DK-scoped | no-key API | opt-in | `jobicy.py` |
-| **RemoteOK** | Large global remote-jobs JSON API | Remote, global | no-key API | opt-in | `remoteok.py` |
-| **We Work Remotely** | Major remote-jobs board, RSS | Remote, global | no-key RSS | opt-in | `weworkremotely.py` |
-| **Working Nomads** | Curated remote-jobs JSON feed | Remote, global | no-key API | opt-in | `workingnomads.py` |
-| JSearch (RapidAPI) | Aggregates Google for Jobs (LinkedIn/Indeed/Glassdoor) | Query-scoped | free-key | keyed | `jsearch.py` |
-| LinkedIn (guest) | Public `jobs-guest` search endpoint (cards + per-job description) | Strong (geoId-filterable) | no-key (unofficial) | opt-in | `linkedin.py` |
+| Name | What | Relevance | Status | Module / notes |
+|---|---|---|---|---|
+| Remotive | Free remote-jobs JSON API | Remote, DK-eligible | **Integrated** (default) | `remotive.py` |
+| Arbeitnow | Free European job-board JSON API | EU incl. DK | **Integrated** (default) | `arbeitnow.py` |
+| Jobicy | Remote-jobs API, `geo=denmark` | Remote, DK-scoped | **Integrated** (opt-in) | `jobicy.py` |
+| RemoteOK | Large global remote-jobs JSON API | Remote, global | **Integrated** (opt-in) | `remoteok.py` (keep URL + "Remote OK" credit) |
+| We Work Remotely | Major remote board, RSS | Remote, global | **Integrated** (opt-in) | `weworkremotely.py` |
+| Working Nomads | Curated remote-jobs JSON | Remote, global | **Integrated** (opt-in) | `workingnomads.py` |
+| Jobspresso | Curated remote board (WP Job Manager `job_feed`) | Remote, contract mix | **Integrated** (opt-in) | `wpjobs.py` |
+| Authentic Jobs | Remote design/dev board (WP `job_feed`) | Remote, contract mix | **Integrated** (opt-in) | `wpjobs.py` |
+| LinkedIn (guest) | Public `jobs-guest` search (no login) | Strong (geoId) | **Integrated** (opt-in) | `linkedin.py` — polite/low-volume |
+| **Landing.jobs** | EU tech board, JSON `api/v1/jobs` (salary, relocation, country_code) | EU; remote/relocation | **Integrable (no-key)** | best DK-adjacency of the unwired no-key finds; HTML in descriptions → `strip_html` |
+| **4dayweek.io** | ~18k 4-day-week roles, JSON `api/jobs` (rich: salary, stack, lat/lon) | Global, EU coverage | **Integrable (no-key)** | undocumented internal feed — poll politely; niche (4-day-week only) |
+
+### Consulting / freelance gigs & tenders
+
+| Name | What | Relevance | Status | Module / notes |
+|---|---|---|---|---|
+| Verama (Ework Group) | Public feed of open **consulting assignments** (fixed-term, rate, hours, dates) | Strong (Nordic incl. DK) | **Integrated** (opt-in) | `verama.py` — `app.verama.com/api/public/job-requests` |
+| Hacker News | Monthly "Freelancer? Seeking freelancer?" threads (Algolia API) | Remote/tech gigs | **Integrated** (opt-in) | `hackernews.py` |
+| EU TED | DK public-sector IT/business **consultancy tenders** (CPV 72/79) — limited-time projects you bid on | Strong (DK public) | **Integrated** (opt-in) | `ted.py` — labelled "tender"; subsumes udbud.dk + Mercell |
 
 ### Company boards (ATS)
 
-| Name | What | Relevance | Access | Default? | Module |
-|---|---|---|---|---|---|
-| **Greenhouse / Lever / Ashby** | The public, no-key board APIs behind companies' own careers pages — **full descriptions** from a curated list of Danish/Nordic firms (Trustpilot, Too Good To Go, Veo, Corti, Pleo, Lunar) | Strong (named DK firms) | no-key | opt-in | `ats.py` |
-
-### Freelance / short-term gigs
-
-| Name | What | Relevance | Access | Default? | Module |
-|---|---|---|---|---|---|
-| **Verama** (Ework Group) | Public feed of open **consulting assignments** — fixed-term contracts with rate, hours/week, start/end dates | Strong (Nordic incl. DK) | no-key | opt-in | `verama.py` |
-| **Hacker News** | Monthly "Freelancer? Seeking freelancer?" threads via the public Algolia API | Remote/tech gigs | no-key | opt-in | `hackernews.py` |
-| **EU TED** | Danish public-sector IT/business-consultancy **tenders** (CPV 72/79) — limited-time projects you bid on | Strong (DK public sector) | no-key | opt-in | `ted.py` |
-| **Jobspresso** | Curated remote board (WP Job Manager `job_feed` RSS) | Remote, contract mix | no-key | opt-in | `wpjobs.py` |
-| **Authentic Jobs** | Remote design/dev board (WP Job Manager `job_feed` RSS) | Remote, contract mix | no-key | opt-in | `wpjobs.py` |
-| **Freelancer.com** | Active short-term project listings (gigs) via the official Projects REST API | Global, remote gigs | free token | keyed | `freelancer.py` |
-
-> The **ATS** source (Greenhouse/Lever/Ashby) seeds a curated Danish/Nordic board list — Trustpilot,
-> Too Good To Go, Veo, Corti, Pleo, Lunar, **Planday** (Copenhagen) and **Netlight** (Nordic IT
-> consultancy, Copenhagen office) — extendable via `JOBFINDER_ATS_COMPANIES`.
-
-> **"Consulting / contract only" filter:** a search toggle (`gigs_only`) keeps just contract/freelance
-> work across every source that exposes an employment type — `Job.employment_type` is populated from
-> Remotive's `job_type`, We Work Remotely's `<type>`, Jobicy's `jobType[]`, and the pure-gig sources
-> (Verama/Hacker News/Freelancer are always contract/freelance). This turns the app into a job board
-> for a consultant without needing consulting-only sources.
-
-**Notes on the integrated set**
-
-- **HR-Manager / SRL is the highest-value DK public-sector integration.** `hrmanager.py` queries a
-  curated list of HR-Manager *customer* aliases and merges them. `statensrekrutteringsloesning_tr`
-  (Statens Rekrutteringsløsning) aggregates ~140 Danish **state** institutions — a ToS-clean
-  programmatic stand-in for the login-gated Jobnet/STAR — and `regionsyddanmark` adds regional
-  health jobs. (University of Copenhagen sits under this same customer, but the syndicated feed
-  currently excludes KU vacancies — see below.)
-- **StepStone.dk / it-jobbank / Jobindex** are the same StepStone/Jobindex RSS family (ISO-8859-1,
-  `"Role, Company"` titles). StepStone.dk's location/company live in the description HTML
-  (`span.job-location` / `div.job-company`), unlike Jobindex's `.jix_robotjob--area`.
-- **RemoteOK** requires keeping the original RemoteOK job URL and crediting "Remote OK" as the
-  source (no logo reuse) — satisfied because the app only links out to `job.url` and labels the
-  source. Its API returns a JSON array whose first element is a legal/metadata object (skipped).
-- **Careerjet / Freelancer.com** carry their credential in the request URL / an auth header, so
-  both sanitise error text to the exception type name only — never the key.
+| Name | What | Relevance | Status | Module / notes |
+|---|---|---|---|---|
+| Greenhouse / Lever / Ashby | Public no-key board APIs behind companies' own careers pages — **full descriptions** | Strong (named DK firms) | **Integrated** (opt-in) | `ats.py` — curated DK/Nordic list (Trustpilot, Too Good To Go, Veo, Corti, Pleo, Lunar, Planday, Netlight); extend via `JOBFINDER_ATS_COMPANIES` |
 
 ---
 
-## Freelance & consulting (gigs)
+## Part 2 — Gated sources (API key, login, approval, paid, or scrape-only)
 
-The Danish consulting/freelance space is overwhelmingly login-, approval- or paid-gated. One read
-API is wired (Freelancer.com); the rest are document-only.
+### 2a. Free API key (self-signup, no approval)
 
-| Name | What | DK relevance | Access | Status | Notes |
-|---|---|---|---|---|---|
-| Freelancer.com | Global project marketplace; official REST API | Global/remote gigs | free token (`FREELANCER_TOKEN`) | **Integrated** | `freelancer.py` — see the integrated table. |
-| **Verama** (Ework Group) | Top Nordic independent-consultant broker; open assignments | Strong | **no-key public REST** | **Integrated** | `verama.py`. Re-probe found a genuine public feed at `GET https://app.verama.com/api/public/job-requests` (`public:true` records) — the earlier "login SPA" assessment was superseded. |
-| **Hacker News** | "Freelancer? Seeking freelancer?" monthly threads | Remote/tech gigs | no-key (Algolia API) | **Integrated** | `hackernews.py` — see the integrated table. |
-| **EU TED** (Tenders Electronic Daily) | DK public-sector IT/business **consultancy tenders** (CPV 72/79) | Strong (authoritative) | no-key public API | **Integrated** | `ted.py` — `POST https://api.ted.europa.eu/v3/notices/search`, keyless. Labelled "EU TED (tender)" (these are RFPs you bid on, not employee jobs); clean Danish titles via `title-proc`. Subsumes udbud.dk + Mercell. |
-| **Himalayas** | Large remote-jobs API (~87k) incl. Contractor/Freelance + salary | Remote, global | no-key API | **Document-only** | The API is rich and works, **but** its ToS §30 forbids automated data gathering without written approval — left document-only for the same ToS-friendly reason as EURES/Reddit. Revisit only with explicit approval. |
-| **Brainville** | Nordic marketplace for freelance/consulting assignments + brokers (ex-Resrc) | Strong | paid + approval (Bearer Base64(`UserKey:SenderKey`)) | **Document-only** | API v2 is genuinely documented — `POST https://api.brainville.com/v2/market/search`. **But** the Market/Search endpoint needs a **paid** Premium subscription + Assignment-Export add-on **and** an approval-gated Sender Key (internal-use-only data). Buildable only for a user's own paid account. Captures Right People Group gigs transitively. |
-| emagine (ex-ProData Consult) | Large IT/business consulting broker, HQ Copenhagen | Strong | login | Document-only | Re-probe found the real backend `portal-api.emagine.org`, but every job endpoint returns **HTTP 401** — the board requires auth. ProData now redirects to emagine and shares this gated portal. |
-| Onsiter | Nordic contractor/consultant aggregator (~1000 assignments/day, DK confirmed) | Strong | scrape (Cloudflare 403) | Document-only | Index + `/api/assignments` are Cloudflare-403 to bots; detail pages public. No usable feed. |
-| PeoplePerHour / Guru / Twine / Workana / Truelancer | Global freelance project marketplaces | Some–Minimal | scrape / login | Document-only | Re-probed live: no project RSS/JSON (feed URLs 404 or return HTML); listings are login- or scrape-only. |
-| Braintrust / Gun.io / Wellfound / YunoJuno / Arc.dev / A.Team / Contra | Vetted / curated freelance & contract networks | Some | login (apply-to-join) | Document-only | Public pages show teaser roles only; the real job APIs are 401/session-gated behind account + screening. Contra's `/feed` + `/api/jobs` both 404. |
-| 7N | Danish-origin elite IT consultancy/broker; agent-mediated | Strong | scrape (JS ATS) | Document-only | `jobs.7n.com` is a JS-rendered ATS shell; value is agent representation. |
-| Right People Group | Copenhagen IT/management consulting broker | Strong | login / email alerts | Document-only | No public board/API. Its gigs flow into Brainville. |
-| Worksome | Danish-origin Freelance Management System; vetted tech freelancers | Strong (the most DK-relevant freelance platform) | login + GraphQL (auth-only) | Document-only | Private client talent pools; GraphQL manages your own contracts, not open gigs. Create a profile to enter pools. |
-| Malt (incl. merged Comatch) | Largest European freelance/consulting marketplace; Nordics covers DK | Some | profiles only (no public jobs API) | Document-only | Reverse marketplace — clients invite freelancers; only profiles are public. |
-| Giig (`giig.dk`) | Danish freelancer platform (marketing/design/dev/IT) | Strong | login (profile/lead model) | Document-only | Companies push tasks to your inbox; no open-gig feed. |
-| Upwork | Largest global freelance marketplace; GraphQL API | Global (weak DK) | free-key but OAuth2 3-legged | Document-only | Readable, but heavy 3-legged token flow + ToS limits on automated use. |
-| Toptal | Closed vetted talent network (top ~3%) | Global | no public board/API | Document-only | Staff-matched; nothing to ingest. |
-| Freelancermap | Pan-EU IT freelance projects; public Denmark list page | Some (DACH-centric) | scrape (HTML, no read API) | Document-only | Enterprise XML/JSON is import-only; no DK RSS verified. |
-| Fiverr / Contra / Twago / Outvise / Useme / Expert360 / Catalant | Assorted freelance marketplaces | Minimal–Some | no API / login | Document-only | Wrong shape (gig supply not demand), login-gated, or no DK relevance. |
+| Name | What | DK relevance | Status | Notes |
+|---|---|---|---|---|
+| Adzuna | Aggregator with a dedicated **Denmark** endpoint + salary | Strong | **Integrated** | `adzuna.py` · `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` · supports `contract_type=contract` |
+| Jooble | Job-search API covering Denmark | Strong | **Integrated** | `jooble.py` · `JOOBLE_API_KEY` · POST `type` filter for contract |
+| Careerjet | Aggregator, Danish portal (`da_DK`) | Strong | **Integrated** | `careerjet.py` · free affiliate id |
+| JSearch (RapidAPI) | Aggregates Google for Jobs (LinkedIn/Indeed/Glassdoor) | Query-scoped | **Integrated** | `jsearch.py` · `RAPIDAPI_KEY` (~200 free/mo) |
+| Freelancer.com | Active short-term **gig** projects (official REST API) | Global gigs | **Integrated** | `freelancer.py` · free `FREELANCER_TOKEN` |
+| Findwork.dev | Tech-jobs search engine, clean REST API | Moderate (remote/EU tech) | **Integrable** | `GET /api/jobs/` `Authorization: Token` · free token · re-verified live |
+| apijobs.dev | Global aggregator with `country=Denmark` filter | Potentially DK | **Integrable** | free key (monthly quota); re-test live before shipping (TLS-unverified in probe) |
+| web3.career | Crypto/web3 jobs, single-endpoint API | Low (crypto niche) | **Integrable** | free token + attribution backlink required |
+| Reed.co.uk | UK board, search API (Basic-auth key) | Low (UK-centric) | **Integrable** | free key; skip unless UK in scope |
+| USAJobs.gov | US federal positions | None for DK | **Integrable** | free key; US-only — out of scope |
 
----
+### 2b. Login / account required
 
-## Job boards (employee roles)
+| Name | What | DK relevance | Notes |
+|---|---|---|---|
+| Worksome | Danish FMS, vetted tech freelancers | Strong | login + auth-only GraphQL; private talent pools, no open gigs. *Create a profile.* |
+| Graduateland (→ JobTeaser) | Copenhagen student/graduate portal | Strong | login-walled SPA; many roles also surface on The Hub + HR-Manager |
+| Workindenmark / Jobnet (STAR) | Official DK govt portals | Strong | backed by STAR/Jobnet — certificate + signed agreement (MitID); no public feed |
+| IDA · HK · Akademikernes / aka.dk · Lederne · PROSA | Union / a-kasse job banks | Some–Strong | member tooling + email job-agents; no public feed (content overlaps Jobindex) |
+| emagine (ex-ProData) | Copenhagen IT-consulting broker | Strong | real backend `portal-api.emagine.org` returns **401** — auth required |
+| Giig (`giig.dk`) | Danish freelancer platform | Strong | profile/lead inbox model; no open-gig feed |
+| Right People Group | Copenhagen IT/mgmt consulting broker | Strong | login/email alerts; gigs flow into Brainville |
+| Contra · Communo · Pangian | Freelance / remote communities | Some | login SPA / membership; `/feed`+`/api` 404 |
+| Wellfound (AngelList) · Otta / Welcome to the Jungle · Honeypot / Talent.io | Startup / vetted / reverse-recruiting | Some | login + internal GraphQL; no public listings API |
+| Upwork | Largest global freelance marketplace | Weak DK | GraphQL behind heavy 3-legged OAuth + ToS limits |
+| Twago · Outvise | EU freelance/expert networks | Some–Minimal | login-gated, small footprint |
 
-| Name | What | DK relevance | Access | Status | Notes |
-|---|---|---|---|---|---|
-| StepStone.dk | Major Danish general/professional board | Strong | no-key RSS | **Integrated** | `stepstonedk.py` — see above. |
-| it-jobbank.dk / Jobindex.dk | DK IT board / DK's largest board | Strong | no-key RSS | **Integrated** | `itjobbank.py` / `jobindex.py`. |
-| Jobfinder.dk / TechJob.dk | DK's largest engineer/IT/tech board (Ingeniøren) | Strong | scrape (jobs feed empty) | Document-only | `rss.xml` is an empty articles feed; jobs view has no RSS/JSON. Drupal HTML scrape only. |
-| Jobsora / Talent.com (dk) / WhatJobs | Global aggregators with DK presence | Strong | partner / paid (inbound XML or CPC, token-by-request) | Document-only | Publisher-push / CPC-gated; no free outbound search/pull API. |
+### 2c. Approval / partner / paid
 
----
+| Name | What | DK relevance | Notes |
+|---|---|---|---|
+| Brainville | Nordic freelance/consulting marketplace | Strong | documented v2 API (`POST /v2/market/search`) but needs **paid Premium + approval-gated Sender Key**; internal-use-only data. Captures Right People Group transitively |
+| Malt (incl. Comatch) | Largest EU freelance marketplace | Some | reverse marketplace — profiles only, clients invite |
+| Toptal · Braintrust · Gun.io · YunoJuno · Arc.dev · A.Team | Vetted talent networks | Some | apply-to-join + screening; job APIs 401/session-gated |
+| Expert networks — GLG · Guidepoint · Coleman · AlphaSights · Expert360 · Catalant | Consulting/expert engagements | Minimal | private, curated; no open feed |
+| Talent.com · Jobsora · WhatJobs | Aggregators | Strong (coverage) | publisher-push / CPC partner / token-by-request — no free outbound pull |
+| Emply (incl. AU, AAU partly) | Legacy DK uni/kommune ATS | Strong (shrinking) | public API needs an admin-issued **per-tenant** key; migrating to SRL by end-2026 |
+| CVR / Virk | Danish company register | n/a (not jobs) | registered system-to-system access; company data, **no vacancies** |
+| jobdataapi.com · Coresignal | Paid job-data aggregators | Some | paid tiers only |
 
-## Aggregators & remote
+### 2d. ToS-restricted (public API, but terms forbid automated use)
 
-| Name | What | Relevance | Access | Status | Notes |
-|---|---|---|---|---|---|
-| Jobicy / RemoteOK / We Work Remotely / Working Nomads | Remote-jobs APIs/feeds | Remote, global | no-key | **Integrated** | See the integrated table. |
-| Adzuna / Jooble / Careerjet / JSearch | Keyed aggregators | DK / global | free-key | **Integrated** | See the integrated table. |
-| **Himalayas** | Large remote-jobs JSON API (~92k jobs), publicly advertised | Remote, global | no-key API | **Document-only** | Technically works (`GET https://himalayas.app/jobs/api?limit=20&offset=N`, clean JSON, robots.txt allows it). **But** its ToS §30 explicitly prohibits "data mining, robots, screen scraping, or similar automated data gathering … without Himalayas' prior written approval." To stay consistent with the project's ToS-friendly principle (same basis as ruling out EURES), it is **not integrated**. Revisit only with explicit written approval. |
-| Findwork.dev | Tech-jobs search engine with a clean REST API | Minimal (incidental DK) | free token (`FINDWORK_TOKEN`) | **Integrable (optional key)** | `GET /api/jobs/` with `Authorization: Token <key>`. Tech-only, low DK yield — an optional complement. |
-| EURES | EU cross-border public jobs portal incl. DK | Some | none (ToS forbids scraping) | Document-only | **Ruled out**: undocumented backend, ToS forbids automated extraction. DK state coverage is better via HR-Manager/SRL + Jobindex. |
+| Name | What | DK relevance | Notes |
+|---|---|---|---|
+| Himalayas | Large remote-jobs API (~87k, incl. Contractor/Freelance + salary) | Remote | API works, **but ToS §30 forbids automated data gathering without written approval** — held document-only (same basis as EURES/Reddit). Revisit only with approval |
+| EURES | EU cross-border public jobs portal incl. DK | Some | undocumented backend; ToS forbids automated extraction. DK coverage better via HR-Manager + Jobindex |
+| Reddit r/forhire (+ r/freelance) | `[Hiring]` gig posts | Some (remote) | the public `.json` is now edge-blocked (403); 2023 API terms require OAuth for automated use |
 
----
+### 2e. Scrape-only / no machine-readable feed
 
-## Academic & public sector
+These are real & relevant but expose no public RSS/JSON (HTML-only, SPA, Cloudflare, or expired/empty feeds). Listed as places to **search/apply manually**.
 
-| Name | What | DK relevance | Access | Status | Notes |
-|---|---|---|---|---|---|
-| HR-Manager / SRL / Region Syddanmark | DK public-sector ATS (state + region) | Strong | no-key JSON | **Integrated** | `hrmanager.py` — generic, parameterised by `customer=` aliases. |
-| University of Copenhagen (KU) | `employment.ku.dk` vacancies (academic + admin) | Strong | (no working no-key feed) | Document-only | KU runs on HR-Manager under customer `cid=3010` = the **already-queried SRL alias** (KU = DepartmentId 20019), but the public syndicated `incads=true` feed returns a fixed 25-item Jobindex subset that **excludes** KU postings, and the bare `ku` alias returns an empty `Items[]`. So no no-key alias surfaces KU jobs today; direct coverage would need scraping `employment.ku.dk/all-vacancies/?show=<id>` (out of scope). Partially covered in spirit via SRL. |
-| EURAXESS Jobs (Denmark facet) | Pan-European research-jobs portal (postdoc/PhD/fellowships) | Strong | scrape (no read API/RSS) | Document-only | Only API is inbound XML submission; the DK-facet search is server-rendered HTML (fragile, ToS asks for politeness). |
-| DTU (Technical University) | DTU vacancies on Oracle Recruiting Cloud | Strong | no-auth CE endpoint (host/site-specific) | Document-only | Oracle CE endpoint works unauthenticated but host + `siteNumber` are DTU-specific and fragile. |
-| Akademikernes Jobbank (`jobbank.dk`) | DK's largest academic/graduate career board | Strong | RSS unconfirmed / scrape | Document-only | No verified RSS/XML/API (email jobagent only). Promote to integrable once a feed URL is confirmed. |
-| Graduateland (now JobTeaser) | Copenhagen-founded student/graduate portal | Strong | login (SPA; 410 on listings) | Document-only | Login-walled SPA; no public feed. Partly mitigated: many roles also land on The Hub + HR-Manager. |
-| Emply | Legacy DK public/uni/kommune ATS | Strong (shrinking) | per-tenant (fragmented) | Document-only | Being decommissioned → SRL on HR-Manager by end-2026. |
-| Lederne / CA / aka.dk JobMatch | A-kasse / career-org member tools | Some–Strong | login / member-only | Document-only | Member-only CV-matching, not browsable boards. |
-
----
-
-## Niche / staffing
-
-| Name | What | DK relevance | Access | Status | Notes |
-|---|---|---|---|---|---|
-| Academic Work / Moment.dk / Adecco / Randstad (DK) | Staffing & temp agencies in DK | Strong | scrape (JS-heavy / no feed) | Document-only | No public API/RSS; listings JS-rendered or behind custom apps. Email jobagents only. |
+| Cluster | Sites | Notes |
+|---|---|---|
+| **DK boards** | Jobfinder.dk / TechJob.dk (Ingeniøren), Jobzonen.dk, Børsen Karrierelink / Finans.dk | feed/API paths 404; content largely overlaps Jobindex |
+| **DK sector** | Sundhedsjobs.dk + danskesundhedsjobs.dk (health), Lærerjob.dk (teaching — feed is blog-only), Mediajob.dk / MediaWatch (media) | no jobs feed; Sundhedsjobs ingests via Emply only |
+| **DK universities (no clean feed)** | KU + RUC (on HR-Manager but the JSON alias returns empty), AAU (CMS API 403) | KU/RUC need an `employment.ku.dk` scrape; AU/SDU/DTU covered (SDU/DTU via `oracle.py`) |
+| **DK staffing** | Academic Work, Moment.dk, Adecco, Randstad, Hays / Michael Page / Robert Half | JS apps or internal AEM servlets; no public feed |
+| **DK consulting brokers** | Onsiter (Cloudflare 403), 7N (JS ATS), Freelancermap | detail pages public but no usable feed |
+| **Marketplaces** | PeoplePerHour, Guru, Twine, Workana, Truelancer, Fiverr, Useme | login/scrape; no public project feed |
+| **Remote long-tail** | NoDesk, Remote.co, EuropeRemotely, Remoters, Outsourcely, Dynamite Jobs, Remote Talent, RubyNow (expired cert), ai-jobs.net, cryptocurrencyjobs.co, builtin.com, Remote3, EU-Startups | 403/Cloudflare/SPA/404 — no consumable feed |
 
 ---
 
-## Investigated and excluded (not relevant platforms)
+## Investigated & excluded (defunct or not job platforms)
 
 | Name | Finding |
 |---|---|
-| Bloffin | No such DK freelance platform; only unrelated "Bloffin Technologies". Skip. |
-| Inhouse | Not a distinct platform; maps to in-house consultancies / Randstad Inhouse. Skip. |
-| Ballou | Ballou PR — a tech PR agency, not a marketplace and not DK-based. Skip. |
-| Comatch | Acquired by and fully merged into Malt (2022); covered by the Malt entry. |
+| GitHub Jobs | Shut down 2021 (positions API removed). |
+| Stack Overflow Jobs / Talent | Discontinued 2022. |
+| Bloffin / Inhouse / Ballou | Not DK job/freelance platforms (cloud co / staffing concept / PR agency). |
+| Comatch | Merged into Malt (2022) — see Malt. |
+| CVR / Virk | Company register, not vacancies. |
 
 ---
 
 ## What to integrate next (priority order)
 
-1. **University of Copenhagen (KU)** — would need a small `employment.ku.dk/all-vacancies` scraper
-   (no working HR-Manager alias); medium effort, high DK-academic value.
-2. **Findwork.dev** — optional keyed remote/tech complement; add behind a free token, off by default.
-3. **Brainville** — the best DK *consulting/gig* source, but only worthwhile if the user obtains a
-   paid, approved Brainville account (the spec is documented above and ready to build then).
-4. **More HR-Manager customer aliases** (regions/kommuner that use HR-Manager) — each is a one-line
-   addition to `hrmanager.py` once the public `customer=` alias is confirmed.
+1. **More HR-Manager `customer=` aliases** — kommuner/regions on the same platform (one-line each once
+   the public alias is confirmed; `regionh` just landed this way).
+2. **More Oracle-ORC tenants** — other DK orgs on Oracle (the `oracle.py` class already parameterises
+   host + siteNumber); confirm each tenant's host/`siteNumber`.
+3. **Findwork.dev** / **Landing.jobs** — easy remote/EU-tech complements (free token / no key); off by default.
+4. **University of Copenhagen (KU)** — needs an `employment.ku.dk/all-vacancies` scraper (no working
+   HR-Manager alias).
+5. **Brainville** — best DK consulting-gig source, but only if the user obtains a paid, approved account
+   (spec recorded above).
 
-Everything else above is document-only by nature (login / partner / paid / ToS-restricted /
-scrape-fragile) — kept here as the manual where-to-look list, not integration targets.
+Everything in Part 2b–2e is document-only by nature — kept here as the manual where-to-look list.
