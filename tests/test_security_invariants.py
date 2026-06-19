@@ -45,8 +45,10 @@ from jobfinder.sources.ats import ATSSource
 from jobfinder.sources.verama import VeramaSource
 from jobfinder.sources.hackernews import HackerNewsSource
 from jobfinder.sources.ted import TEDSource
-from jobfinder.sources.wpjobs import JobspressoSource, AuthenticJobsSource
+from jobfinder.sources.wpjobs import JobspressoSource, AuthenticJobsSource, EURemoteJobsSource
 from jobfinder.sources.oracle import OracleORCSource
+from jobfinder.sources.codeur import CodeurSource
+from jobfinder.sources.wearedevelopers import WeAreDevelopersSource
 
 _PKG = Path(__file__).resolve().parents[1] / "jobfinder"
 _PY_FILES = sorted(_PKG.rglob("*.py"))
@@ -87,6 +89,10 @@ _ALLOWED_HOSTS = {
     "authenticjobs.com",                            # Authentic Jobs WP job_feed
     "efzu.fa.em2.oraclecloud.com",                  # DTU — Oracle Recruiting Cloud
     "fa-eosd-saasfaprod1.fa.ocs.oraclecloud.com",   # SDU — Oracle Recruiting Cloud
+    "euremotejobs.com",                             # EU Remote Jobs WP job_feed
+    "www.codeur.com",                               # Codeur (FR gigs) RSS
+    "wad-api.wearedevelopers.com",                  # WeAreDevelopers API
+    "www.wearedevelopers.com",                      # WeAreDevelopers job links (built, not fetched)
     "www.linkedin.com",                             # LinkedIn guest source
     "api.anthropic.com",                            # Claude (anthropic SDK)
     "127.0.0.1", "localhost",                       # loopback
@@ -183,7 +189,8 @@ def test_runtime_egress_allowlist(monkeypatch):
         ItJobbankSource(), HRManagerSource(), JobicySource(), CareerjetSource(affid="x"),
         StepStoneDkSource(), RemoteOKSource(), WeWorkRemotelySource(), WorkingNomadsSource(),
         FreelancerSource(token="x"), ATSSource(), VeramaSource(), HackerNewsSource(), TEDSource(),
-        JobspressoSource(), AuthenticJobsSource(), OracleORCSource(),
+        JobspressoSource(), AuthenticJobsSource(), EURemoteJobsSource(), OracleORCSource(),
+        CodeurSource(), WeAreDevelopersSource(),
         AdzunaSource(app_id="x", app_key="y"), JoobleSource(api_key="k"),
         JSearchSource(api_key="k"), LinkedInSource(),
     ]

@@ -773,6 +773,81 @@ def test_wpjobs_multiple_job_types_resolve_to_gig():
         assert jobs[0].employment_type == "freelance"     # not lost to last-wins
 
 
+def test_codeur_parses_project_rss():
+    from jobfinder.sources.codeur import CodeurSource
+    rss = ('<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>'
+           '<item><title>Cherche dev Django freelance</title>'
+           '<link>https://www.codeur.com/projects/483569-x</link>'
+           '<pubDate>Mon, 18 May 2026 15:51:59 +0200</pubDate><guid>483569</guid>'
+           '<description>&lt;p&gt;Budget : 1 000 € - Catégories : Développement&lt;/p&gt;&lt;p&gt;Build a Django API&lt;/p&gt;</description>'
+           '</item></channel></rss>').encode("utf-8")
+    with patch("jobfinder.sources.codeur.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = CodeurSource().search("django", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Cherche dev Django freelance" and j.employment_type == "freelance"
+    assert j.remote is True and j.posted == "2026-05-18" and j.source == "Codeur (FR gigs)"
+    assert "Budget" in j.description and j.url.endswith("483569-x")
+
+
+def test_wearedevelopers_parses_json_and_skips_non_dict():
+    from jobfinder.sources.wearedevelopers import WeAreDevelopersSource
+    payload = {"data": [
+        "not-a-dict",
+        {"id": 48267, "title": "Ruby on Rails Developer", "company_name": "Acme",
+         "location": "Köln, Germany", "remote": True, "salary": "60k EUR",
+         "seniorities": ["Senior"], "skills": ["Ruby", "Rails"], "slug": "ror-dev",
+         "job_type": "job", "last_published_at": "2026-06-18T10:00:00+00:00"},
+    ]}
+    with patch("jobfinder.sources.wearedevelopers.requests.get", return_value=_FakeResp(payload)):
+        jobs = WeAreDevelopersSource().search("ruby", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Ruby on Rails Developer" and j.company == "Acme" and j.remote is True
+    assert j.posted == "2026-06-18" and j.url.endswith("/jobs/48267/ror-dev") and "Ruby" in j.description
+
+
+def test_euremotejobs_wpfeed_defaults_company_location():
+    from jobfinder.sources.wpjobs import EURemoteJobsSource
+    rss = ('<?xml version="1.0" encoding="UTF-8"?>'
+           '<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+           '<channel><item><title>Online Math Teacher</title>'
+           '<link>https://euremotejobs.com/job/x/</link>'
+           '<pubDate>Thu, 18 Jun 2026 15:24:45 +0000</pubDate>'
+           '<content:encoded>&lt;p&gt;Remote math tutoring&lt;/p&gt;</content:encoded></item>'
+           '</channel></rss>').encode("utf-8")
+    with patch("jobfinder.sources.wpjobs.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = EURemoteJobsSource().search("math", limit=5)
+    assert len(jobs) == 1
+    j = jobs[0]
+    assert j.title == "Online Math Teacher" and j.company == "" and j.location == "Remote"
+    assert j.remote is True and j.source == "EU Remote Jobs"
+
+
+def test_wpfeed_no_location_field_not_zeroed_by_location_filter():
+    from jobfinder.sources.wpjobs import EURemoteJobsSource
+    rss = ('<?xml version="1.0" encoding="UTF-8"?>'
+           '<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">'
+           '<channel><item><title>Remote Data Engineer</title>'
+           '<link>https://euremotejobs.com/job/y/</link>'
+           '<pubDate>Thu, 18 Jun 2026 00:00:00 +0000</pubDate>'
+           '<content:encoded>&lt;p&gt;Data pipelines&lt;/p&gt;</content:encoded></item>'
+           '</channel></rss>').encode("utf-8")
+    with patch("jobfinder.sources.wpjobs.requests.get", return_value=_FakeRssResp(rss)):
+        jobs = EURemoteJobsSource().search("data", location="copenhagen", limit=5)
+    assert len(jobs) == 1                                # no location field → not filtered out
+
+
+def test_wearedevelopers_tolerates_nonstring_job_type():
+    from jobfinder.sources.wearedevelopers import WeAreDevelopersSource
+    payload = {"data": [{"id": 1, "title": "Go Developer", "company_name": "C", "location": "Berlin",
+                         "skills": ["Go"], "slug": "d", "job_type": ["job"], "remote": False,
+                         "last_published_at": "2026-06-18"}]}
+    with patch("jobfinder.sources.wearedevelopers.requests.get", return_value=_FakeResp(payload)):
+        jobs = WeAreDevelopersSource().search("go", limit=5)
+    assert len(jobs) == 1 and jobs[0].employment_type == ""   # non-string job_type → "", record kept
+
+
 def test_oracle_orc_parses_university_jobs():
     from jobfinder.sources.oracle import OracleORCSource
     payload = {"items": [{"TotalJobsCount": 1, "requisitionList": [

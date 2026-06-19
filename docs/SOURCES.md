@@ -23,14 +23,14 @@ ethically ingestible (login/paid/ToS/scrape).
 
 ---
 
-## At a glance — 25 integrated sources
+## At a glance — 28 integrated sources
 
 | Group | Sources |
 |---|---|
 | **DK (default on)** | The Hub · The Muse · it-jobbank · HR-Manager/SRL (state + Region Syddanmark + Region Hovedstaden) · Remotive · Arbeitnow |
 | **DK (opt-in)** | StepStone.dk · Jobindex · **Universities — DTU/SDU (Oracle ORC)** · Adzuna* · Jooble* · Careerjet* |
-| **Remote / global (opt-in)** | Jobicy · RemoteOK · We Work Remotely · Working Nomads · Jobspresso · Authentic Jobs · LinkedIn (guest) · JSearch* |
-| **Consulting / gigs (opt-in)** | Verama · Hacker News · EU TED (tenders) · Freelancer.com* |
+| **Remote / EU / global (opt-in)** | Jobicy · RemoteOK · We Work Remotely · Working Nomads · Jobspresso · Authentic Jobs · **EU Remote Jobs** · **WeAreDevelopers** (DACH/pan-EU) · LinkedIn (guest) · JSearch* |
+| **Consulting / gigs (opt-in)** | Verama · Hacker News · EU TED (tenders) · **Codeur** (FR projects) · Freelancer.com* |
 | **Company boards (opt-in)** | ATS — Greenhouse/Lever/Ashby (Trustpilot, Too Good To Go, Veo, Corti, Pleo, Lunar, Planday, Netlight) |
 
 `*` = needs a free API key. A **"Consulting / contract only"** search toggle filters every source
@@ -66,6 +66,8 @@ Public RSS/JSON feeds, usable without any credential.
 | Working Nomads | Curated remote-jobs JSON | Remote, global | **Integrated** (opt-in) | `workingnomads.py` |
 | Jobspresso | Curated remote board (WP Job Manager `job_feed`) | Remote, contract mix | **Integrated** (opt-in) | `wpjobs.py` |
 | Authentic Jobs | Remote design/dev board (WP `job_feed`) | Remote, contract mix | **Integrated** (opt-in) | `wpjobs.py` |
+| **EU Remote Jobs** | EU-wide remote board (WP Job Manager `?feed=job_feed`) | EU remote | **Integrated** (opt-in) | `wpjobs.py` |
+| **WeAreDevelopers** | Vienna/DACH/pan-EU tech board, public JSON API (~hundreds of thousands of listings) | EU tech, remote-filterable | **Integrated** (opt-in) | `wearedevelopers.py` |
 | LinkedIn (guest) | Public `jobs-guest` search (no login) | Strong (geoId) | **Integrated** (opt-in) | `linkedin.py` — polite/low-volume |
 | **Landing.jobs** | EU tech board, JSON `api/v1/jobs` (salary, relocation, country_code) | EU; remote/relocation | **Integrable (no-key)** | best DK-adjacency of the unwired no-key finds; HTML in descriptions → `strip_html` |
 | **4dayweek.io** | ~18k 4-day-week roles, JSON `api/jobs` (rich: salary, stack, lat/lon) | Global, EU coverage | **Integrable (no-key)** | undocumented internal feed — poll politely; niche (4-day-week only) |
@@ -77,6 +79,7 @@ Public RSS/JSON feeds, usable without any credential.
 | Verama (Ework Group) | Public feed of open **consulting assignments** (fixed-term, rate, hours, dates) | Strong (Nordic incl. DK) | **Integrated** (opt-in) | `verama.py` — `app.verama.com/api/public/job-requests` |
 | Hacker News | Monthly "Freelancer? Seeking freelancer?" threads (Algolia API) | Remote/tech gigs | **Integrated** (opt-in) | `hackernews.py` |
 | EU TED | DK public-sector IT/business **consultancy tenders** (CPV 72/79) — limited-time projects you bid on | Strong (DK public) | **Integrated** (opt-in) | `ted.py` — labelled "tender"; subsumes udbud.dk + Mercell |
+| **Codeur** | French freelance-**project** marketplace; public RSS of every newly-posted client gig | EU (FR; remote-deliverable) | **Integrated** (opt-in) | `codeur.py` — `/projects.rss`; anonymous clients, budget in description |
 
 ### Company boards (ATS)
 
@@ -153,6 +156,7 @@ These are real & relevant but expose no public RSS/JSON (HTML-only, SPA, Cloudfl
 | **DK consulting brokers** | Onsiter (Cloudflare 403), 7N (JS ATS), Freelancermap | detail pages public but no usable feed |
 | **Marketplaces** | PeoplePerHour, Guru, Twine, Workana, Truelancer, Fiverr, Useme | login/scrape; no public project feed |
 | **Remote long-tail** | NoDesk, Remote.co, EuropeRemotely, Remoters, Outsourcely, Dynamite Jobs, Remote Talent, RubyNow (expired cert), ai-jobs.net, cryptocurrencyjobs.co, builtin.com, Remote3, EU-Startups | 403/Cloudflare/SPA/404 — no consumable feed |
+| **EU freelance/contracting (DACH/FR/Nordic/UK)** | GULP, freelance.de, freelancermap (paid Enterprise XML), Expertlead, SOLCOM (geo-blocked), Westhouse, Proxify, Cinode, Talmix, Lemon.io, Gigster, Distributed, Malt, Twago, Outvise, Jobgether (empty stub), EuroTechJobs, eurojobs (inbound only), iAgora | login / WAF / Cloudflare / vetted-screening / paid / inbound-multiposting — no public read feed. The European freelance scene mirrors the Nordic one: marketplaces gate listings behind an account. |
 
 ---
 

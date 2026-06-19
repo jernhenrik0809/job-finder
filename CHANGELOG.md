@@ -2,6 +2,40 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.25.0] — 2026-06-19
+
+### Added — European (non-DK) remote / freelance sources (→ 28)
+A dedicated sweep of the European freelance/consulting scene (DACH, France/Benelux/Iberia, Nordic,
+UK, pan-EU) found three usable no-key feeds; the rest is gated (now documented):
+- **Codeur** (`codeur.py`) — French freelance-**project** marketplace; public `/projects.rss` of
+  every newly-posted client gig (web/dev/SEO/design/marketing). Every item is contract/freelance.
+- **EU Remote Jobs** (`wpjobs.py`) — EU-wide **remote** board on WP Job Manager (`?feed=job_feed`),
+  reusing the shared WP parser.
+- **WeAreDevelopers** (`wearedevelopers.py`) — Vienna/pan-EU tech board, public JSON API
+  (~hundreds of thousands of listings) with `remote` + `location` for DK/remote filtering.
+
+### Researched but not added (documented in `docs/SOURCES.md`)
+- The European freelance/contracting heavyweights are all gated: **GULP** (login SPA),
+  **freelance.de** (WAF/403), **freelancermap** (RSS retired; paid Enterprise XML), **Expertlead**
+  (Cloudflare/vetted), **SOLCOM / Westhouse** (registration + geo-blocked), **Proxify / Cinode /
+  Talmix / Lemon.io / Gigster / Distributed** (vetted/login), **Malt / Twago / Outvise** (login),
+  **Jobgether** (empty stub), **EuroTechJobs / eurojobs / iAgora** (scrape/inbound-only).
+
+### Security
+- Allow-list + runtime egress test extended to `euremotejobs.com`, `www.codeur.com`,
+  `wad-api.wearedevelopers.com`, `www.wearedevelopers.com`.
+
+### Fixed (from adversarial review)
+- **WP-feed location filter** (shared parser): a board with no `location` field (EU Remote Jobs)
+  was zeroed out by any location query (`loc not in ""` was always true). An unknown location is no
+  longer treated as a non-match.
+- **WeAreDevelopers** `_emp_type` now coerces a non-string `job_type` instead of letting the
+  per-record `try/except` silently drop an otherwise-valid listing.
+
+### Tests
+- 265 → 270 (Codeur project-RSS parsing, WeAreDevelopers JSON + non-dict + non-string-job_type
+  tolerance, EU Remote Jobs WP-feed company/location fallback + location-filter regression).
+
 ## [1.24.0] — 2026-06-19
 
 ### Added — Danish universities + a fuller catalog (→ 25)

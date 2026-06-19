@@ -15,8 +15,8 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
 
 1. **Reads your CV** (PDF / DOCX / TXT) and extracts your skills, job titles,
    seniority and years of experience.
-2. **Searches live job boards** for matching roles — **25 sources**, the no-key Danish ones
-   **on by default**, broadening to remote / short-term / consulting work:
+2. **Searches live job boards** for matching roles — **28 sources**, the no-key Danish ones
+   **on by default**, broadening to remote / short-term / consulting work across Europe:
    - **Denmark:** **it-jobbank** & **Public sector (HR-Manager / SRL)** (default) — DK's leading IT
      board plus the public-sector backbone: one feed spans ~140 Danish **state** institutions
      (Statens Rekrutteringsløsning) + Region Syddanmark + Region Hovedstaden; **The Hub** & **The
@@ -24,7 +24,8 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
      RSS — Jobindex is DK's largest, also covers Ofir); **Universities** (opt-in; DTU & SDU via their
      public Oracle Recruiting Cloud APIs); **Adzuna**, **Jooble** & **Careerjet** (free-key, strong DK).
    - **Remote / global:** **Remotive** & **Arbeitnow** (default), plus **Jobicy**, **RemoteOK**,
-     **We Work Remotely** & **Working Nomads** (opt-in, no-key remote boards).
+     **We Work Remotely**, **Working Nomads**, **EU Remote Jobs** & **WeAreDevelopers** (DACH/pan-EU
+     tech) — opt-in, no-key remote boards.
    - **Company boards (ATS):** **Greenhouse / Lever / Ashby** — the public, no-key APIs behind
      companies' own careers pages, giving **full job descriptions** straight from a curated list of
      Danish/Nordic firms (Trustpilot, Pleo, Corti, Lunar, Veo, Too Good To Go…). Opt-in; extend the
@@ -32,8 +33,9 @@ skills and experience. Runs entirely on your local PC with a clean web UI.
    - **Consulting / freelance gigs:** **Verama** (Ework Group's public consultant-assignment feed —
      fixed-term contracts with rate & hours, no key), **Hacker News** "Seeking freelancer" monthly
      threads (no key), **EU TED** (Danish public-sector IT/consultancy **tenders** — limited-time
-     projects, no key), **Jobspresso** & **Authentic Jobs** (remote/contract boards, no key), and
-     **Freelancer.com** (official API, free token). All opt-in.
+     projects, no key), **Codeur** (French freelance-project marketplace, no key), **Jobspresso** &
+     **Authentic Jobs** (remote/contract boards, no key), and **Freelancer.com** (official API, free
+     token). All opt-in.
    - **Consulting / contract only:** a search toggle that keeps just contract/freelance work across
      every source that exposes an employment type — turning the app into a **job board for a
      consultant**.
@@ -338,7 +340,7 @@ Job finder/
 │  ├─ drafts.py           # application-draft generation (template + optional Claude)
 │  ├─ data/skills.txt     # curated skills list (editable)
 │  ├─ static/             # web UI (HTML/CSS/JS, no build step)
-│  └─ sources/            # 25 sources + normalize.py (see docs/SOURCES.md for the full catalog)
+│  └─ sources/            # 28 sources + normalize.py (see docs/SOURCES.md for the full catalog)
 └─ tests/                 # pytest unit tests + sample CV
 ```
 

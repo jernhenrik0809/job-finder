@@ -47,6 +47,9 @@ _SOURCES: tuple[SourceMeta, ...] = (
     SourceMeta("ted", "ted", "TEDSource", ("tenders",)),
     SourceMeta("jobspresso", "wpjobs", "JobspressoSource"),
     SourceMeta("authenticjobs", "wpjobs", "AuthenticJobsSource", ("authentic",)),
+    SourceMeta("euremotejobs", "wpjobs", "EURemoteJobsSource", ("euremote",)),
+    SourceMeta("codeur", "codeur", "CodeurSource"),
+    SourceMeta("wearedevelopers", "wearedevelopers", "WeAreDevelopersSource", ("wad",)),
     SourceMeta("oracle", "oracle", "OracleORCSource", ("dtu", "sdu", "universities")),
     SourceMeta("jsearch", "jsearch", "JSearchSource"),
 )

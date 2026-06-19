@@ -63,8 +63,8 @@ class _WPJobFeed(JobSource):
             desc = strip_html(f.get("encoded") or f.get("description"))
             if kw and not any(w in f"{title} {company} {desc}".lower() for w in kw):
                 continue
-            if loc and loc not in loc_name.lower():
-                continue
+            if loc and loc_name and loc not in loc_name.lower():
+                continue                               # unknown (empty) location ≠ a non-match
             jobs.append(Job(
                 title=title,
                 company=company,
@@ -91,3 +91,11 @@ class AuthenticJobsSource(_WPJobFeed):
     name = "authenticjobs"
     _FEED = "https://authenticjobs.com/?feed=job_feed"
     _LABEL = "Authentic Jobs"
+
+
+class EURemoteJobsSource(_WPJobFeed):
+    # EU-wide remote board; company/location aren't separate XML fields here (they live in the
+    # description body), so company comes up "" and location defaults to "Remote" — acceptable.
+    name = "euremotejobs"
+    _FEED = "https://euremotejobs.com/?feed=job_feed"
+    _LABEL = "EU Remote Jobs"
