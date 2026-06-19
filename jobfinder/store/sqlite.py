@@ -18,9 +18,11 @@ import time
 from pathlib import Path
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS)
 from ..applications import Application
+from ..consultants import Consultant
 from ..cv_parser import CVProfile
+from ..house import House, HOUSE_ID
 from ..notifications import Notification
 from ..saved_searches import SavedSearch
 
@@ -30,9 +32,11 @@ CREATE TABLE IF NOT EXISTS examples      (id TEXT PRIMARY KEY, created REAL NOT 
 CREATE TABLE IF NOT EXISTS applications  (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS saved_searches(id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS consultants   (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS house         (id TEXT PRIMARY KEY, created REAL NOT NULL, data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
 """
-_SCHEMA_VERSION = 4
+_SCHEMA_VERSION = 5
 
 
 class SqliteStore(Store):
@@ -50,16 +54,21 @@ class SqliteStore(Store):
 
     def _migrate(self) -> None:
         with self._lock, self._conn:
-            self._conn.executescript(_SCHEMA)
+            self._conn.executescript(_SCHEMA)    # idempotent schema — also creates any new tables
             row = self._conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
             if row is None:                      # fresh DB — record the current version
                 self._conn.execute("INSERT INTO schema_version(version) VALUES(?)", (_SCHEMA_VERSION,))
                 return
             version = row["version"]
-            if version < 2:                      # v1.x → v2: carry old drafts into applications
-                self._migrate_v1_drafts(self._conn)
-            # v2 → v3 adds saved_searches; v3 → v4 adds notifications. Both are new tables
-            # (already created above via IF NOT EXISTS); there is no data to migrate.
+            # Ordered DATA-backfill steps, keyed by the version they upgrade TO. The schema
+            # itself (CREATE TABLE IF NOT EXISTS above) is applied every open, so a version
+            # that only ADDS empty tables (v3 saved_searches, v4 notifications, v5
+            # consultants/house) needs NO step here. A step runs only when the stored version
+            # is below its target, so a future data backfill can't be skipped by a later bump.
+            steps = [(2, self._migrate_v1_drafts)]   # v1.x → v2: carry old drafts into applications
+            for to_version, step in steps:
+                if version < to_version:
+                    step(self._conn)
             if version < _SCHEMA_VERSION:
                 self._conn.execute("UPDATE schema_version SET version=?", (_SCHEMA_VERSION,))
 
@@ -210,6 +219,45 @@ class SqliteStore(Store):
         with self._lock, self._conn:
             self._conn.execute("DELETE FROM saved_searches WHERE id=?", (search_id,))
 
+    # --- consultants (the bench) ---
+    def save_consultant(self, consultant: Consultant) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO consultants(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (consultant.id, time.time(), json.dumps(consultant.to_dict())),
+            )
+            self._evict("consultants", "id", MAX_CONSULTANTS)
+
+    def get_consultant(self, consultant_id: str) -> Consultant | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM consultants WHERE id=?", (consultant_id,)).fetchone()
+        return Consultant.from_dict(json.loads(row["data"])) if row else None
+
+    def list_consultants(self) -> list[Consultant]:
+        with self._lock:
+            rows = self._conn.execute("SELECT data FROM consultants ORDER BY created ASC").fetchall()
+        return [Consultant.from_dict(json.loads(r["data"])) for r in rows]
+
+    def delete_consultant(self, consultant_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM consultants WHERE id=?", (consultant_id,))
+
+    # --- house (single-row identity) ---
+    def get_house(self) -> House | None:
+        with self._lock:
+            row = self._conn.execute("SELECT data FROM house WHERE id=?", (HOUSE_ID,)).fetchone()
+        return House.from_dict(json.loads(row["data"])) if row else None
+
+    def save_house(self, house: House) -> None:
+        house.id = HOUSE_ID                       # enforce the single-row invariant
+        with self._lock, self._conn:
+            self._conn.execute(
+                "INSERT INTO house(id, created, data) VALUES(?,?,?) "
+                "ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+                (HOUSE_ID, time.time(), json.dumps(house.to_dict())),
+            )
+
     # --- data rights ---
     def export_all(self) -> dict:
         with self._lock:
@@ -218,12 +266,16 @@ class SqliteStore(Store):
             apps = self._conn.execute("SELECT data FROM applications ORDER BY created ASC").fetchall()
             ss = self._conn.execute("SELECT data FROM saved_searches ORDER BY created ASC").fetchall()
             notes = self._conn.execute("SELECT data FROM notifications ORDER BY created DESC").fetchall()
+            cons = self._conn.execute("SELECT data FROM consultants ORDER BY created ASC").fetchall()
+            house = self._conn.execute("SELECT data FROM house WHERE id=?", (HOUSE_ID,)).fetchone()
         return {
             "profiles": {r["cv_id"]: json.loads(r["data"]) for r in prof},
             "examples": [dict(r) for r in ex],
             "applications": [json.loads(r["data"]) for r in apps],
             "saved_searches": [json.loads(r["data"]) for r in ss],
             "notifications": [json.loads(r["data"]) for r in notes],
+            "consultants": [json.loads(r["data"]) for r in cons],
+            "house": json.loads(house["data"]) if house else {},
         }
 
     def delete_all(self) -> None:
@@ -231,7 +283,8 @@ class SqliteStore(Store):
         # a gap. VACUUM can't run inside a transaction, so commit() explicitly first, then VACUUM
         # runs in autocommit — still under the lock.
         with self._lock:
-            for table in ("profiles", "examples", "applications", "saved_searches", "notifications"):
+            for table in ("profiles", "examples", "applications", "saved_searches",
+                          "notifications", "consultants", "house"):
                 self._conn.execute(f"DELETE FROM {table}")
             self._conn.commit()
             try:

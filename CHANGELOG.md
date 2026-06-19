@@ -2,6 +2,30 @@
 
 All notable changes to Job Finder are documented here. Dates are YYYY-MM-DD.
 
+## [1.27.0] — 2026-06-19
+
+### Added — consulting engine: bench data model + store (Phase 1 foundation)
+The first persistent slice of the consulting-house pursuit engine (see `docs/BUILD_PLAN.md`).
+- **`Consultant`** (`consultants.py`) — the house's bench: a durable, multi-person record with
+  the field shapes a *bid* needs, frozen up front because they are ruinous to backfill later —
+  `engagement_type` (employee/associate/subcontractor), `right_to_present`, `data_origin`
+  provenance, `cost_rate`/`sell_rate`/`currency`, availability window, clearance/certs, plus a
+  `cv_id` link to a parsed `CVProfile` so onboarding reuses the existing upload path.
+- **`House`** (`house.py`) — a single-row identity (name/voice/signatory/boilerplate) that will
+  ground proposals in a consistent house voice.
+- **Store CRUD** for both across `SqliteStore` + `MemoryStore`; schema **v4 → v5** with the
+  migration path restructured into ordered data-backfill steps separate from the idempotent
+  `CREATE TABLE IF NOT EXISTS` schema (so a future backfill can't be skipped by a later bump).
+  Bench cap sized for a ~100-consultant house (`MAX_CONSULTANTS=300`).
+- **Reflective data-rights test** — replaces the hard-coded export bundle assertion with one
+  that reflects over `sqlite_master`: every user-data table must appear in `export_all()` and be
+  emptied by `delete_all()`, so a newly-added entity can't silently escape export/erasure.
+
+### Not built (owner decision)
+- GDPR consent/retention machinery is intentionally **not** built; only a free-text
+  `consent_note` + a one-field `data_origin` provenance are kept (provenance is free to capture
+  now and impossible to reconstruct later). Encryption-at-rest remains deferred.
+
 ## [1.26.1] — 2026-06-19
 
 ### Fixed — silent de-dup data loss on gig sources (P0-JOBID-SOURCE-UID)

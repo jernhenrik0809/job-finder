@@ -9,7 +9,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from ..applications import Application
+from ..consultants import Consultant
 from ..cv_parser import CVProfile
+from ..house import House
 from ..notifications import Notification
 from ..saved_searches import SavedSearch
 
@@ -18,6 +20,7 @@ MAX_EXAMPLES = 10
 MAX_APPLICATIONS = 200
 MAX_SAVED_SEARCHES = 40
 MAX_NOTIFICATIONS = 100
+MAX_CONSULTANTS = 300            # the bench — sized well above a ~100-consultant house
 
 
 class Store(ABC):
@@ -56,22 +59,33 @@ class Store(ABC):
     def delete_saved_search(self, search_id: str) -> None: ...
     @abstractmethod
     def update_saved_search(self, search_id: str, mutator) -> SavedSearch | None:
-        """Atomically load → ``mutator(search)`` → save under one lock. Returns the updated
-        search (or None if it doesn't exist). Prevents lost updates when the background alert
-        sweep and a foreground /run·/seen request touch the same row."""
-        ...
-    @abstractmethod
-    def update_saved_search(self, search_id: str, mutator) -> SavedSearch | None:
         """Atomically load → ``mutator(search)`` → save under a single lock, so a
         background sweep and a foreground run/seen can't clobber each other's
         seen_ids/new_count (lost update). Returns the updated search, or None if it's gone."""
         ...
 
+    # --- consultants (the house's bench) ---
+    @abstractmethod
+    def save_consultant(self, consultant: Consultant) -> None: ...
+    @abstractmethod
+    def get_consultant(self, consultant_id: str) -> Consultant | None: ...
+    @abstractmethod
+    def list_consultants(self) -> list[Consultant]: ...
+    @abstractmethod
+    def delete_consultant(self, consultant_id: str) -> None: ...
+
+    # --- house (single-row identity that grounds proposals) ---
+    @abstractmethod
+    def get_house(self) -> House | None: ...
+    @abstractmethod
+    def save_house(self, house: House) -> None: ...
+
     # --- data rights (export / wipe everything) ---
     @abstractmethod
     def export_all(self) -> dict:
-        """A serializable bundle of everything stored (profiles, examples, applications,
-        saved searches, notifications). Excludes API keys — those live outside the DB."""
+        """A serializable bundle of EVERY user-data table (one key per table). Excludes API
+        keys — those live outside the DB. The reflective data-rights test asserts this bundle
+        names every table, so a newly-added entity can't silently escape export/erasure."""
         ...
     @abstractmethod
     def delete_all(self) -> None:

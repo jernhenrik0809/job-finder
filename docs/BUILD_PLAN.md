@@ -24,7 +24,7 @@ These guardrails are **decided** and constrain every ticket below:
 
 - **Channel priority CORRECTED — postings are primary.** The posting-path tickets (`P2-BENCH-POSTING-PATH-PLUGGABLE`, `P3-POSTING-PATH`, `P2-POSTING-SWEEP-BENCH`) **move into Phase 1**; the direct-warm tickets (`P1-PASTE-INTAKE`, `P1-CLIENT-CONTACT-ENTITY`, `P1-CLIENT-VIEW-REMINDERS`) **move to Phase 3**. The ticket specs are unchanged — only their order shifts. Posting scope = **all platforms, gig-focused** (default the bench flow to the `gigs_only` set, but allow any ingested posting).
 - **Encryption-at-rest = DEFERRED** until the bench holds real CVs. Build the pluggable cipher seam later; plaintext is acceptable for prototyping. `P0-ENC-REST` **drops off the near-term critical path** (it was already flagged droppable).
-- **GDPR default = legitimate-interest basis, 24-month flag-only retention** (`P0-CONSENT` keeps the consent/retention *fields*; the default `consent_basis` is `legitimate_interest`).
+- **GDPR de-prioritized (owner steer, 2026-06-19): "we are not worried about that."** Do NOT build consent/retention machinery or gate work on compliance. `P0-CONSENT` is demoted: the `Consultant` entity is still created (it's the bench record), but it carries at most a single optional free-text `consent_note` for hygiene — no retention sweep, no lawful-basis enforcement. (Past-client/NDA confidentiality is a separate *business* concern and still matters.)
 - **Storage caps sized for a ~100-consultant bench** (`P0-CAPS-WARN`): set `MAX_CONSULTANTS` and the credibility caps comfortably above 100 (e.g. 300), with a near-cap warning.
 - **De-dup field name frozen as `source_uid`** — shipped in v1.26.1.
 
@@ -143,7 +143,7 @@ These guardrails are **decided** and constrain every ticket below:
 
 ## 3. Owner decisions needed
 
-> **Resolved 2026-06-19** (see the block in §1): #1 encryption → **deferred**; #2 field name → **`source_uid`** (shipped); #3 GDPR → **legitimate-interest / 24mo**; #4 caps → **~100 bench**; #9 posting sources → **all platforms, gig-focused**. The items below remain for when their ticket comes up.
+> **Resolved 2026-06-19** (see the block in §1): #1 encryption → **deferred**; #2 field name → **`source_uid`** (shipped); #3 GDPR → **de-prioritized, not building it** (owner steer); #4 caps → **~100 bench**; #9 posting sources → **all platforms, gig-focused**. The items below remain for when their ticket comes up.
 
 These block or shape the build. The first two gate Phase 0.
 

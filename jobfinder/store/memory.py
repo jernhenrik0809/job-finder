@@ -9,9 +9,11 @@ from __future__ import annotations
 import threading
 
 from .base import (Store, MAX_PROFILES, MAX_EXAMPLES, MAX_APPLICATIONS, MAX_SAVED_SEARCHES,
-                   MAX_NOTIFICATIONS)
+                   MAX_NOTIFICATIONS, MAX_CONSULTANTS)
 from ..applications import Application
+from ..consultants import Consultant
 from ..cv_parser import CVProfile
+from ..house import House, HOUSE_ID
 from ..notifications import Notification
 from ..saved_searches import SavedSearch
 
@@ -28,6 +30,8 @@ class MemoryStore(Store):
         self._apps: dict[str, Application] = {}
         self._searches: dict[str, SavedSearch] = {}
         self._notes: dict[str, Notification] = {}
+        self._consultants: dict[str, Consultant] = {}
+        self._house: House | None = None
         # A single non-reentrant lock guards every dict access, so a background alert sweep
         # writing (save_notification / update_saved_search) can't race a concurrent export_all
         # iteration ("dictionary changed size") or a delete_all clear. No method calls another
@@ -98,6 +102,34 @@ class MemoryStore(Store):
             mutator(s)
             return s
 
+    # --- consultants (the bench) ---
+    def save_consultant(self, consultant: Consultant) -> None:
+        with self._lock:
+            self._consultants[consultant.id] = consultant
+            _evict(self._consultants, MAX_CONSULTANTS)
+
+    def get_consultant(self, consultant_id: str) -> Consultant | None:
+        with self._lock:
+            return self._consultants.get(consultant_id)
+
+    def list_consultants(self) -> list[Consultant]:
+        with self._lock:
+            return list(self._consultants.values())
+
+    def delete_consultant(self, consultant_id: str) -> None:
+        with self._lock:
+            self._consultants.pop(consultant_id, None)
+
+    # --- house (single-row identity) ---
+    def get_house(self) -> House | None:
+        with self._lock:
+            return self._house
+
+    def save_house(self, house: House) -> None:
+        house.id = HOUSE_ID
+        with self._lock:
+            self._house = house
+
     def export_all(self) -> dict:
         with self._lock:
             return {
@@ -106,6 +138,8 @@ class MemoryStore(Store):
                 "applications": [a.to_dict() for a in self._apps.values()],
                 "saved_searches": [s.to_dict() for s in self._searches.values()],
                 "notifications": [n.to_dict() for n in self._notes.values()],
+                "consultants": [c.to_dict() for c in self._consultants.values()],
+                "house": self._house.to_dict() if self._house else {},
             }
 
     def delete_all(self) -> None:
@@ -115,6 +149,8 @@ class MemoryStore(Store):
             self._apps.clear()
             self._searches.clear()
             self._notes.clear()
+            self._consultants.clear()
+            self._house = None
 
     def save_notification(self, note: Notification) -> None:
         with self._lock:

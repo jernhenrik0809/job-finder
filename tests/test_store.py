@@ -168,10 +168,67 @@ def test_export_and_delete_all(tmp_path):
 
     s.delete_all()
     empty = s.export_all()
-    assert empty == {"profiles": {}, "examples": [], "applications": [],
-                     "saved_searches": [], "notifications": []}
+    assert all(not v for v in empty.values())        # every section emptied (robust to new tables)
     assert s.get_profile("cv1") is None and s.list_applications() == []
     s.close()
+
+
+def test_export_delete_all_covers_every_table(tmp_path):
+    """Reflective data-rights guard: every user-data table must appear in export_all() and be
+    emptied by delete_all(), so a newly-added entity can't silently escape export/erasure."""
+    from jobfinder.saved_searches import new_saved_search
+    from jobfinder.notifications import Notification
+    from jobfinder.consultants import Consultant
+    from jobfinder.house import House
+    s = SqliteStore(tmp_path / "jf.db")
+    s.save_profile("cv1", build_profile(CV))
+    s.save_example({"id": "e1", "name": "ex", "text": "t", "chars": 1})
+    s.save_application(_app("a1"))
+    s.save_saved_search(new_saved_search("S", {"cv_id": "cv1", "keywords": "py"}))
+    s.save_notification(Notification(kind="reminder", title="T", created=1.0))
+    s.save_consultant(Consultant(name="Anna", id="c1", skills=["python"]))
+    s.save_house(House(name="Acme Consulting"))
+
+    tables = {r["name"] for r in s._conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    tables -= {"schema_version", "sqlite_sequence"}
+    bundle = s.export_all()
+    for t in tables:
+        assert t in bundle, f"table {t!r} missing from export_all()"
+        assert bundle[t], f"table {t!r} populated but missing/empty in export_all()"
+
+    s.delete_all()
+    empty = s.export_all()
+    for t in tables:
+        assert not empty[t], f"table {t!r} not emptied by delete_all()"
+    s.close()
+
+
+def test_consultant_and_house_round_trip(tmp_path):
+    from jobfinder.consultants import Consultant, new_consultant
+    from jobfinder.house import House, HOUSE_ID
+    db = tmp_path / "jf.db"
+    s1 = SqliteStore(db)
+    c = new_consultant("Lars Holm", id="c1", skills=["python", "aws"], seniority="senior",
+                       engagement_type="subcontractor", cost_rate=600.0, sell_rate=950.0,
+                       currency="DKK", data_origin="third_party", right_to_present=True)
+    s1.save_consultant(c)
+    s1.save_house(House(name="Nordic Consulting", voice="pragmatic", signatory="Jane, Partner"))
+    s1.close()
+
+    s2 = SqliteStore(db)                              # reopen: bench survives restart
+    got = s2.get_consultant("c1")
+    assert got is not None and got.name == "Lars Holm" and got.engagement_type == "subcontractor"
+    assert got.cost_rate == 600.0 and got.currency == "DKK" and got.data_origin == "third_party"
+    assert [x.id for x in s2.list_consultants()] == ["c1"]
+    h = s2.get_house()
+    assert h is not None and h.id == HOUSE_ID and h.name == "Nordic Consulting"
+    # save_house enforces the single-row id even if a different id is passed
+    s2.save_house(House(name="Renamed", id="bogus"))
+    assert s2.get_house().name == "Renamed" and s2.get_house().id == HOUSE_ID
+    s2.delete_consultant("c1")
+    assert s2.get_consultant("c1") is None
+    s2.close()
 
 
 def test_memory_store_basics():
